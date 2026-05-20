@@ -1,0 +1,21 @@
+# CircAp { #astroapers.CircAp }
+
+```python
+CircAp(positions, r, *, validate=True)
+```
+
+Circular aperture in pixel coordinates.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+<code>[**positions**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple or array - like]{.parameter-annotation}</code>
+
+:   Aperture center or centers as ``(x, y)`` pixel coordinates. Multiple centers are accepted as an ``(N, 2)`` array-like object.
+
+<code>[**r**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Aperture radius in pixels.
+
+<code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
+
+:   If `False`, skip input validation and assume finite, positive geometry and normalized positions. This is intended for expert high-throughput code paths.

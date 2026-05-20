@@ -1,0 +1,29 @@
+# EllipAp { #astroapers.EllipAp }
+
+```python
+EllipAp(positions, a, b, theta=0.0, *, validate=True)
+```
+
+Elliptical aperture in pixel coordinates.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+<code>[**positions**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple or array - like]{.parameter-annotation}</code>
+
+:   Aperture center or centers as ``(x, y)`` pixel coordinates. Multiple centers are accepted as an ``(N, 2)`` array-like object.
+
+<code>[**a**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Semimajor and semiminor axis lengths in pixels.
+
+<code>[**b**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Semimajor and semiminor axis lengths in pixels.
+
+<code>[**theta**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation} [ = ]{.parameter-default-sep} [0.0]{.parameter-default}</code>
+
+:   Rotation angle in radians, measured counterclockwise from the positive x axis.
+
+<code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
+
+:   If `False`, skip input validation and assume finite, positive geometry and normalized positions.

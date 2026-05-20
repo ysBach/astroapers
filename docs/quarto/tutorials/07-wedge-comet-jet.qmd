@@ -1,0 +1,233 @@
+---
+title: "Wedge aperture sums for comet jets"
+---
+
+This tutorial builds a synthetic comet-like image with three components:
+
+1. a compact point source;
+2. a circular coma with surface brightness proportional to $r^{-1.5}$;
+3. an asymmetric jet centered near $30^\circ$ whose brightness fades as
+   $r^{-2}$.
+
+The goal is to show how `WedgeAp` can measure directional excess flux in an
+annular region. This is an aperture-sum workflow, not a complete comet
+photometry pipeline: background subtraction, PSF modeling, and physical dust
+modeling remain user-level analysis steps.
+
+```{python}
+import numpy as np
+import matplotlib.pyplot as plt
+import astroapers as aap
+```
+
+## Make a synthetic comet image
+
+`astroapers` angles are radians measured counterclockwise from the positive
+image x axis. The jet below is centered at `theta_jet = 30 deg`.
+
+```{python}
+ny, nx = 70, 70
+y, x = np.mgrid[:ny, :nx]
+
+x0, y0 = 28.4, 28.7
+dx = x - x0
+dy = y - y0
+r = np.hypot(dx, dy)
+theta = np.arctan2(dy, dx)
+
+
+# Component 1: unresolved nucleus/point source, represented here by a Gaussian.
+point_source = 50.0 * np.exp(-0.5 * r**2 / 1.5**2)
+
+# Component 2: circular coma. The softening avoids a singular central pixel.
+coma = 100.0 / (r + 1.5) ** 1.5
+
+# Component 3: asymmetric jet centered at 30 degrees with finite angular width.
+theta_jet = np.deg2rad(30.0)
+jet_width = np.deg2rad(10.0)
+angle_offset = np.angle(np.exp(1j * (theta - theta_jet)))
+angular_profile = np.exp(-0.5 * (angle_offset / (0.5 * jet_width)) ** 2)
+radial_profile = 20.0 / (r + 1.0) ** 0.5
+jet = radial_profile * angular_profile * (r > 2.0)
+
+rng = np.random.default_rng(20250501)
+background = rng.poisson(np.sqrt(6.0), size=(ny, nx))
+noise = rng.normal(scale=0.3, size=(ny, nx))
+data = background + point_source + coma + jet
+data += rng.poisson(np.sqrt(data), size=(ny, nx)) + noise
+```
+
+```{python}
+fig, axes = plt.subplots(1, 4, figsize=(12, 3), constrained_layout=True)
+for ax, image, title in [
+    (axes[0], point_source, "point source"),
+    (axes[1], coma, r"$r^{-1.5}$ coma"),
+    (axes[2], jet, r"$r^{-0.5}$ jet"),
+    (axes[3], data, "synthetic image"),
+]:
+    im = ax.imshow(image, origin="lower", cmap="viridis", vmin=0, vmax=50)
+    ax.plot(x0, y0, "w+", ms=6)
+    ax.set_title(title)
+    fig.colorbar(im, ax=ax, fraction=0.046)
+plt.show()
+```
+
+## Measure one wedge aperture
+
+The wedge excludes the innermost point-source dominated pixels and sums an
+annular sector around the expected jet direction.
+
+```{python}
+r_in = 5.0
+r_out = 25.0
+dtheta = np.deg2rad(20.0)
+
+jet_ap = aap.WedgeAp((x0, y0), r_in, r_out, theta_jet, dtheta)
+jet_apsum, jet_npix = jet_ap.apsum(data, method="exact")
+
+an = aap.CircAn((x0, y0), 30, 40)
+anm = an.get_apmask(method="center")  # use "center" to get only in-annulus full pixels
+msky = np.nanmedian(anm.weighted_values(data))
+
+jet_srcsum = jet_apsum - msky * jet_npix
+
+print(f"jet_apsum : {jet_apsum:.3f}")
+print(f"jet_npix  : {jet_npix:.3f}")
+print(f"msky      : {msky:.3f}")
+print(f"jet_srcsum: {jet_srcsum:.3f}")
+```
+
+For a quick visual check, overlay the aperture outline.
+
+```{python}
+fig, ax = plt.subplots(figsize=(5, 4))
+ax.imshow(data, origin="lower", cmap="viridis", vmin=0, vmax=50)
+jet_ap.plot(ax=ax, color="r", lw=1.5)
+an.plot(ax=ax, color="w", lw=1.5)
+ax.set_title("WedgeAp & CircAn around the comet")
+plt.show()
+```
+
+## Scan position angle
+
+A common wedge-photometry pattern is to evaluate the same annular wedge at many
+position angles. The peak indicates the angle with the largest directional
+excess.
+
+```{python}
+angles_deg = np.arange(0.0, 360.0, 2.0)
+angles_rad = np.deg2rad(angles_deg)
+raw_sums = np.empty_like(angles_rad)
+npix = np.empty_like(angles_rad)
+
+for i, angle in enumerate(angles_rad):
+    ap = aap.WedgeAp((x0, y0), r_in, r_out, angle, dtheta)
+    raw_sums[i], npix[i] = ap.apsum(data, method="exact")
+
+excess = raw_sums - msky * npix
+best = np.argmax(excess)
+
+angles_deg[best], np.rad2deg(theta_jet)
+```
+
+```{python}
+fig, ax = plt.subplots(figsize=(7, 3))
+ax.plot(angles_deg, excess, lw=1.5)
+ax.axvline(np.rad2deg(theta_jet), color="C3", ls="--", label="input jet angle")
+ax.axvline(angles_deg[best], color="k", ls=":", label="measured peak")
+ax.set_xlabel("wedge center angle (deg from +x)")
+ax.set_ylabel("sum - msky * npix")
+ax.legend()
+plt.show()
+```
+
+The base level is higher than zero because the wedge includes some coma flux. In a real comet analysis, subtract or model the coma before interpreting the angular excess as jet flux.
+
+## Center mode and caveats
+
+`method="center"` assigns each pixel by its center. For large wedges this is a fast approximation that often gives a similar result to `method="exact"`.
+
+```{python}
+center_apsum, center_npix = jet_ap.apsum(data, method="center")
+
+print(f"center_apsum: {center_apsum:.3f}")
+print(f"exact_apsum: {jet_apsum:.3f}")
+print(f"center_npix : {center_npix:.3f}")
+print(f"exact_npix : {jet_npix:.3f}")
+```
+
+`method="exact"` computes analytic fractional pixel overlap. Constant wedges
+like the examples above use a fast sector path; generalized wedges connect the
+inner and outer arc endpoints with straight sides and are also evaluated
+analytically. Use exact mode when fractional overlap is scientifically
+necessary; otherwise prefer `method="center"` for exploratory scans and large
+position-angle sweeps.
+
+```{python}
+tapered = aap.WedgeAp(
+    (x0, y0),
+    r_in,
+    r_out,
+    theta_jet,
+    np.deg2rad(8.0),
+    theta_out=theta_jet + np.deg2rad(6.0),
+    dtheta_out=np.deg2rad(24.0),
+)
+
+# Exact generalized wedges are available, but center mode is still faster.
+tapered_center_sum, tapered_center_npix = tapered.apsum(data, method="center")
+tapered_exact_sum, tapered_exact_npix = tapered.apsum(data, method="exact")
+
+np.array([tapered_center_sum, tapered_exact_sum, tapered_center_npix, tapered_exact_npix])
+```
+
+## Low-Level Kernels for Lowest Overhead
+
+When source positions already live in arrays, call the direct kernel functions.
+This avoids object construction and is the lowest-overhead entry point for
+production work. Geometry parameters are scalar for one kernel call, so a
+position-angle scan still loops over angle, but each call can process a catalog
+of centers.
+
+```{python}
+import astroapers.kernels as aapk
+
+xpos = np.array([x0], dtype=np.float64)
+ypos = np.array([y0], dtype=np.float64)
+
+kernel_sums = np.array(
+    [
+        aapk.apsum_wedge_center(
+            data,
+            xpos,
+            ypos,
+            r_in,
+            r_out,
+            angle,
+            dtheta,
+            return_npix=False,
+        )[0]
+        for angle in angles_rad
+    ]
+)
+
+np.rad2deg(angles_rad[np.argmax(kernel_sums - np.median(kernel_sums))])
+```
+
+Use `apsum_wedge_exact()` for analytic fractional overlap, including
+straight-sided generalized wedges.
+
+```{python}
+exact_sums = aapk.apsum_wedge_exact(
+    data,
+    xpos,
+    ypos,
+    r_in,
+    r_out,
+    theta_jet,
+    dtheta,
+    return_npix=False,
+)
+
+exact_sums
+```

@@ -1,0 +1,43 @@
+# apsum_circ_ann_exact { #astroapers.apsum_circ_ann_exact }
+
+```python
+apsum_circ_ann_exact(data, x, y, r_in, r_out, *, mask=None, return_npix=True)
+```
+
+Return exact circular-annulus aperture sums for one or many aperture centers.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+<code>[**data**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like]{.parameter-annotation}</code>
+
+:   Two-dimensional image. For ``mask=None``, ``float64``, ``float32``, ``int32``, and ``int16`` arrays dispatch to dtype-specialized Rust kernels when available; other dtypes are converted to contiguous ``float64`` before summation. Returned aperture sums and effective pixel counts are always ``float64`` arrays.
+
+<code>[**x, y**]{.parameter-name} [:]{.parameter-annotation-sep} [scalar or array_like]{.parameter-annotation}</code>
+
+:   Aperture center coordinates in pixel units. Inputs are converted to contiguous ``float64`` arrays. Shapes must match after ``numpy.atleast_1d``. The return shape matches that broadcast-free input shape, so scalar inputs return one-element arrays.
+
+<code>[**r_in, r_out**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Inner and outer annulus radii in pixels. ``r_in`` must be nonnegative and smaller than ``r_out``.
+
+<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like of bool, optional]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
+
+:   Boolean image mask with the same shape as ``data``. ``True`` pixels are excluded from both the aperture sum and effective pixel count. Values are converted to boolean. When this is omitted, the unmasked Rust summation path is used.
+
+<code>[**return_npix**]{.parameter-name} [:]{.parameter-annotation-sep} [bool, optional]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
+
+:   If `True`, return ``(apsum, npix)``. If `False`, return only ``apsum`` and use the sum-only Rust kernel for supported unmasked calls.
+
+## Returns {.doc-section .doc-section-returns}
+
+<code>[**apsum**]{.parameter-name} [:]{.parameter-annotation-sep} [ndarray]{.parameter-annotation}</code>
+
+:   Sum of the unmasked data values multiplied by the aperture weights.
+
+<code>[**npix**]{.parameter-name} [:]{.parameter-annotation-sep} [ndarray]{.parameter-annotation}</code>
+
+:   Effective in-frame pixel count, returned only when ``return_npix=True``. This is the sum of aperture weights after image clipping and mask exclusion.
+
+## Notes {.doc-section .doc-section-notes}
+
+The annulus is computed as exact outer-circle coverage minus exact inner-circle coverage after validating the radii.

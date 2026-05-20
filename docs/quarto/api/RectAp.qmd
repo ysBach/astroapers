@@ -1,0 +1,29 @@
+# RectAp { #astroapers.RectAp }
+
+```python
+RectAp(positions, w, h, theta=0.0, *, validate=True)
+```
+
+Rotated rectangular aperture in pixel coordinates.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+<code>[**positions**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple or array - like]{.parameter-annotation}</code>
+
+:   Aperture center or centers as ``(x, y)`` pixel coordinates. Multiple centers are accepted as an ``(N, 2)`` array-like object.
+
+<code>[**w**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Full rectangle width and height in pixels. ``w`` is measured along the rectangle's local x axis, and ``h`` along its local y axis. At ``theta=0``, the width axis is aligned with the image x axis and the height axis is aligned with the image y axis.
+
+<code>[**h**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Full rectangle width and height in pixels. ``w`` is measured along the rectangle's local x axis, and ``h`` along its local y axis. At ``theta=0``, the width axis is aligned with the image x axis and the height axis is aligned with the image y axis.
+
+<code>[**theta**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation} [ = ]{.parameter-default-sep} [0.0]{.parameter-default}</code>
+
+:   Rotation angle in radians, measured counterclockwise from the positive image x axis to the rectangle's local width axis.
+
+<code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
+
+:   If `False`, skip input validation and assume finite, positive geometry and normalized positions.

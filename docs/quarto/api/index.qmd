@@ -1,0 +1,89 @@
+# Function reference {.doc .doc-index}
+
+## Python aperture objects
+
+Classes for readable aperture construction, plotting, masks, and aperture sums.
+
+| | |
+| --- | --- |
+| [CircAp](CircAp.qmd#astroapers.CircAp) | Circular aperture in pixel coordinates. |
+| [CircAn](CircAn.qmd#astroapers.CircAn) | Circular annulus in pixel coordinates. |
+| [EllipAp](EllipAp.qmd#astroapers.EllipAp) | Elliptical aperture in pixel coordinates. |
+| [EllipAn](EllipAn.qmd#astroapers.EllipAn) | Elliptical annulus in pixel coordinates. |
+| [RectAp](RectAp.qmd#astroapers.RectAp) | Rotated rectangular aperture in pixel coordinates. |
+| [RectAn](RectAn.qmd#astroapers.RectAn) | Rotated rectangular annulus in pixel coordinates. |
+| [PillAp](PillAp.qmd#astroapers.PillAp) | Capsule-like aperture composed from one rectangle and two ellipses. |
+| [PillAn](PillAn.qmd#astroapers.PillAn) | Capsule-like annulus with explicit inner and outer pills. |
+| [WedgeAp](WedgeAp.qmd#astroapers.WedgeAp) | Annular wedge aperture in pixel coordinates. |
+| [PathAp](PathAp.qmd#astroapers.PathAp) | Aperture defined by a closed path of line segments and circular arcs. |
+
+## Masks and Python helpers
+
+Bbox-tight mask containers and Python-level helper functions.
+
+| | |
+| --- | --- |
+| [ApMask](ApMask.qmd#astroapers.ApMask) | Bbox-tight aperture overlap weights plus their pixel bounding box. |
+| [BoundingBox](BoundingBox.qmd#astroapers.BoundingBox) | Pixel-index bounding box with exclusive upper bounds. |
+| [apmask_apsum](apmask_apsum.qmd#astroapers.apmask_apsum) | Return aperture sum, and npix by default, for raw aperture weights. |
+| [apmask_npix](apmask_npix.qmd#astroapers.apmask_npix) | Return the in-frame sum of raw aperture weights for ``shape``. |
+| [apmask_to_image](apmask_to_image.qmd#astroapers.apmask_to_image) | Embed bbox-tight mask weights in a full image array. |
+| [apmask_weighted_cutout](apmask_weighted_cutout.qmd#astroapers.apmask_weighted_cutout) | Return a bbox-tight weighted cutout for raw aperture weights and ``bbox``. |
+| [apmask_weighted_values](apmask_weighted_values.qmd#astroapers.apmask_weighted_values) | Return weighted values for positive raw aperture weights and ``bbox``. |
+
+## Direct Rust-backed kernels
+
+Low-overhead catalog functions for fixed geometry workflows.
+
+| | |
+| --- | --- |
+| [apsum_circ_exact](apsum_circ_exact.qmd#astroapers.apsum_circ_exact) | Return exact circular aperture sums for one or many aperture centers. |
+| [apsum_circ_center](apsum_circ_center.qmd#astroapers.apsum_circ_center) | Return center-selected circular aperture sums for one or many aperture centers. |
+| [apsum_circ_ann_exact](apsum_circ_ann_exact.qmd#astroapers.apsum_circ_ann_exact) | Return exact circular-annulus aperture sums for one or many aperture centers. |
+| [apsum_circ_ann_center](apsum_circ_ann_center.qmd#astroapers.apsum_circ_ann_center) | Return center-selected circular-annulus aperture sums for one or many aperture centers. |
+| [apsum_ellip_exact](apsum_ellip_exact.qmd#astroapers.apsum_ellip_exact) | Return exact elliptical aperture sums for one or many aperture centers. |
+| [apsum_ellip_center](apsum_ellip_center.qmd#astroapers.apsum_ellip_center) | Return center-selected elliptical aperture sums for one or many aperture centers. |
+| [apsum_ellip_ann_exact](apsum_ellip_ann_exact.qmd#astroapers.apsum_ellip_ann_exact) | Return exact elliptical-annulus aperture sums for one or many aperture centers. |
+| [apsum_ellip_ann_center](apsum_ellip_ann_center.qmd#astroapers.apsum_ellip_ann_center) | Return center-selected elliptical-annulus aperture sums for one or many aperture centers. |
+| [apsum_rect_exact](apsum_rect_exact.qmd#astroapers.apsum_rect_exact) | Return exact rotated-rectangle aperture sums for one or many aperture centers. |
+| [apsum_rect_center](apsum_rect_center.qmd#astroapers.apsum_rect_center) | Return center-selected rotated-rectangle aperture sums for one or many aperture centers. |
+| [apsum_rect_ann_exact](apsum_rect_ann_exact.qmd#astroapers.apsum_rect_ann_exact) | Return exact rotated-rectangle-annulus aperture sums for one or many aperture centers. |
+| [apsum_rect_ann_center](apsum_rect_ann_center.qmd#astroapers.apsum_rect_ann_center) | Return center-selected rotated-rectangle-annulus aperture sums for one or many aperture centers. |
+| [apsum_pill_exact](apsum_pill_exact.qmd#astroapers.apsum_pill_exact) | Return exact pill aperture sums for one or many aperture centers. |
+| [apsum_pill_center](apsum_pill_center.qmd#astroapers.apsum_pill_center) | Return center-selected pill aperture sums for one or many aperture centers. |
+| [apsum_pill_ann_exact](apsum_pill_ann_exact.qmd#astroapers.apsum_pill_ann_exact) | Return exact pill-annulus aperture sums for one or many aperture centers. |
+| [apsum_pill_ann_center](apsum_pill_ann_center.qmd#astroapers.apsum_pill_ann_center) | Return center-selected pill-annulus aperture sums for one or many aperture centers. |
+| [apsum_wedge_exact](apsum_wedge_exact.qmd#astroapers.apsum_wedge_exact) | Return exact wedge aperture sums for one or many aperture centers. |
+| [apsum_wedge_center](apsum_wedge_center.qmd#astroapers.apsum_wedge_center) | Return center-selected wedge aperture sums for one or many aperture centers. |
+| [apsum_path_exact](apsum_path_exact.qmd#astroapers.apsum_path_exact) | Return exact path aperture sums for one or many centers. |
+| [apsum_path_center](apsum_path_center.qmd#astroapers.apsum_path_center) | Return center-selected path aperture sums for one or many centers. |
+| [npix_circ_exact](npix_circ_exact.qmd#astroapers.npix_circ_exact) | Return exact circular-aperture effective in-frame pixel counts. |
+| [npix_circ_center](npix_circ_center.qmd#astroapers.npix_circ_center) | Return center-selected circular-aperture effective in-frame pixel counts. |
+| [npix_circ_ann_exact](npix_circ_ann_exact.qmd#astroapers.npix_circ_ann_exact) | Return exact circular-annulus effective in-frame pixel counts. |
+| [npix_circ_ann_center](npix_circ_ann_center.qmd#astroapers.npix_circ_ann_center) | Return center-selected circular-annulus effective in-frame pixel counts. |
+| [npix_ellip_exact](npix_ellip_exact.qmd#astroapers.npix_ellip_exact) | Return exact elliptical-aperture effective in-frame pixel counts. |
+| [npix_ellip_center](npix_ellip_center.qmd#astroapers.npix_ellip_center) | Return center-selected elliptical-aperture effective in-frame pixel counts. |
+| [npix_ellip_ann_exact](npix_ellip_ann_exact.qmd#astroapers.npix_ellip_ann_exact) | Return exact elliptical-annulus effective in-frame pixel counts. |
+| [npix_ellip_ann_center](npix_ellip_ann_center.qmd#astroapers.npix_ellip_ann_center) | Return center-selected elliptical-annulus effective in-frame pixel counts. |
+| [npix_rect_exact](npix_rect_exact.qmd#astroapers.npix_rect_exact) | Return exact rotated-rectangle-aperture effective in-frame pixel counts. |
+| [npix_rect_center](npix_rect_center.qmd#astroapers.npix_rect_center) | Return center-selected rotated-rectangle-aperture effective in-frame pixel counts. |
+| [npix_rect_ann_exact](npix_rect_ann_exact.qmd#astroapers.npix_rect_ann_exact) | Return exact rotated-rectangle-annulus effective in-frame pixel counts. |
+| [npix_rect_ann_center](npix_rect_ann_center.qmd#astroapers.npix_rect_ann_center) | Return center-selected rotated-rectangle-annulus effective in-frame pixel counts. |
+| [npix_pill_exact](npix_pill_exact.qmd#astroapers.npix_pill_exact) | Return exact pill-aperture effective in-frame pixel counts. |
+| [npix_pill_center](npix_pill_center.qmd#astroapers.npix_pill_center) | Return center-selected pill-aperture effective in-frame pixel counts. |
+| [npix_pill_ann_exact](npix_pill_ann_exact.qmd#astroapers.npix_pill_ann_exact) | Return exact pill-annulus effective in-frame pixel counts. |
+| [npix_pill_ann_center](npix_pill_ann_center.qmd#astroapers.npix_pill_ann_center) | Return center-selected pill-annulus effective in-frame pixel counts. |
+| [npix_wedge_exact](npix_wedge_exact.qmd#astroapers.npix_wedge_exact) | Return exact wedge-aperture effective in-frame pixel counts. |
+| [npix_wedge_center](npix_wedge_center.qmd#astroapers.npix_wedge_center) | Return center-selected wedge-aperture effective in-frame pixel counts. |
+| [bboxes_path](bboxes_path.qmd#astroapers.bboxes_path) | Return path aperture bounding boxes for one or many centers. |
+
+## Parallel threshold utilities
+
+Helpers for configuring when the Rust kernels switch to Rayon.
+
+| | |
+| --- | --- |
+| [ParallelThresholdCalibration](ParallelThresholdCalibration.qmd#astroapers.ParallelThresholdCalibration) | Result from calibrating the Rayon parallelization threshold. |
+| [calibrate_parallel_threshold](calibrate_parallel_threshold.qmd#astroapers.calibrate_parallel_threshold) | Benchmark and optionally apply a machine-local parallel threshold. |
+| [get_parallel_threshold](get_parallel_threshold.qmd#astroapers.get_parallel_threshold) | Return the aperture count where Rust kernels switch to Rayon. |
+| [set_parallel_threshold](set_parallel_threshold.qmd#astroapers.set_parallel_threshold) | Set the aperture count where Rust kernels switch to Rayon. |

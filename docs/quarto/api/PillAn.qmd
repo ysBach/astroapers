@@ -1,0 +1,106 @@
+# PillAn { #astroapers.PillAn }
+
+```python
+PillAn(
+    positions,
+    w_in,
+    a_in,
+    b_in,
+    w_out,
+    a_out,
+    b_out,
+    *,
+    theta_in=0.0,
+    theta_out=None,
+    plot_samples=96,
+    validate=True,
+)
+```
+
+Capsule-like annulus with explicit inner and outer pills.
+
+The outer boundary is a pill with rectangle length ``w_out`` and cap
+semiaxes ``a_out`` and ``b_out``. The inner boundary uses explicit
+``w_in``, ``a_in``, and ``b_in`` values. Its masks use fused Rust kernels
+that subtract the inner composite pill from the outer composite pill.
+If ``theta_out`` is `None`, it defaults to ``theta_in``.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+<code>[**positions**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple or array - like]{.parameter-annotation}</code>
+
+:   Annulus center or centers as ``(x, y)`` pixel coordinates. Multiple centers are accepted as an ``(N, 2)`` array-like object.
+
+<code>[**w_in**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Inner central-rectangle length in pixels.
+
+<code>[**a_in**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Inner cap semimajor axis in pixels.
+
+<code>[**b_in**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Inner cap semiminor axis in pixels.
+
+<code>[**w_out**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Outer central-rectangle length in pixels. Must be larger than ``w_in``.
+
+<code>[**a_out**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Outer cap semimajor axis in pixels. Must be larger than ``a_in``.
+
+<code>[**b_out**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Outer cap semiminor axis in pixels. Must be larger than ``b_in``.
+
+<code>[**theta_in**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation} [ = ]{.parameter-default-sep} [0.0]{.parameter-default}</code>
+
+:   Inner pill rotation angle in radians, measured counterclockwise from the positive x axis.
+
+<code>[**theta_out**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
+
+:   Outer pill rotation angle in radians, measured counterclockwise from the positive x axis. If `None`, it defaults to ``theta_in``.
+
+<code>[**plot_samples**]{.parameter-name} [:]{.parameter-annotation-sep} [int]{.parameter-annotation} [ = ]{.parameter-default-sep} [96]{.parameter-default}</code>
+
+:   Even number of samples used to draw each pill boundary when creating Matplotlib patches.
+
+<code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
+
+:   If `False`, skip input validation and assume finite, positive geometry, ordered inner/outer dimensions, and normalized positions.
+
+## Attributes {.doc-section .doc-section-attributes}
+
+<code>[**area**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Analytic geometric annulus area. Image clipping and bad-pixel masks are accounted for by ``npix`` results, not by this property.
+
+## Methods
+
+| Name | Description |
+| --- | --- |
+| [apsum](#astroapers.PillAn.apsum) | Return exact pill-annulus sums, and npix by default. |
+
+### apsum { #astroapers.PillAn.apsum }
+
+```python
+PillAn.apsum(data, mask=None, *, return_npix=True)
+```
+
+Return exact pill-annulus sums, and npix by default.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+<code>[**data**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like]{.parameter-annotation}</code>
+
+:   Two-dimensional image.
+
+<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like of bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
+
+:   Boolean image mask with the same shape as ``data``. ``True`` pixels are excluded from both ``apsum`` and ``npix``.
+
+<code>[**return_npix**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
+
+:   If `True`, return ``(apsum, npix)``. If `False`, return only ``apsum``.

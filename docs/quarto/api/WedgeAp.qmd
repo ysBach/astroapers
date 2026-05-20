@@ -1,0 +1,87 @@
+# WedgeAp { #astroapers.WedgeAp }
+
+```python
+WedgeAp(
+    positions,
+    r_in,
+    r_out,
+    theta_in,
+    dtheta_in,
+    theta_out=None,
+    dtheta_out=None,
+    plot_samples=96,
+    *,
+    validate=True,
+)
+```
+
+Annular wedge aperture in pixel coordinates.
+
+A wedge is bounded by inner and outer circular arcs, with straight sides
+connecting the corresponding arc endpoints. Angles are in radians, measured
+counterclockwise from the positive image x axis. ``dtheta_*`` values are
+full angular widths. If ``theta_out`` or ``dtheta_out`` is `None`, the
+corresponding inner value is used, giving the constant-width annular sector
+used by wedge-photometry workflows.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+<code>[**positions**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple or array - like]{.parameter-annotation}</code>
+
+:   Aperture center or centers as ``(x, y)`` pixel coordinates. Multiple centers are accepted as an ``(N, 2)`` array-like object.
+
+<code>[**r_in**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Inner and outer radii in pixels. ``r_out`` must be larger than ``r_in`` and ``r_in`` must be positive.
+
+<code>[**r_out**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Inner and outer radii in pixels. ``r_out`` must be larger than ``r_in`` and ``r_in`` must be positive.
+
+<code>[**theta_in**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Center angle and full angular width at ``r_in``. ``dtheta_in`` must be in ``(0, 2*pi)``.
+
+<code>[**dtheta_in**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Center angle and full angular width at ``r_in``. ``dtheta_in`` must be in ``(0, 2*pi)``.
+
+<code>[**theta_out**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
+
+:   Center angle and full angular width at ``r_out``. ``dtheta_out`` must be in ``(0, 2*pi)``. Missing values default to the corresponding inner value.
+
+<code>[**dtheta_out**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
+
+:   Center angle and full angular width at ``r_out``. ``dtheta_out`` must be in ``(0, 2*pi)``. Missing values default to the corresponding inner value.
+
+<code>[**plot_samples**]{.parameter-name} [:]{.parameter-annotation-sep} [int]{.parameter-annotation} [ = ]{.parameter-default-sep} [96]{.parameter-default}</code>
+
+:   Even number of samples used to draw the two circular arcs.
+
+<code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
+
+:   If `False`, skip input validation and assume finite, ordered geometry and normalized positions.
+
+## Attributes
+
+| Name | Description |
+| --- | --- |
+| [area](#astroapers.WedgeAp.area) | Analytic wedge area, before image clipping or bad-pixel masking. |
+
+## Methods
+
+| Name | Description |
+| --- | --- |
+| [get_apmask](#astroapers.WedgeAp.get_apmask) | Return bbox-tight wedge masks as `ApMask` objects. |
+
+### get_apmask { #astroapers.WedgeAp.get_apmask }
+
+```python
+WedgeAp.get_apmask(method='exact')
+```
+
+Return bbox-tight wedge masks as `ApMask` objects.
+
+``method="exact"`` computes analytic fractional pixel overlap.
+``method="center"`` assigns pixels by their centers, matching the
+original wedge-photometry definition.

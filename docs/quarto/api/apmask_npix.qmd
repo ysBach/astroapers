@@ -1,0 +1,31 @@
+# apmask_npix { #astroapers.apmask_npix }
+
+```python
+apmask_npix(weights, bbox, shape, mask=None)
+```
+
+Return the in-frame sum of raw aperture weights for ``shape``.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+<code>[**weights**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like]{.parameter-annotation}</code>
+
+:   Bbox-tight aperture weights with shape ``bbox.shape``.
+
+<code>[**bbox**]{.parameter-name} [:]{.parameter-annotation-sep} [BoundingBox]{.parameter-annotation}</code>
+
+:   Location of the bbox-tight weights in image coordinates.
+
+<code>[**shape**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple\[int, int\]]{.parameter-annotation}</code>
+
+:   Full image shape as ``(ny, nx)``. This controls image-edge clipping.
+
+<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like of bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
+
+:   Boolean image mask with shape ``shape``. ``True`` pixels are excluded from the returned effective pixel count.
+
+## Returns {.doc-section .doc-section-returns}
+
+<code>[**npix**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Sum of in-frame, unmasked aperture weights. Accumulation uses `float64`, even when the stored weights are `float32`.

@@ -1,0 +1,39 @@
+# apmask_apsum { #astroapers.apmask_apsum }
+
+```python
+apmask_apsum(weights, bbox, image, mask=None, *, return_npix=True)
+```
+
+Return aperture sum, and npix by default, for raw aperture weights.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+<code>[**weights**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like]{.parameter-annotation}</code>
+
+:   Bbox-tight aperture weights with shape ``bbox.shape``.
+
+<code>[**bbox**]{.parameter-name} [:]{.parameter-annotation-sep} [BoundingBox]{.parameter-annotation}</code>
+
+:   Location of the bbox-tight weights in ``image`` coordinates.
+
+<code>[**image**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like]{.parameter-annotation}</code>
+
+:   Two-dimensional image to sample.
+
+<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like of bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
+
+:   Boolean image mask with the same shape as ``image``. ``True`` pixels contribute zero weight.
+
+<code>[**return_npix**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
+
+:   If `True`, return ``(apsum, npix)``. If `False`, return only ``apsum``.
+
+## Returns {.doc-section .doc-section-returns}
+
+<code>[**apsum**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Sum of ``image * weight`` over the overlapping, unmasked footprint. Accumulation uses `float64`, even when both the image and stored weights are `float32`.
+
+<code>[**npix**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Sum of the contributing aperture weights. This can be smaller than the analytic aperture area when the aperture is clipped by the image edge or by ``mask``. Accumulation uses `float64`. Returned only when ``return_npix=True``.

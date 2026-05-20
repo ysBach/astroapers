@@ -1,0 +1,218 @@
+---
+title: "Annulus background"
+---
+
+This notebook estimates a local background from a circular annulus and subtracts
+it from exact aperture sums.
+
+```{python}
+import numpy as np
+import matplotlib.pyplot as plt
+import astroapers as aap
+```
+
+## Synthetic image with a sloped background
+
+```{python}
+ny, nx = 60, 60
+y, x = np.mgrid[:ny, :nx]
+
+x0, y0 = 34.7, 33.9
+background = 20.0 + 0.03 * x - 0.02 * y
+source = 10.0 * np.exp(-0.5 * ((x - x0) ** 2 + (y - y0) ** 2) / 3.2**2)
+data = background + source
+```
+
+## Source aperture and sky annulus
+
+Use exact fractional weights for the source sum, and center-selected annulus
+pixels for robust background samples.
+
+```{python}
+ap = aap.CircAp((x0, y0), r=5.0)
+an = aap.CircAn((x0, y0), r_in=9.0, r_out=15.0)
+
+apsum, src_npix = ap.apsum(data)
+sky_values = an.get_apmask(method="center").weighted_values(data)
+# you can do complicated math to get best sky value.
+# Here I just use median:
+sky_median = np.median(sky_values)
+
+# sky subtraction
+srcsum = apsum - src_npix * sky_median
+
+# apsum, src_npix, sky_values.size, sky_median, srcsum
+print(f"Aperture sum: {apsum:.3f}")
+print(f"Sky median: {sky_median:.3f}")
+print(f"Source npix: {src_npix:.3f}")
+print(f"Source sum: {srcsum:.3f} = apsum - npix * sky")
+```
+
+## Visual check
+
+```{python}
+fig, ax = plt.subplots(1, 2, figsize=(7, 4))
+ax[0].imshow(data, origin="lower", cmap="viridis")
+ap.plot(ax=ax[0], color="r", lw=1)
+an.plot(ax=ax[0], color="w", lw=1)
+ax[0].set_title("Source aperture and sky annulus")
+
+# apmask("center") is 0/1 bool mask,
+# so the weighted_values are just the selected pixels:
+skyvals = an.get_apmask("center").weighted_values(data)
+ax[1].hist(skyvals, bins=20, color="gray", edgecolor="k")
+ax[1].set_title("Sky values")
+ax[1].axvline(sky_median, color="r", ls="--", label=f"Median={sky_median:.2f}")
+ax[1].legend()
+
+plt.show()
+```
+
+## A masked-pixel example
+
+Bad-pixel masks are full image-shaped boolean arrays where `True` means
+excluded.
+
+```{python}
+bad_pixels = np.zeros(data.shape, dtype=bool)
+bad_pixels[40:45, 45:52] = True
+
+sky_values_masked = an.get_apmask(method="center").weighted_values(
+    data, mask=bad_pixels
+)
+sky_median_masked = np.median(sky_values_masked)
+apsum_masked, src_npix_masked = ap.apsum(data, mask=bad_pixels)
+srcsum_masked = apsum_masked - src_npix_masked * sky_median_masked
+
+print(f"Unmasked sky pixels: {sky_values.size}")
+print(f"Masked sky pixels: {sky_values_masked.size}")
+print(f"Unmasked sky median: {sky_median:.3f}")
+print(f"Masked sky median: {sky_median_masked:.3f}")
+print(f"Masked source npix: {src_npix_masked:.3f}")
+print(f"Masked source sum: {srcsum_masked:.3f}")
+```
+
+```{python}
+fig, ax = plt.subplots(figsize=(5, 4))
+ax.imshow(data, origin="lower", cmap="viridis")
+ax.imshow(bad_pixels, origin="lower", cmap="gray_r", alpha=0.4)
+ap.plot(ax=ax, color="r", lw=1)
+an.plot(ax=ax, color="w", lw=1)
+ax.set_title("Bad pixels excluded from aperture and annulus")
+plt.show()
+```
+
+## Bbox-Tight Mask Helpers
+
+For large images or production-level pipelines, use the bbox-tight `ApMask`
+arrays directly. This avoids making full image-shaped float masks and keeps the
+work restricted to the aperture and annulus bounding boxes.
+
+```{python}
+src_apm = ap.get_apmask(method="exact")
+sky_apm = an.get_apmask(method="center")
+
+raw_apsum, raw_src_npix = aap.apmask_apsum(
+    src_apm.weights, src_apm.bbox, data, mask=bad_pixels
+)
+raw_sky_values = aap.apmask_weighted_values(
+    sky_apm.weights, sky_apm.bbox, data, mask=bad_pixels
+)
+raw_sky_median = np.median(raw_sky_values)
+raw_srcsum = raw_apsum - raw_src_npix * raw_sky_median
+
+assert np.allclose(raw_apsum, apsum_masked)
+assert np.allclose(raw_src_npix, src_npix_masked)
+assert np.allclose(raw_sky_values, sky_values_masked)
+assert np.allclose(raw_srcsum, srcsum_masked)
+
+print(f"Low-level source sum: {raw_srcsum:.3f}")
+```
+
+If you only need a boolean mask from bbox-tight weights, fill the overlapping
+slice explicitly:
+
+```{python}
+sky_bpm = np.zeros(data.shape, dtype=bool)
+overlap = sky_apm.bbox.overlap_slices(data.shape)
+if overlap is not None:
+    data_slices, weight_slices = overlap
+    sky_bpm[data_slices] = sky_apm.weights[weight_slices] > 0
+
+assert np.array_equal(sky_bpm, sky_apm.to_image(data.shape) > 0)
+```
+
+## Low-Level Kernels for Lowest Overhead
+
+The direct kernels are the lowest-overhead entry point for source aperture sums,
+and they accept `mask=bad_pixels` when bad pixels must be excluded. The object
+methods for these supported unmasked sums call the same kernels, so direct calls
+mostly save Python object overhead; the relative gain is largest for small
+aperture counts and can shrink to a near tie for large batches. For the annulus
+background, the annulus sum is not the useful quantity: the median needs the
+center-selected annulus sample values. Use the low-level center weights with
+`apmask_weighted_values()` for that part.
+
+```{python}
+import astroapers.kernels as aapk
+
+xpos = np.array([x0])
+ypos = np.array([y0])
+
+kernel_src_apsum, kernel_src_npix = aapk.apsum_circ_exact(
+    data,
+    xpos,
+    ypos,
+    r=5.0,
+    mask=bad_pixels,
+)
+sky_weights, sky_boxes = aapk.weights_circ_ann_center(
+    xpos,
+    ypos,
+    9.0,
+    15.0,
+)
+kernel_sky_values = aap.apmask_weighted_values(
+    sky_weights[0],
+    sky_boxes[0],
+    data,
+    mask=bad_pixels,
+)
+kernel_sky_median = np.median(kernel_sky_values)
+kernel_srcsum = kernel_src_apsum[0] - kernel_src_npix[0] * kernel_sky_median
+kernel_sum_only = aapk.apsum_circ_exact(
+    data,
+    xpos,
+    ypos,
+    r=5.0,
+    mask=bad_pixels,
+    return_npix=False,
+)
+
+assert np.allclose(kernel_src_apsum[0], apsum_masked)
+assert np.allclose(kernel_src_npix[0], src_npix_masked)
+assert np.allclose(kernel_sum_only[0], apsum_masked)
+assert np.allclose(kernel_sky_values, sky_values_masked)
+assert np.allclose(kernel_sky_median, sky_median_masked)
+assert np.allclose(kernel_srcsum, srcsum_masked)
+
+kernel_sky_median, sky_median_masked, kernel_srcsum
+```
+
+The direct circular-annulus `apsum` function is still useful when you actually
+want the weighted annulus flux or mean. It is not a substitute for robust
+background sampling:
+
+```{python}
+kernel_ann_apsum, kernel_ann_npix = aapk.apsum_circ_ann_exact(
+    data,
+    xpos,
+    ypos,
+    r_in=9.0,
+    r_out=15.0,
+    mask=bad_pixels,
+)
+
+kernel_ann_mean = kernel_ann_apsum[0] / kernel_ann_npix[0]
+kernel_ann_mean, kernel_sky_median
+```

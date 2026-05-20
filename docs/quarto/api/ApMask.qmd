@@ -1,0 +1,153 @@
+# ApMask { #astroapers.ApMask }
+
+```python
+ApMask(weights, bbox)
+```
+
+Bbox-tight aperture overlap weights plus their pixel bounding box.
+
+`ApMask` is the convenience wrapper returned by `PixelAp.get_apmask()`. It is
+useful when the caller wants to place bbox-tight weights into a full image,
+multiply it by data, or extract weighted values. Use the `.weights`
+attribute when a top-level `apmask_*` helper needs raw bbox-tight weights. The
+wrapper preserves `float32` or `float64` aperture weights supplied by callers;
+other numeric or boolean dtypes are converted to `float64`.
+
+Common helpers include `npix()`, `to_image()`, `weighted_cutout()`,
+`weighted_values()`, and `apsum()`.
+
+## Methods
+
+| Name | Description |
+| --- | --- |
+| [apsum](#astroapers.ApMask.apsum) | Return aperture sum, and npix by default, for this mask. |
+| [npix](#astroapers.ApMask.npix) | Return the in-frame sum of mask weights for ``shape``. |
+| [to_image](#astroapers.ApMask.to_image) | Embed bbox-tight weights in a full image-shaped array. |
+| [weighted_cutout](#astroapers.ApMask.weighted_cutout) | Return a bbox-tight weighted data cutout. |
+| [weighted_values](#astroapers.ApMask.weighted_values) | Return weighted values for positive bbox-tight mask weights. |
+
+### apsum { #astroapers.ApMask.apsum }
+
+```python
+ApMask.apsum(data, mask=None, *, return_npix=True)
+```
+
+Return aperture sum, and npix by default, for this mask.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+<code>[**data**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like]{.parameter-annotation}</code>
+
+:   Two-dimensional image sampled by this aperture mask.
+
+<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like of bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
+
+:   Boolean image mask with the same shape as ``data``. ``True`` pixels contribute zero weight.
+
+<code>[**return_npix**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
+
+:   If `True`, return ``(apsum, npix)``. If `False`, return only ``apsum``.
+
+#### Returns {.doc-section .doc-section-returns}
+
+<code>[**apsum**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Sum of ``data * weight`` over the in-frame, unmasked aperture footprint.
+
+<code>[**npix**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Sum of the aperture weights that contributed to ``apsum``. Returned only when ``return_npix=True``.
+
+### npix { #astroapers.ApMask.npix }
+
+```python
+ApMask.npix(shape, mask=None)
+```
+
+Return the in-frame sum of mask weights for ``shape``.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+<code>[**shape**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple\[int, int\]]{.parameter-annotation}</code>
+
+:   Full image shape as ``(ny, nx)``. This controls image-edge clipping.
+
+<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like of bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
+
+:   Boolean image mask with shape ``shape``. ``True`` pixels are excluded from the returned effective pixel count.
+
+### to_image { #astroapers.ApMask.to_image }
+
+```python
+ApMask.to_image(shape, fill_value=0.0)
+```
+
+Embed bbox-tight weights in a full image-shaped array.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+<code>[**shape**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple\[int, int\]]{.parameter-annotation}</code>
+
+:   Output image shape as ``(ny, nx)``.
+
+<code>[**fill_value**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation} [ = ]{.parameter-default-sep} [0.0]{.parameter-default}</code>
+
+:   Value used outside the mask footprint.
+
+#### Returns {.doc-section .doc-section-returns}
+
+<code>[]{.parameter-name} [:]{.parameter-annotation-sep} [ndarray]{.parameter-annotation}</code>
+
+:   Floating array with shape ``shape``. The dtype follows the bbox-tight aperture weights for floating weights. Pixels covered by this bounding box receive the fractional aperture weights; all other pixels are set to ``fill_value``. If the bounding box extends beyond the image, only the overlapping part is copied.
+
+### weighted_cutout { #astroapers.ApMask.weighted_cutout }
+
+```python
+ApMask.weighted_cutout(data, mask=None, fill_value=np.nan)
+```
+
+Return a bbox-tight weighted data cutout.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+<code>[**data**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like]{.parameter-annotation}</code>
+
+:   Two-dimensional image sampled by this aperture mask.
+
+<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like of bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
+
+:   Boolean image mask with the same shape as ``data``. ``True`` pixels are excluded by setting their aperture weights to zero.
+
+<code>[**fill_value**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation} [ = ]{.parameter-default-sep} [np.nan]{.parameter-default}</code>
+
+:   Value used for bbox-tight mask pixels that do not overlap ``data``.
+
+#### Returns {.doc-section .doc-section-returns}
+
+<code>[]{.parameter-name} [:]{.parameter-annotation-sep} [ndarray]{.parameter-annotation}</code>
+
+:   Floating cutout with the same shape as ``self.weights``. In-frame pixels contain ``data * weight``; off-image pixels contain ``fill_value``.
+
+### weighted_values { #astroapers.ApMask.weighted_values }
+
+```python
+ApMask.weighted_values(data, mask=None)
+```
+
+Return weighted values for positive bbox-tight mask weights.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+<code>[**data**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like]{.parameter-annotation}</code>
+
+:   Two-dimensional image sampled by this aperture mask.
+
+<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like of bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
+
+:   Boolean image mask with the same shape as ``data``. ``True`` pixels are excluded from the returned values.
+
+#### Returns {.doc-section .doc-section-returns}
+
+<code>[]{.parameter-name} [:]{.parameter-annotation-sep} [ndarray]{.parameter-annotation}</code>
+
+:   One-dimensional floating array containing ``data * weight`` for pixels where the aperture weight is positive and the optional image mask is not set. Pixels outside ``data`` are ignored.

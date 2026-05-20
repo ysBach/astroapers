@@ -1,0 +1,51 @@
+# EllipAn { #astroapers.EllipAn }
+
+```python
+EllipAn(
+    positions,
+    a_in,
+    b_in,
+    a_out,
+    b_out,
+    *,
+    theta_in=0.0,
+    theta_out=None,
+    validate=True,
+)
+```
+
+Elliptical annulus in pixel coordinates.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+<code>[**positions**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple or array - like]{.parameter-annotation}</code>
+
+:   Annulus center or centers as ``(x, y)`` pixel coordinates. Multiple centers are accepted as an ``(N, 2)`` array-like object.
+
+<code>[**a_in**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Inner ellipse semiaxes in pixels.
+
+<code>[**b_in**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Inner ellipse semiaxes in pixels.
+
+<code>[**a_out**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Outer ellipse semiaxes in pixels. Each outer axis must be larger than the corresponding inner axis.
+
+<code>[**b_out**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Outer ellipse semiaxes in pixels. Each outer axis must be larger than the corresponding inner axis.
+
+<code>[**theta_in**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation} [ = ]{.parameter-default-sep} [0.0]{.parameter-default}</code>
+
+:   Inner and outer rotation angles in radians, measured counterclockwise from the positive x axis. If ``theta_out`` is `None`, it defaults to ``theta_in``.
+
+<code>[**theta_out**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation} [ = ]{.parameter-default-sep} [0.0]{.parameter-default}</code>
+
+:   Inner and outer rotation angles in radians, measured counterclockwise from the positive x axis. If ``theta_out`` is `None`, it defaults to ``theta_in``.
+
+<code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
+
+:   If `False`, skip input validation and assume finite, positive geometry, ordered axes, and normalized positions.

@@ -1,0 +1,16 @@
+# apsum_path_center { #astroapers.apsum_path_center }
+
+```python
+apsum_path_center(
+    data,
+    x,
+    y,
+    segments,
+    holes=None,
+    *,
+    mask=None,
+    return_npix=True,
+)
+```
+
+Return center-selected path aperture sums for one or many centers. Path geometry is limited to closed contours made from ``"line"`` and circular ``"arc"`` commands.

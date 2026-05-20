@@ -1,0 +1,35 @@
+# apmask_to_image { #astroapers.apmask_to_image }
+
+```python
+apmask_to_image(weights, bbox, shape, fill_value=0.0)
+```
+
+Embed bbox-tight mask weights in a full image array.
+
+This is the function equivalent of ``ApMask(weights, bbox).to_image(shape)``
+and is intended for raw weights stored on ``ApMask.weights`` or supplied by
+external rasterizers.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+<code>[**weights**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like]{.parameter-annotation}</code>
+
+:   Bbox-tight aperture weights with shape ``bbox.shape``.
+
+<code>[**bbox**]{.parameter-name} [:]{.parameter-annotation-sep} [BoundingBox]{.parameter-annotation}</code>
+
+:   Location of ``weights`` in the output image coordinate system.
+
+<code>[**shape**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple\[int, int\]]{.parameter-annotation}</code>
+
+:   Output image shape as ``(ny, nx)``.
+
+<code>[**fill_value**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation} [ = ]{.parameter-default-sep} [0.0]{.parameter-default}</code>
+
+:   Value assigned to pixels outside the aperture mask footprint.
+
+## Returns {.doc-section .doc-section-returns}
+
+<code>[]{.parameter-name} [:]{.parameter-annotation-sep} [ndarray]{.parameter-annotation}</code>
+
+:   Floating image with shape ``shape``. If ``bbox`` is partly outside the image, only the overlapping weights are copied. If it is fully outside, the returned image contains only ``fill_value``.

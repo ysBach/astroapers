@@ -1,0 +1,7 @@
+# set_parallel_threshold { #astroapers.set_parallel_threshold }
+
+```python
+set_parallel_threshold(threshold)
+```
+
+Set the aperture count where Rust kernels switch to Rayon.

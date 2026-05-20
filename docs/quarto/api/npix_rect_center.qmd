@@ -1,0 +1,35 @@
+# npix_rect_center { #astroapers.npix_rect_center }
+
+```python
+npix_rect_center(x, y, w, h, theta=0.0, *, shape)
+```
+
+Return center-selected rotated-rectangle-aperture effective in-frame pixel counts.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+<code>[**x, y**]{.parameter-name} [:]{.parameter-annotation-sep} [scalar or array_like]{.parameter-annotation}</code>
+
+:   Aperture center coordinates in pixel units. Shapes must match after ``numpy.atleast_1d``. The return shape matches that broadcast-free input shape, so scalar inputs return one-element arrays.
+
+<code>[**w, h**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Full rectangle width and height in pixels. ``w`` is measured along the rectangle's local x axis, and ``h`` along its local y axis. At ``theta=0``, the width axis is aligned with the image x axis and the height axis is aligned with the image y axis.
+
+<code>[**theta**]{.parameter-name} [:]{.parameter-annotation-sep} [float, optional]{.parameter-annotation} [ = ]{.parameter-default-sep} [0.0]{.parameter-default}</code>
+
+:   Rotation angle in radians, measured counterclockwise from the positive image x axis to the rectangle's local width axis.
+
+<code>[**shape**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple[int, int]]{.parameter-annotation}</code>
+
+:   Image shape as ``(ny, nx)`` used to clip the aperture footprint.
+
+## Returns {.doc-section .doc-section-returns}
+
+<code>[**npix**]{.parameter-name} [:]{.parameter-annotation-sep} [ndarray]{.parameter-annotation}</code>
+
+:   Effective pixel count inside the image frame.
+
+## Notes {.doc-section .doc-section-notes}
+
+``center`` mode uses binary weights selected by pixel-center inclusion. The boundary convention matches Photutils for supported shapes: pixels exactly on the outer boundary are excluded, and annuli include the inner boundary while excluding the outer boundary.

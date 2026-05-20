@@ -1,0 +1,35 @@
+# apmask_weighted_cutout { #astroapers.apmask_weighted_cutout }
+
+```python
+apmask_weighted_cutout(weights, bbox, image, mask=None, fill_value=np.nan)
+```
+
+Return a bbox-tight weighted cutout for raw aperture weights and ``bbox``.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+<code>[**weights**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like]{.parameter-annotation}</code>
+
+:   Bbox-tight aperture weights with shape ``bbox.shape``.
+
+<code>[**bbox**]{.parameter-name} [:]{.parameter-annotation-sep} [BoundingBox]{.parameter-annotation}</code>
+
+:   Location of the bbox-tight weights in ``image`` coordinates.
+
+<code>[**image**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like]{.parameter-annotation}</code>
+
+:   Two-dimensional image to sample.
+
+<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like of bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
+
+:   Boolean image mask with the same shape as ``image``. ``True`` pixels are excluded by setting their aperture weights to zero before multiplication.
+
+<code>[**fill_value**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation} [ = ]{.parameter-default-sep} [np.nan]{.parameter-default}</code>
+
+:   Value used in returned cutout pixels that do not overlap ``image``.
+
+## Returns {.doc-section .doc-section-returns}
+
+<code>[]{.parameter-name} [:]{.parameter-annotation-sep} [ndarray]{.parameter-annotation}</code>
+
+:   Floating cutout with shape ``bbox.shape``. Overlapping pixels contain ``image * weight``; non-overlapping pixels contain ``fill_value``.

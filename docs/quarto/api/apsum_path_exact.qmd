@@ -1,0 +1,16 @@
+# apsum_path_exact { #astroapers.apsum_path_exact }
+
+```python
+apsum_path_exact(
+    data,
+    x,
+    y,
+    segments,
+    holes=None,
+    *,
+    mask=None,
+    return_npix=True,
+)
+```
+
+Return exact path aperture sums for one or many centers. Exact mode is analytic for the represented straight-line and circular-arc path. Other curve types are unsupported unless approximated before calling this function.

@@ -1,0 +1,9 @@
+# bboxes_path { #astroapers.bboxes_path }
+
+```python
+bboxes_path(x, y, segments, holes=None)
+```
+
+Return path aperture bounding boxes for one or many centers.
+
+Path geometry is limited to straight line segments and circular arcs.

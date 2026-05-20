@@ -1,0 +1,19 @@
+# calibrate_parallel_threshold { #astroapers.calibrate_parallel_threshold }
+
+```python
+calibrate_parallel_threshold(
+    counts=(1, 2, 4, 8, 16, 32, 64, 128, 256, 512),
+    repeats=100,
+    image_size=256,
+    radius=5.0,
+    apply=True,
+)
+```
+
+Benchmark and optionally apply a machine-local parallel threshold.
+
+The calibration compares the forced-serial path against the forced-parallel
+path for representative circular aperture apsum measurements. The returned
+threshold minimizes total measured runtime across the tested counts. A
+threshold larger than the largest tested count means the serial path was
+fastest for the measured workload.

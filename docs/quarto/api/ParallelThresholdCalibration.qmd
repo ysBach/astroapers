@@ -1,0 +1,36 @@
+# ParallelThresholdCalibration { #astroapers.ParallelThresholdCalibration }
+
+```python
+ParallelThresholdCalibration(
+    threshold,
+    original_threshold,
+    applied,
+    counts,
+    serial_seconds,
+    parallel_seconds,
+)
+```
+
+Result from calibrating the Rayon parallelization threshold.
+
+## Attributes {.doc-section .doc-section-attributes}
+
+<code>[**threshold**]{.parameter-name} [:]{.parameter-annotation-sep} [int]{.parameter-annotation}</code>
+
+:   Recommended aperture-count threshold for switching to Rayon.
+
+<code>[**original_threshold**]{.parameter-name} [:]{.parameter-annotation-sep} [int]{.parameter-annotation}</code>
+
+:   Threshold value active before calibration started.
+
+<code>[**applied**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation}</code>
+
+:   Whether ``threshold`` was applied to the current Python process.
+
+<code>[**counts**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple\[int, ...\]]{.parameter-annotation}</code>
+
+:   Aperture counts tested during calibration.
+
+<code>[**serial_seconds, parallel_seconds**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple\[float, ...\]]{.parameter-annotation}</code>
+
+:   Best measured runtime for each count with serial and forced-parallel execution.

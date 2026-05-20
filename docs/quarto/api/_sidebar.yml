@@ -1,0 +1,74 @@
+website:
+  sidebar:
+  - contents:
+    - api/index.qmd
+    - contents:
+      - api/CircAp.qmd
+      - api/CircAn.qmd
+      - api/EllipAp.qmd
+      - api/EllipAn.qmd
+      - api/RectAp.qmd
+      - api/RectAn.qmd
+      - api/PillAp.qmd
+      - api/PillAn.qmd
+      - api/WedgeAp.qmd
+      - api/PathAp.qmd
+      section: Python aperture objects
+    - contents:
+      - api/ApMask.qmd
+      - api/BoundingBox.qmd
+      - api/apmask_apsum.qmd
+      - api/apmask_npix.qmd
+      - api/apmask_to_image.qmd
+      - api/apmask_weighted_cutout.qmd
+      - api/apmask_weighted_values.qmd
+      section: Masks and Python helpers
+    - contents:
+      - api/apsum_circ_exact.qmd
+      - api/apsum_circ_center.qmd
+      - api/apsum_circ_ann_exact.qmd
+      - api/apsum_circ_ann_center.qmd
+      - api/apsum_ellip_exact.qmd
+      - api/apsum_ellip_center.qmd
+      - api/apsum_ellip_ann_exact.qmd
+      - api/apsum_ellip_ann_center.qmd
+      - api/apsum_rect_exact.qmd
+      - api/apsum_rect_center.qmd
+      - api/apsum_rect_ann_exact.qmd
+      - api/apsum_rect_ann_center.qmd
+      - api/apsum_pill_exact.qmd
+      - api/apsum_pill_center.qmd
+      - api/apsum_pill_ann_exact.qmd
+      - api/apsum_pill_ann_center.qmd
+      - api/apsum_wedge_exact.qmd
+      - api/apsum_wedge_center.qmd
+      - api/apsum_path_exact.qmd
+      - api/apsum_path_center.qmd
+      - api/npix_circ_exact.qmd
+      - api/npix_circ_center.qmd
+      - api/npix_circ_ann_exact.qmd
+      - api/npix_circ_ann_center.qmd
+      - api/npix_ellip_exact.qmd
+      - api/npix_ellip_center.qmd
+      - api/npix_ellip_ann_exact.qmd
+      - api/npix_ellip_ann_center.qmd
+      - api/npix_rect_exact.qmd
+      - api/npix_rect_center.qmd
+      - api/npix_rect_ann_exact.qmd
+      - api/npix_rect_ann_center.qmd
+      - api/npix_pill_exact.qmd
+      - api/npix_pill_center.qmd
+      - api/npix_pill_ann_exact.qmd
+      - api/npix_pill_ann_center.qmd
+      - api/npix_wedge_exact.qmd
+      - api/npix_wedge_center.qmd
+      - api/bboxes_path.qmd
+      section: Direct Rust-backed kernels
+    - contents:
+      - api/ParallelThresholdCalibration.qmd
+      - api/calibrate_parallel_threshold.qmd
+      - api/get_parallel_threshold.qmd
+      - api/set_parallel_threshold.qmd
+      section: Parallel threshold utilities
+    id: api
+  - id: dummy-sidebar

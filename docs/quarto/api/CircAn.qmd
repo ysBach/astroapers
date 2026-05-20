@@ -1,0 +1,25 @@
+# CircAn { #astroapers.CircAn }
+
+```python
+CircAn(positions, r_in, r_out, *, validate=True)
+```
+
+Circular annulus in pixel coordinates.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+<code>[**positions**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple or array - like]{.parameter-annotation}</code>
+
+:   Annulus center or centers as ``(x, y)`` pixel coordinates. Multiple centers are accepted as an ``(N, 2)`` array-like object.
+
+<code>[**r_in**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Inner and outer radii in pixels. ``r_in`` may be zero and must be smaller than ``r_out``.
+
+<code>[**r_out**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Inner and outer radii in pixels. ``r_in`` may be zero and must be smaller than ``r_out``.
+
+<code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
+
+:   If `False`, skip input validation and assume finite geometry, ordered radii, and normalized positions.

@@ -1,0 +1,62 @@
+# BoundingBox { #astroapers.BoundingBox }
+
+```python
+BoundingBox(ixmin, ixmax, iymin, iymax)
+```
+
+Pixel-index bounding box with exclusive upper bounds.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+<code>[**ixmin**]{.parameter-name} [:]{.parameter-annotation-sep} [int]{.parameter-annotation}</code>
+
+:   Inclusive lower and exclusive upper x pixel indices.
+
+<code>[**ixmax**]{.parameter-name} [:]{.parameter-annotation-sep} [int]{.parameter-annotation}</code>
+
+:   Inclusive lower and exclusive upper x pixel indices.
+
+<code>[**iymin**]{.parameter-name} [:]{.parameter-annotation-sep} [int]{.parameter-annotation}</code>
+
+:   Inclusive lower and exclusive upper y pixel indices.
+
+<code>[**iymax**]{.parameter-name} [:]{.parameter-annotation-sep} [int]{.parameter-annotation}</code>
+
+:   Inclusive lower and exclusive upper y pixel indices.
+
+## Notes {.doc-section .doc-section-notes}
+
+Bounding boxes may extend outside an image. Use
+:meth:`overlap_slices` to obtain matching image and bbox-tight mask slices.
+
+## Attributes
+
+| Name | Description |
+| --- | --- |
+| [shape](#astroapers.BoundingBox.shape) | Mask-array shape as ``(ny, nx)``. |
+
+## Methods
+
+| Name | Description |
+| --- | --- |
+| [overlap_slices](#astroapers.BoundingBox.overlap_slices) | Return image and mask slices for the overlap with ``shape``. |
+
+### overlap_slices { #astroapers.BoundingBox.overlap_slices }
+
+```python
+BoundingBox.overlap_slices(shape)
+```
+
+Return image and mask slices for the overlap with ``shape``.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+<code>[**shape**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple\[int, int\]]{.parameter-annotation}</code>
+
+:   Full image shape as ``(ny, nx)``.
+
+#### Returns {.doc-section .doc-section-returns}
+
+<code>[]{.parameter-name} [:]{.parameter-annotation-sep} [tuple of tuple of slice, or None]{.parameter-annotation}</code>
+
+:   ``(data_slices, mask_slices)`` when the bounding box overlaps the image. ``data_slices`` select the in-frame pixels from the full image; ``mask_slices`` select the matching region from the bbox-tight mask. Returns ``None`` when the bounding box is fully outside the image.

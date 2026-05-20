@@ -1,0 +1,142 @@
+---
+title: "Bbox-tight masks (`ApMask`)"
+---
+
+`ApMask` (usually called `apm` throughout `astroapers`) is the sampled result of an aperture. It stores only the small `bbox`(bounding box)-tight weight image and the `bbox` that places those weights in the parent image. This is the object to inspect when you want to understand what pixels actually contributed to a measurement.
+
+`ApMask` can be defined by `aap.ApMask()`, but the most common way to get one is from an aperture method `ap.get_apmask()`, which will be demonstrated below.
+
+Keep three ideas separate:
+
+- `ap.area` is the analytic geometric area of the aperture (e.g., $\pi r^2$ for a circle).
+- `apm.npix(shape, mask=...)` is the sum of weights, that is, excluding pixels outside the image and/or masked pixels (therefore, $\le$ `ap.area`).
+- `apm.weights` are "fraction of area for each pixel that is inside the aperture". To save memory, it is `bbox`-tight, so to get the full image-shaped mask, use a method `apm.to_image(shape)`.
+
+```{python}
+import numpy as np
+import matplotlib.pyplot as plt
+import astroapers as aap
+```
+
+## `"exact"` and `"center"` Masks
+
+1. `method="exact"`: Exact masks - fractional overlap weights.
+2. `method="center"`: Center masks - weights in binary (0 or 1). ``1`` if pixel center is inside the aperture, ``0`` otherwise.
+
+Exact masks are natural for aperture sums, while center masks are often better for sampling background pixels in an annulus, without fractional values.
+
+```{python}
+shape = (25, 23)
+ap = aap.CircAp((15.0, 15.0), r=6.0)
+
+apm_exact = ap.get_apmask(method="exact")
+apm_center = ap.get_apmask(method="center")
+
+print("Exact ApMask:")
+print(f"Shape: {apm_exact.weights.shape}")
+print(f"BBox: {apm_exact.bbox}")
+print(f"Area: {ap.area:.3f} - analytic geometric area")
+print(f"Npix: {apm_exact.npix(shape):.3f} - in-frame exact weight sum")
+```
+
+* **NOTE**: Imagine your aperture was located near the edge of the image. Changing the center in `CircAp` to `(25.0, 15.0)` will make `npix` smaller than `area`.
+
+```{python}
+ap_edge = aap.CircAp((25.0, 15.0), r=6.0)
+apm_edge_exact = ap_edge.get_apmask(method="exact")
+print(f"{apm_edge_exact.npix(shape)} < {ap_edge.area}")
+```
+
+Convert the bbox-tight weights to an arbitrary shape (preferably the same shape as your data, using the information in `.bbox`) for visualization or masking the full data:
+```{python}
+apm_exact_image = apm_exact.to_image(shape)
+apm_center_image = apm_center.to_image(shape)
+```
+
+```{python}
+fig, axes = plt.subplots(1, 2, figsize=(7, 3))
+axes[0].imshow(apm_exact_image, origin="lower", vmin=0, vmax=1)
+axes[0].set_title("exact weights")
+axes[1].imshow(apm_center_image, origin="lower", vmin=0, vmax=1)
+axes[1].set_title("center weights")
+plt.show()
+```
+
+## Build a boolean exclusion mask
+
+No special helper is needed. Compare the image-shaped weights with a threshold.
+For exact masks, `> 0` means any positive overlap. For center masks, `> 0`
+means the pixel center was selected.
+
+```{python}
+cosmicrayhit = aap.RectAp((10.0, 15.0), w=2.0, h=5.25, theta=np.pi/4)
+apm_cr = cosmicrayhit.get_apmask()  # aperture mask (apm)
+bpm_cr = apm_cr.to_image(shape) > 0.1  # bad pixel mask: >10% overlap
+print(f"Num. of pixels flagged as bad: {bpm_cr.sum()}")
+print(f"Full exact weights of RectAp (npix): {apm_cr.npix(shape)}")
+
+fig, ax = plt.subplots(figsize=(5, 4))
+ax.imshow(apm_exact_image, origin="lower", cmap="viridis", vmin=0, vmax=1)
+ax.imshow(bpm_cr, origin="lower", cmap="gray_r", vmin=0, vmax=1, alpha=0.5)
+cosmicrayhit.plot(ax=ax, color="r", lw=1.5)
+ax.set_title("CR-hit mask (weights > 0.1)")
+plt.show()
+```
+
+The threshold is part of your data-quality rule, not part of aperture
+aperture summation. A cosmic-ray mask, saturation mask, or detector-footprint mask may
+choose different thresholds.
+
+## Weighted cutouts and values
+
+`weighted_cutout()` preserves the bbox shape. `weighted_values()` returns the
+positive-weight values as a 1-D array. Exact values are already multiplied by
+the fractional weights; center values are ordinary selected pixels.
+
+Built-in aperture masks use `float64` weights. If you build an `ApMask` from
+your own raw weights, `float32` and `float64` are preserved, but other numeric
+or boolean dtypes are converted to `float64`. That includes `float128` or
+`longdouble` arrays on platforms where NumPy provides them.
+
+```{python}
+cutout = apm_exact.weighted_cutout(np.ones(shape))
+exact_values = apm_exact.weighted_values(np.ones(shape))
+center_values = apm_center.weighted_values(np.ones(shape))
+
+cutout.shape, exact_values.sum(), center_values.size
+```
+
+## Low-Level Kernels for Lowest Overhead
+
+For catalog aperture sums where your coordinates are already arrays, use the direct
+kernel namespace as the lowest-overhead entry point. For supported unmasked
+`apsum()` calls, aperture objects delegate to the same kernels, so the direct
+path mainly saves object construction and validation overhead. That advantage is
+most visible for small aperture counts and can be a near tie for large batches.
+Use `mask=bad_pixels` for direct masked sums, and use `ApMask` or `apmask_*`
+helpers when you need reusable bbox-tight weights, full-frame masks, or custom
+mask composition.
+
+```{python}
+import astroapers.kernels as aapk
+
+image = np.ones(shape, dtype=float)
+kernel_apsum, kernel_npix = aapk.apsum_circ_exact(
+    image,
+    np.array([15.0]),
+    np.array([15.0]),
+    r=6.0,
+)
+kernel_npix_only = aapk.npix_circ_exact(
+    np.array([15.0]),
+    np.array([15.0]),
+    r=6.0,
+    shape=shape,
+)
+
+assert np.allclose(kernel_apsum[0], apm_exact.apsum(image)[0])
+assert np.allclose(kernel_npix[0], apm_exact.npix(shape))
+assert np.allclose(kernel_npix_only[0], kernel_npix[0])
+
+kernel_apsum[0], kernel_npix[0]
+```

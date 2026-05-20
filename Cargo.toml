@@ -1,0 +1,20 @@
+[package]
+name = "astroapers"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "_rust"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+extension-module = ["pyo3/extension-module"]
+
+[dependencies]
+numpy = "0.28"
+pyo3 = { version = "0.28" }
+rayon = "1.10"
+
+[profile.release]
+codegen-units = 1
+lto = "thin"

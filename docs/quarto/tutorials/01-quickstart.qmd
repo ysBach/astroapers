@@ -1,0 +1,100 @@
+---
+title: "Quickstart aperture sums"
+---
+
+This notebook measures a synthetic source with exact circular aperture
+aperture summation. The point is to show the shortest useful workflow: create an
+aperture, call `apsum()`, and interpret the returned flux and effective pixel
+area.
+
+```{python}
+import numpy as np
+import matplotlib.pyplot as plt
+import astroapers as aap
+```
+
+## Make a small image
+
+The source center is in `(x, y)` order, matching Photutils and SEP pixel
+coordinates.
+
+```{python}
+ny, nx = 30, 40
+y, x = np.mgrid[:ny, :nx]
+
+x0, y0 = 15.2, 17.6
+background = 12.0
+
+# make a Gaussian source
+amplitude = 150.0
+sigma = 3.0
+source = amplitude * np.exp(-0.5 * ((x - x0) ** 2 + (y - y0) ** 2) / sigma**2)
+data = background + source
+```
+
+```{python}
+fig, ax = plt.subplots(figsize=(5, 4))
+ax.imshow(data, origin="lower", cmap="viridis")
+ax.set_title("Synthetic image")
+ax.set_xlabel("x pixel")
+ax.set_ylabel("y pixel")
+plt.show()
+```
+
+## Measure an aperture sum
+
+`CircAp.apsum()` uses exact fractional pixel overlap for circular apertures.
+It returns the weighted sum and the in-frame weighted pixel count.
+
+```{python}
+ap = aap.CircAp((x0, y0), r=5.0)
+apsum, npix = ap.apsum(data, return_npix=True)
+
+apsum, npix, ap.area, npix == ap.area
+```
+
+The source flux above a known constant background is:
+
+```{python}
+# Use a known background level for this synthetic example.
+srcsum = apsum - background * npix
+print(f"Net flux: {srcsum:.2f} = apsum({apsum:.2f}) - background({background:.2f}) * npix({npix:.2f})")
+```
+
+## Overlay the aperture
+
+```{python}
+fig, ax = plt.subplots(figsize=(5, 4))
+ax.imshow(data, origin="lower", cmap="viridis")
+ap.plot(ax=ax, color="r", lw=1.5)
+ax.set(title="CircAp.plot()")
+plt.show()
+```
+
+## Low-Level Kernels for Lowest Overhead
+
+The object API above is the clearest way to learn the workflow. In production (e.g., when making large-scale pipelines after all algorithms are fixed), use the direct, that is, the lowest-overhead entry point. These are the same Rust-backed functions that `CircAp.apsum()` uses internally for this unmasked case, so the speed difference is mostly Python object construction and result-shaping overhead. That margin is most visible for small aperture counts. When you have large batches of apertures, the difference is smaller and may not be noticeable.
+
+```{python}
+import astroapers.kernels as aapk
+
+kernel_apsum, kernel_npix = aapk.apsum_circ_exact(
+    data,
+    np.array([x0]),
+    np.array([y0]),
+    r=5.0,
+)
+kernel_sum_only = aapk.apsum_circ_exact(
+    data,
+    np.array([x0]),
+    np.array([y0]),
+    r=5.0,
+    return_npix=False,
+)
+
+assert np.allclose(kernel_apsum[0], apsum)
+assert np.allclose(kernel_npix[0], npix)
+assert np.allclose(kernel_sum_only[0], apsum)
+
+kernel_apsum[0], kernel_npix[0], kernel_sum_only[0]
+```

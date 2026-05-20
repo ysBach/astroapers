@@ -1,0 +1,211 @@
+---
+title: "Multiple apertures and radial profiles"
+---
+
+This notebook shows how to measure several source positions at once, check edge coverage, and use multiple radii to build a simple radial profile.
+
+```{python}
+import numpy as np
+import matplotlib.pyplot as plt
+import astroapers as aap
+import pandas as pd
+```
+
+## Several apertures at once
+
+```{python}
+ny, nx = 70, 80
+y, x = np.mgrid[:ny, :nx]
+positions = np.array(
+    [
+        [20.0, 24.0],
+        [40.5, 35.2],
+        [78.0, 68.0],
+    ],
+)
+
+data = np.full((ny, nx), 5.0)
+for x0, y0 in positions:
+    data += 80.0 * np.exp(-0.5 * ((x - x0) ** 2 + (y - y0) ** 2) / 2.5**2)
+```
+
+```{python}
+# multiple apertures at once:
+ap = aap.CircAp(positions, r=5.0)
+
+# all at once:
+apsum, npix = ap.apsum(data)
+coverage = npix / ap.area
+
+assert coverage[-1] < 1.0
+pd.DataFrame({
+    "x": positions[:, 0],
+    "y": positions[:, 1],
+    "apsum": apsum,
+    "npix": npix,
+    "coverage": coverage
+})
+```
+
+The third source is near the image edge, so its in-frame coverage is smaller.
+
+```{python}
+fig, ax = plt.subplots(figsize=(5, 4))
+ax.imshow(data, origin="lower", cmap="viridis")
+ap.plot(ax=ax, color="r", lw=2)
+ax.set_title("Multiple circular apertures")
+plt.show()
+```
+
+## Multiple radii for radial profiles
+
+Use one vector aperture per radius to measure the same source catalog at several scales. The examples below use the two in-frame sources; the edge source is excluded so the radial profile is not dominated by image clipping.
+
+```{python}
+# drop objects with low coverage:
+edgemask = npix < ap.area
+
+profile_positions = positions[~edgemask]
+radii = np.arange(1.0, 10.0, 1.0)
+
+cumulative = []
+for radius in radii:
+    ap_r = aap.CircAp(profile_positions, r=radius)
+    ap_r_sum, ap_r_npix = ap_r.apsum(data)
+    cumulative.append((ap_r_sum, ap_r_npix))
+
+cumulative_apsum = np.vstack([row[0] for row in cumulative])
+cumulative_npix = np.vstack([row[1] for row in cumulative])
+
+pd.DataFrame(
+    cumulative_apsum,
+    index=pd.Index(radii, name="radius"),
+    columns=[f"source {idx}" for idx in range(len(profile_positions))],
+)
+```
+
+Draw the same radii on the image:
+
+```{python}
+fig, ax = plt.subplots(figsize=(5, 4))
+ax.imshow(data, origin="lower", cmap="viridis")
+for radius in radii:
+    aap.CircAp(profile_positions, r=radius).plot(
+        ax=ax,
+        color="tab:red",
+        alpha=0.35,
+        lw=1.2,
+    )
+ax.scatter(profile_positions[:, 0], profile_positions[:, 1], c="white", s=12)
+ax.set_title("Multiple radii at each source")
+plt.show()
+```
+
+
+For custom pixel-sample statistics such as a sigma-clipped median, or robust scatter, each aperture returns a different number of pixels. That result is ragged, so a Python reduction over the returned arrays is expected. Keep the aperture construction vectorized over source positions, and use the length of each returned sample array as the center-selected pixel count.
+
+```{python}
+radius_edges = np.arange(0.0, 10.0, 1.0)
+radius_mid = 0.5 * (radius_edges[:-1] + radius_edges[1:])
+
+custom_rows = []
+for r_in, r_out, r_mid in zip(radius_edges[:-1], radius_edges[1:], radius_mid):
+    an = aap.CircAn(profile_positions, r_in=r_in, r_out=r_out)
+    an_vals = an.weighted_values(data, method="center")
+
+    # For the case of "center", npix is just the number of pixels used here.
+    # For complicated calculations, user may store npix before/after sigclip
+    # such as npix and nrej.
+
+    for source_idx, ((x0, y0), vals) in enumerate(zip(profile_positions, an_vals)):
+        custom_rows.append(
+            {
+                "radius": r_mid,
+                "source": source_idx,
+                "x": x0,
+                "y": y0,
+                "mpix": np.nanmedian(vals),
+                "spix": np.nanstd(vals, ddof=1),
+                "npix": len(vals),
+            }
+        )
+
+custom_profile = pd.DataFrame(custom_rows).set_index(["radius", "source"])
+custom_profile
+```
+
+```{python}
+fig, ax = plt.subplots(figsize=(5, 3.5))
+for source_idx, source_profile in custom_profile.groupby(level="source"):
+    x0 = source_profile["x"].iloc[0]
+    y0 = source_profile["y"].iloc[0]
+
+    # Median surface brightness (divide by area), normalized by the central annulus:
+    sample_npix = source_profile["npix"]
+    surf_b = source_profile["mpix"] / sample_npix
+    center = surf_b.iloc[0]
+    surf_b = surf_b / center
+    spix_surfb = source_profile["spix"] / center / sample_npix
+
+    ax.errorbar(
+        source_profile.index.get_level_values("radius"),
+        surf_b,
+        yerr=spix_surfb,
+        marker=".",
+        label=f"({x0:.1f}, {y0:.1f})",
+    )
+ax.legend(title="source")
+ax.set(
+    xlabel="radius (pixels)",
+    ylabel="Surface brightness (normalized)",
+    yscale="log",
+)
+plt.show()
+```
+
+## Aperture masks return a list
+
+`get_apmask()` returns one `ApMask` per vector position. This makes clipping and
+reusing each bbox-tight mask explicit.
+
+```{python}
+masks = ap.get_apmask(method="center")
+assert len(masks) == len(positions)
+[mask.weights.sum() for mask in masks]
+```
+
+```{python}
+full_masks = [mask.to_image(data.shape) > 0 for mask in masks]
+[mask.sum() for mask in full_masks]
+```
+
+## Low-Level Kernels for Lowest Overhead
+
+Vector positions are where the direct kernels are most useful. Pass coordinate
+arrays directly when you already have catalog columns. For supported unmasked
+`apsum()` calls, vector aperture objects use the same Rust kernels, so the
+direct call mainly avoids object construction, validation, and result-shaping
+overhead. That overhead matters most for small batches; at large `n`, the
+kernel work dominates and timings can be close.
+
+```{python}
+import astroapers.kernels as aapk
+
+xpos = positions[:, 0]
+ypos = positions[:, 1]
+
+kernel_apsum, kernel_npix = aapk.apsum_circ_exact(data, xpos, ypos, r=5.0)
+kernel_sum_only = aapk.apsum_circ_exact(
+    data,
+    xpos,
+    ypos,
+    r=5.0,
+    return_npix=False,
+)
+
+assert np.allclose(kernel_apsum, apsum)
+assert np.allclose(kernel_npix, npix)
+assert np.allclose(kernel_sum_only, apsum)
+
+np.column_stack([positions, kernel_apsum, kernel_npix, kernel_npix / ap.area])
+```

@@ -1,0 +1,53 @@
+# PathAp { #astroapers.PathAp }
+
+```python
+PathAp(positions, segments, holes=None, *, validate=True, plot_samples=96)
+```
+
+Aperture defined by a closed path of line segments and circular arcs.
+
+`PathAp` supports only straight line segments and circular arcs. It does
+not accept Bezier curves, spline curves, elliptical arcs, Matplotlib
+``Path`` objects, or arbitrary Python predicate/callback masks. If another
+curve type is flattened into line segments before construction, the
+resulting aperture is exact for that flattened line-segment path, not for
+the original curve.
+
+Coordinates in `segments` and `holes` are local offsets from each aperture
+center. Angles are radians counterclockwise from the positive x axis.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+<code>[**positions**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple or array - like]{.parameter-annotation}</code>
+
+:   Aperture center(s) as ``(x, y)`` pixel coordinates. Multiple centers as ``(N, 2)`` array-like.
+
+<code>[**segments**]{.parameter-name} [:]{.parameter-annotation-sep} [sequence of tuples]{.parameter-annotation}</code>
+
+:   Outer contour commands. Must start with ``('move', x, y)``, followed by any mix of ``('line', x, y)`` and ``('arc', cx, cy, r, theta0, dtheta)``, and end with ``('close',)``. These are the only supported geometry commands.
+
+<code>[**holes**]{.parameter-name} [:]{.parameter-annotation-sep} [sequence of sequences]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
+
+:   Zero or more hole contours, each using the same command language.
+
+<code>[**plot_samples**]{.parameter-name} [:]{.parameter-annotation-sep} [int]{.parameter-annotation} [ = ]{.parameter-default-sep} [96]{.parameter-default}</code>
+
+:   Even number >= 4 used to sample arcs for plotting.
+
+<code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
+
+:   If `False`, skip Python-side validation.
+
+## Methods
+
+| Name | Description |
+| --- | --- |
+| [get_apmask](#astroapers.PathAp.get_apmask) | Return bbox-tight path masks as `ApMask` objects. |
+
+### get_apmask { #astroapers.PathAp.get_apmask }
+
+```python
+PathAp.get_apmask(method='exact')
+```
+
+Return bbox-tight path masks as `ApMask` objects.

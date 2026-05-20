@@ -1,0 +1,76 @@
+# PillAp { #astroapers.PillAp }
+
+```python
+PillAp(positions, w, a, b, theta=0.0, plot_samples=96, *, validate=True)
+```
+
+Capsule-like aperture composed from one rectangle and two ellipses.
+
+The pill aperture has a central rectangle of length ``w`` and height
+``2 * b`` with elliptical caps of semiaxes ``a`` and ``b`` centered on the
+rectangle ends. Its masks use fused Rust kernels that preserve the package's
+composite rectangle-plus-cap semantics.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+<code>[**positions**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple or array - like]{.parameter-annotation}</code>
+
+:   Aperture center or centers as ``(x, y)`` pixel coordinates. Multiple centers are accepted as an ``(N, 2)`` array-like object.
+
+<code>[**w**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Length of the central rectangle in pixels, measured along the pill major axis between the two cap centers.
+
+<code>[**a**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Semimajor axis of each elliptical cap in pixels.
+
+<code>[**b**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Semiminor axis of each elliptical cap in pixels. The central rectangle height is ``2 * b``.
+
+<code>[**theta**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation} [ = ]{.parameter-default-sep} [0.0]{.parameter-default}</code>
+
+:   Rotation angle in radians, measured counterclockwise from the positive x axis.
+
+<code>[**plot_samples**]{.parameter-name} [:]{.parameter-annotation-sep} [int]{.parameter-annotation} [ = ]{.parameter-default-sep} [96]{.parameter-default}</code>
+
+:   Even number of samples used to draw the two elliptical caps when creating Matplotlib patches.
+
+<code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
+
+:   If `False`, skip input validation and assume finite, positive geometry and normalized positions.
+
+## Attributes {.doc-section .doc-section-attributes}
+
+<code>[**area**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Analytic geometric area, ``w * 2 * b + pi * a * b``. Image clipping and bad-pixel masks are accounted for by ``npix`` results, not by this property.
+
+## Methods
+
+| Name | Description |
+| --- | --- |
+| [apsum](#astroapers.PillAp.apsum) | Return exact pill-aperture sums, and npix by default. |
+
+### apsum { #astroapers.PillAp.apsum }
+
+```python
+PillAp.apsum(data, mask=None, *, return_npix=True)
+```
+
+Return exact pill-aperture sums, and npix by default.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+<code>[**data**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like]{.parameter-annotation}</code>
+
+:   Two-dimensional image.
+
+<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like of bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
+
+:   Boolean image mask with the same shape as ``data``. ``True`` pixels are excluded from both ``apsum`` and ``npix``.
+
+<code>[**return_npix**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
+
+:   If `True`, return ``(apsum, npix)``. If `False`, return only ``apsum``.

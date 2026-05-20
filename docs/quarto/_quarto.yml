@@ -1,0 +1,144 @@
+project:
+  type: website
+  output-dir: _site
+
+metadata-files:
+  - api/_sidebar.yml
+
+website:
+  title: "astroapers"
+  favicon: assets/logo.png
+  image: assets/logo.png
+  navbar:
+    logo: assets/logo.png
+    logo-alt: "astroapers aperture logo"
+    left:
+      - href: index.qmd
+        text: Home
+      - href: gallery.qmd
+        text: Gallery
+      - text: Tutorials
+        menu:
+          - href: tutorials/01-quickstart.qmd
+            text: Quickstart aperture sums
+          - href: tutorials/02-masks.qmd
+            text: Bbox-tight masks
+          - href: tutorials/03-background.qmd
+            text: Annulus background
+          - href: tutorials/04-multiple-apertures.qmd
+            text: Multiple apertures and radial profiles
+          - href: tutorials/05-custom-masks.qmd
+            text: Custom masks and composition
+          - href: tutorials/06-ellipse-annuli-galaxies.qmd
+            text: ELLIPSE-style galaxy annuli
+          - href: tutorials/07-wedge-comet-jet.qmd
+            text: Wedge aperture sums for comet jets
+          - href: tutorials/08-pathap-custom-shapes.qmd
+            text: PathAp custom line and arc apertures
+          - href: tutorials/09-performance-guide.qmd
+            text: Performance guide
+      - href: api/index.qmd
+        text: API reference
+
+format:
+  html:
+    theme: cosmo
+    toc: true
+    code-fold: false
+    code-copy: true
+    css:
+      - styles.css
+      - api/_styles-quartodoc.css
+
+execute:
+  echo: true
+  warning: false
+  message: false
+  cache: false
+  freeze: auto
+
+quartodoc:
+  package: astroapers
+  parser: numpy
+  dynamic: true
+  rewrite_all_pages: true
+  dir: api
+  sidebar: api/_sidebar.yml
+  css: api/_styles-quartodoc.css
+  sections:
+    - title: Python aperture objects
+      desc: Classes for readable aperture construction, plotting, masks, and aperture sums.
+      contents:
+        - CircAp
+        - CircAn
+        - EllipAp
+        - EllipAn
+        - RectAp
+        - RectAn
+        - PillAp
+        - PillAn
+        - WedgeAp
+        - PathAp
+    - title: Masks and Python helpers
+      desc: Bbox-tight mask containers and Python-level helper functions.
+      contents:
+        - ApMask
+        - BoundingBox
+        - apmask_apsum
+        - apmask_npix
+        - apmask_to_image
+        - apmask_weighted_cutout
+        - apmask_weighted_values
+    - title: Direct Rust-backed kernels
+      desc: Low-overhead catalog functions for fixed geometry workflows.
+      contents:
+        - apsum_circ_exact
+        - apsum_circ_center
+        - apsum_circ_ann_exact
+        - apsum_circ_ann_center
+        - apsum_ellip_exact
+        - apsum_ellip_center
+        - apsum_ellip_ann_exact
+        - apsum_ellip_ann_center
+        - apsum_rect_exact
+        - apsum_rect_center
+        - apsum_rect_ann_exact
+        - apsum_rect_ann_center
+        - apsum_pill_exact
+        - apsum_pill_center
+        - apsum_pill_ann_exact
+        - apsum_pill_ann_center
+        - apsum_wedge_exact
+        - apsum_wedge_center
+        - apsum_path_exact
+        - apsum_path_center
+        - npix_circ_exact
+        - npix_circ_center
+        - npix_circ_ann_exact
+        - npix_circ_ann_center
+        - npix_ellip_exact
+        - npix_ellip_center
+        - npix_ellip_ann_exact
+        - npix_ellip_ann_center
+        - npix_rect_exact
+        - npix_rect_center
+        - npix_rect_ann_exact
+        - npix_rect_ann_center
+        - npix_pill_exact
+        - npix_pill_center
+        - npix_pill_ann_exact
+        - npix_pill_ann_center
+        - npix_wedge_exact
+        - npix_wedge_center
+        - bboxes_path
+    - title: Parallel threshold utilities
+      desc: Helpers for configuring when the Rust kernels switch to Rayon.
+      contents:
+        - ParallelThresholdCalibration
+        - calibrate_parallel_threshold
+        - get_parallel_threshold
+        - set_parallel_threshold
+  renderer:
+    style: markdown
+    display_name: short
+    table_style: description-list

@@ -1,0 +1,295 @@
+---
+title: "Performance guide"
+---
+
+Use the direct kernel namespace for catalog aperture sums when your source coordinates already live in arrays. The object API is the most readable way to express one measurement; the kernel API is the lowest-overhead function-style form when you already have a large array of positions.
+
+The `astroapers.kernels` (or `aapk`) functions are the same as what `PixelAp` and `ApMask` uses. Calls with `mask=None` use the fastest unmasked Rust path; calls with `mask=bad_pixels` apply bbox-tight masks.
+
+For supported unmasked aperture sums, object methods such as `CircAp(...).apsum(data)` delegate to this same kernel layer. Direct calls mostly save Python object construction, constructor validation, and result-shaping overhead. That margin is most visible for small aperture counts; as the number of apertures grows, the Rust kernel work dominates and object and direct calls can benchmark close to each other.
+
+* **NOTE**: In this repo, there is a benchmark script. In the output, read `aap` as the normal object API and `aap_opt` as the optimized astroapers path for that row: direct kernels where available and `validate=False` object paths otherwise.
+
+```{python}
+import numpy as np
+import astroapers as aap
+import astroapers.kernels as aapk
+import pandas as pd
+
+assert aapk.apsum_circ_exact is aap.kernels.apsum_circ_exact
+```
+
+## Build one image and many positions
+
+```{python}
+ny, nx = 80, 96
+y, x = np.mgrid[:ny, :nx]
+data = 10.0 + 0.03 * x + 0.02 * y
+
+positions = np.array(
+    [
+        [16.2, 18.5],
+        [40.0, 22.0],
+        [72.5, 44.2],
+        [88.0, 76.0],
+    ],
+    dtype=float,
+)
+
+for x0, y0 in positions:
+    data += 100.0 * np.exp(-0.5 * ((x - x0) ** 2 + (y - y0) ** 2) / 2.2**2)
+```
+
+## Object API for readable work
+
+This is how general `aap` users would do:
+```{python}
+ap = aap.CircAp(positions, r=4.0)
+obj_apsum, obj_npix = ap.apsum(data)
+obj_coverage = obj_npix / ap.area
+
+pd.DataFrame({
+    "x": positions[:, 0],
+    "y": positions[:, 1],
+    "apsum": obj_apsum,
+    "npix": obj_npix,
+    "coverage": obj_coverage
+})
+```
+
+## Kernel API for lowest overhead
+
+For direct kernel calls, this is how the user would do:
+```{python}
+xpos = positions[:, 0]
+ypos = positions[:, 1]
+
+ker_apsum, ker_npix = aapk.apsum_circ_exact(data, xpos, ypos, r=4.0)
+assert np.allclose(ker_apsum, obj_apsum)
+assert np.allclose(ker_npix, obj_npix)
+
+pd.DataFrame({
+    "x": xpos,
+    "y": ypos,
+    "apsum": ker_apsum,
+    "npix": ker_npix
+})
+```
+
+When only aperture sums are needed, use `apsum_circ_exact(..., return_npix=False)` for a minor speedup:
+
+```{python}
+sum_only = aapk.apsum_circ_exact(
+    data,
+    xpos,
+    ypos,
+    r=4.0,
+    return_npix=False,
+)
+
+assert np.allclose(sum_only, ker_apsum)
+sum_only
+```
+
+When only `npix` is needed, use standalone `npix_*`:
+
+```{python}
+npix_only = aapk.npix_circ_exact(xpos, ypos, r=4.0, shape=data.shape)
+assert np.allclose(npix_only, ker_npix)
+
+# Case of mode="center" in kernel form:
+center_npix = aapk.npix_circ_center(xpos, ypos, r=4.0, shape=data.shape)
+pd.DataFrame({
+    "x": xpos,
+    "y": ypos,
+    "ker_npix": ker_npix,
+    "center_npix": center_npix
+})
+```
+
+Direct kernels accept bad-pixel masks. `True` pixels are excluded from both `apsum` and `npix`.
+
+```{python}
+bad = np.zeros_like(data, dtype=bool)
+bad[20:24, 18:22] = True
+
+masked_apsum, masked_npix = aapk.apsum_circ_exact(
+    data, xpos, ypos, r=4.0, mask=bad
+)
+
+assert np.all(masked_npix <= ker_npix)
+pd.DataFrame({
+    "x": xpos,
+    "y": ypos,
+    "ker_apsum": ker_apsum,
+    "masked_apsum": masked_apsum,
+    "ker_npix": ker_npix,
+    "masked_npix": masked_npix
+})
+```
+
+## Dtypes and validation
+
+Direct kernels dispatch common image dtypes to Rust **without** converting the whole image to `float64` first. However, some results such as `apsum` and `npix` are always `float64`, so integer images do not accumulate in integer precision.
+
+```{python}
+data_i16 = data.astype(np.int16)
+i16_apsum, i16_npix = aapk.apsum_circ_exact(data_i16, xpos, ypos, r=4.0)
+
+i16_apsum.dtype, i16_npix.dtype
+```
+
+The specialized unmasked kernel paths cover `float64`, `float32`, `int32`, and `int16` images. Other image dtypes, such as `uint16`, `int64`, `bool`, or extended precision floating types, are copied to contiguous `float64` before summation (similar to numpy). Calls with `mask=...` and the composite weight-based paths also reduce through bbox-tight floating weights; public `apsum` and `npix` arrays are still returned as `float64`.
+
+Of course, if a position is not finite (e.g., `nan`), any result is also `nan`:
+
+```{python}
+x_bad = xpos.copy()
+x_bad[1] = np.nan
+bad_coord_apsum, bad_coord_npix = aapk.apsum_circ_exact(data, x_bad, ypos, r=4.0)
+
+bad_coord_apsum
+```
+
+
+## A small reproducible benchmark
+
+The repository benchmark script validates numerical agreement before it prints
+timings. This page runs the same script with `--repeats 5` and shows a focused
+subset: `float32` exact aperture sums for circles, ellipses, rectangles, and
+pills at 1, 100, and 10,000 positions.
+
+The benchmark labels are:
+
+- `aap`: the normal object API;
+- `aap_opt`: the optimized `astroapers` path for that row, usually a direct
+  Rust-backed kernel;
+- `photutils.geometry`: low-level Photutils overlap kernels where available;
+- `photutils.Aperture`: Photutils aperture objects;
+- `sep`: SEP aperture sums where available.
+
+```{python}
+from io import StringIO
+from pathlib import Path
+import subprocess
+import sys
+
+
+for parent in [Path.cwd(), *Path.cwd().parents]:
+    benchmark_script = parent / "benchmarks" / "benchmark_apertures.py"
+    if benchmark_script.exists():
+        break
+else:
+    raise FileNotFoundError("could not find benchmarks/benchmark_apertures.py")
+
+benchmark_cmd = [
+    sys.executable,
+    str(benchmark_script),
+    "--repeats",
+    "5",
+    "--format",
+    "csv",
+    "--tasks",
+    "apsum",
+    "--dtypes",
+    "float32",
+    "--shapes",
+    "circle",
+    "ellipse",
+    "rectangle",
+    "pill",
+    "--counts",
+    "1",
+    "100",
+    "10000",
+]
+
+benchmark_output = subprocess.run(
+    benchmark_cmd,
+    check=True,
+    capture_output=True,
+    text=True,
+).stdout
+
+benchmark_lines = [
+    line for line in benchmark_output.splitlines()
+    if line and not line.startswith("#")
+]
+benchmark_csv = "\n".join(
+    line for line in benchmark_lines
+    if not line.startswith("task,shape,dtype,n_apertures,fastest_library")
+)
+benchmark_raw = pd.read_csv(StringIO(benchmark_csv))
+benchmark_raw = benchmark_raw[benchmark_raw["speedup_vs_library"].isna()].copy()
+
+benchmark_summary = (
+    benchmark_raw
+    .pivot_table(
+        index=["shape", "n_apertures"],
+        columns="library",
+        values="seconds",
+        aggfunc="first",
+    )
+    .reset_index()
+)
+
+for column in ["aap_opt", "aap", "photutils.geometry", "photutils.Aperture", "sep"]:
+    if column in benchmark_summary:
+        benchmark_summary[f"{column}_us"] = benchmark_summary[column] * 1.0e6
+
+for column in ["aap", "photutils.geometry", "photutils.Aperture", "sep"]:
+    if column in benchmark_summary:
+        benchmark_summary[f"{column}/aap_opt"] = benchmark_summary[column] / benchmark_summary["aap_opt"]
+
+display_columns = [
+    "shape",
+    "n_apertures",
+    "aap_opt_us",
+    "aap/aap_opt",
+    "photutils.geometry/aap_opt",
+    "photutils.Aperture/aap_opt",
+    "sep/aap_opt",
+]
+display_columns = [column for column in display_columns if column in benchmark_summary]
+benchmark_table = benchmark_summary[display_columns].copy()
+
+for column in benchmark_table.columns:
+    if column.endswith("_us"):
+        benchmark_table[column] = benchmark_table[column].map(lambda value: f"{value:.1f}")
+    elif column.endswith("/aap_opt"):
+        benchmark_table[column] = benchmark_table[column].map(
+            lambda value: "--" if pd.isna(value) else f"{value:.1f}x"
+        )
+
+benchmark_table
+```
+
+The exact numbers are hardware-dependent, but the ratios are the useful part:
+values larger than `1x` mean that backend was slower than `aap_opt`. The script
+interleaves timing order, validates results before reporting times, and drops
+one fastest and one slowest sample when at least three samples are available.
+For very large Photutils rows the script may reduce the effective Photutils
+repeat count to keep the benchmark from dominating docs build time; this is
+reported in the benchmark script notes.
+
+
+## Parallel threshold
+
+For large coordinate batches, Rust kernels can split work across CPU threads.
+The default threshold is conservative. Benchmark the current machine when
+performance matters:
+
+```{python}
+# result = aap.calibrate_parallel_threshold()
+# aap.set_parallel_threshold(result.threshold)
+```
+
+From a shell, the CLI prints copyable commands:
+
+```bash
+astroapers calibrate-threshold
+export ASTROAPERS_PARALLEL_THRESHOLD=<recommended_threshold>
+```
+
+Set the environment variable before starting Python, or call
+`aap.set_parallel_threshold(...)` inside an already-running process.

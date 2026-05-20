@@ -1,0 +1,60 @@
+/* Landing-page branding */
+.brand-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 1.25rem 0 1.75rem;
+  flex-wrap: wrap;
+}
+
+.brand-header p {
+  margin: 0;
+}
+
+.brand-header .brand-mark {
+  display: block;
+  width: min(150px, 32vw);
+  height: auto;
+  border-radius: 0.75rem;
+}
+
+.brand-header .brand-wordmark {
+  display: block;
+  width: min(420px, 82vw);
+  height: auto;
+}
+
+main table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+main table th:nth-child(1),
+main table td:nth-child(1) {
+  width: 18%;
+  white-space: nowrap;
+}
+
+main table th:nth-child(2),
+main table td:nth-child(2) {
+  width: 14%;
+}
+
+main table th:nth-child(3),
+main table td:nth-child(3) {
+  width: auto;
+}
+
+main table th:nth-child(4),
+main table td:nth-child(4) {
+  width: 11%;
+  white-space: nowrap;
+}
+
+pre,
+pre code,
+div.sourceCode pre,
+div.sourceCode pre code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
