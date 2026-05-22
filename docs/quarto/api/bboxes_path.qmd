@@ -1,7 +1,7 @@
 # bboxes_path { #astroapers.bboxes_path }
 
 ```python
-bboxes_path(x, y, segments, holes=None)
+bboxes_path(x, y, segments, holes=None, *, validate=True)
 ```
 
 Return path aperture bounding boxes for one or many centers.

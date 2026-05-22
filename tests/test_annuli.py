@@ -7,22 +7,28 @@ from numpy.testing import assert_allclose
 import astroapers as apers
 
 
+def _weights_box(aperture, method: str = "exact", idx: int = 0):
+    return aperture.weights(method=method)[idx], aperture.bboxes()[idx]
+
+
 def _subtracted_annulus_reference(outer, inner):
-    expected = outer.weights.copy()
-    ixmin = max(outer.bbox.ixmin, inner.bbox.ixmin)
-    ixmax = min(outer.bbox.ixmax, inner.bbox.ixmax)
-    iymin = max(outer.bbox.iymin, inner.bbox.iymin)
-    iymax = min(outer.bbox.iymax, inner.bbox.iymax)
+    outer_weights, outer_bbox = outer
+    inner_weights, inner_bbox = inner
+    expected = outer_weights.copy()
+    ixmin = max(outer_bbox.ixmin, inner_bbox.ixmin)
+    ixmax = min(outer_bbox.ixmax, inner_bbox.ixmax)
+    iymin = max(outer_bbox.iymin, inner_bbox.iymin)
+    iymax = min(outer_bbox.iymax, inner_bbox.iymax)
     if ixmin < ixmax and iymin < iymax:
         outer_slice = (
-            slice(iymin - outer.bbox.iymin, iymax - outer.bbox.iymin),
-            slice(ixmin - outer.bbox.ixmin, ixmax - outer.bbox.ixmin),
+            slice(iymin - outer_bbox.iymin, iymax - outer_bbox.iymin),
+            slice(ixmin - outer_bbox.ixmin, ixmax - outer_bbox.ixmin),
         )
         inner_slice = (
-            slice(iymin - inner.bbox.iymin, iymax - inner.bbox.iymin),
-            slice(ixmin - inner.bbox.ixmin, ixmax - inner.bbox.ixmin),
+            slice(iymin - inner_bbox.iymin, iymax - inner_bbox.iymin),
+            slice(ixmin - inner_bbox.ixmin, ixmax - inner_bbox.ixmin),
         )
-        expected[outer_slice] -= inner.weights[inner_slice]
+        expected[outer_slice] -= inner_weights[inner_slice]
     return np.clip(expected, 0.0, 1.0)
 
 
@@ -48,29 +54,15 @@ def test_circular_annulus_fused_weights_match_subtracted_circle_reference(method
     r_out = 4.2
     annulus = apers.CircAn(positions, r_in=r_in, r_out=r_out)
 
-    apms = annulus.get_apmask(method=method)
-    for apm, (x, y) in zip(apms, positions):
-        outer = apers.CircAp((float(x), float(y)), r_out).get_apmask(method=method)
-        inner = apers.CircAp((float(x), float(y)), r_in).get_apmask(method=method)
-        expected = outer.weights.copy()
-        ixmin = max(outer.bbox.ixmin, inner.bbox.ixmin)
-        ixmax = min(outer.bbox.ixmax, inner.bbox.ixmax)
-        iymin = max(outer.bbox.iymin, inner.bbox.iymin)
-        iymax = min(outer.bbox.iymax, inner.bbox.iymax)
-        if ixmin < ixmax and iymin < iymax:
-            outer_slice = (
-                slice(iymin - outer.bbox.iymin, iymax - outer.bbox.iymin),
-                slice(ixmin - outer.bbox.ixmin, ixmax - outer.bbox.ixmin),
-            )
-            inner_slice = (
-                slice(iymin - inner.bbox.iymin, iymax - inner.bbox.iymin),
-                slice(ixmin - inner.bbox.ixmin, ixmax - inner.bbox.ixmin),
-            )
-            expected[outer_slice] -= inner.weights[inner_slice]
-        expected = np.clip(expected, 0.0, 1.0)
+    weights = annulus.weights(method=method)
+    boxes = annulus.bboxes()
+    for weight, bbox, (x, y) in zip(weights, boxes, positions, strict=True):
+        outer = _weights_box(apers.CircAp((float(x), float(y)), r_out), method)
+        inner = _weights_box(apers.CircAp((float(x), float(y)), r_in), method)
+        expected = _subtracted_annulus_reference(outer, inner)
 
-        assert apm.bbox == outer.bbox
-        assert_allclose(apm.weights, expected, rtol=0, atol=1e-14)
+        assert bbox == outer[1]
+        assert_allclose(weight, expected, rtol=0, atol=1e-14)
 
 
 @pytest.mark.parametrize("method", ["exact", "center"])
@@ -79,18 +71,19 @@ def test_elliptical_annulus_fused_weights_match_subtracted_ellipse_reference(met
     a_in, b_in, a_out, b_out, theta = 1.3, 0.8, 4.2, 2.7, 0.35
     annulus = apers.EllipAn(positions, a_in, b_in, a_out, b_out, theta_in=theta)
 
-    apms = annulus.get_apmask(method=method)
-    for apm, (x, y) in zip(apms, positions):
-        outer = apers.EllipAp((float(x), float(y)), a_out, b_out, theta).get_apmask(
-            method=method
+    weights = annulus.weights(method=method)
+    boxes = annulus.bboxes()
+    for weight, bbox, (x, y) in zip(weights, boxes, positions, strict=True):
+        outer = _weights_box(
+            apers.EllipAp((float(x), float(y)), a_out, b_out, theta), method
         )
-        inner = apers.EllipAp((float(x), float(y)), a_in, b_in, theta).get_apmask(
-            method=method
+        inner = _weights_box(
+            apers.EllipAp((float(x), float(y)), a_in, b_in, theta), method
         )
         expected = _subtracted_annulus_reference(outer, inner)
 
-        assert apm.bbox == outer.bbox
-        assert_allclose(apm.weights, expected, rtol=0, atol=5e-14)
+        assert bbox == outer[1]
+        assert_allclose(weight, expected, rtol=0, atol=5e-14)
 
 
 @pytest.mark.parametrize("method", ["exact", "center"])
@@ -99,18 +92,19 @@ def test_rectangular_annulus_fused_weights_match_subtracted_rectangle_reference(
     w_in, h_in, w_out, h_out, theta = 1.5, 0.9, 4.8, 3.1, -0.35
     annulus = apers.RectAn(positions, w_in, h_in, w_out, h_out, theta_in=theta)
 
-    apms = annulus.get_apmask(method=method)
-    for apm, (x, y) in zip(apms, positions):
-        outer = apers.RectAp((float(x), float(y)), w_out, h_out, theta).get_apmask(
-            method=method
+    weights = annulus.weights(method=method)
+    boxes = annulus.bboxes()
+    for weight, bbox, (x, y) in zip(weights, boxes, positions, strict=True):
+        outer = _weights_box(
+            apers.RectAp((float(x), float(y)), w_out, h_out, theta), method
         )
-        inner = apers.RectAp((float(x), float(y)), w_in, h_in, theta).get_apmask(
-            method=method
+        inner = _weights_box(
+            apers.RectAp((float(x), float(y)), w_in, h_in, theta), method
         )
         expected = _subtracted_annulus_reference(outer, inner)
 
-        assert apm.bbox == outer.bbox
-        assert_allclose(apm.weights, expected, rtol=0, atol=5e-14)
+        assert bbox == outer[1]
+        assert_allclose(weight, expected, rtol=0, atol=5e-14)
 
 
 @pytest.mark.parametrize("method", ["exact", "center"])
@@ -118,15 +112,14 @@ def test_pill_fused_weights_match_component_reference(method):
     positions = np.array([(4.3, 5.1), (-1.2, 2.6), (12.4, 3.5)], dtype=np.float64)
     aperture = apers.PillAp(positions, w=5.0, a=1.6, b=1.1, theta=0.35)
 
-    apms = aperture.get_apmask(method=method)
-    for apm, (x, y) in zip(apms, positions):
+    weights = aperture.weights(method=method)
+    boxes = aperture.bboxes()
+    for weight, bbox, (x, y) in zip(weights, boxes, positions, strict=True):
         scalar = apers.PillAp((float(x), float(y)), 5.0, 1.6, 1.1, 0.35)
-        expected = _pill_component_reference(
-            scalar, float(x), float(y), apm.bbox, method
-        )
+        expected = _pill_component_reference(scalar, float(x), float(y), bbox, method)
 
-        assert apm.bbox == scalar.bbox
-        assert_allclose(apm.weights, expected, rtol=0, atol=5e-14)
+        assert bbox == scalar.bboxes()[0]
+        assert_allclose(weight, expected, rtol=0, atol=5e-14)
 
 
 @pytest.mark.parametrize("method", ["exact", "center"])
@@ -137,20 +130,21 @@ def test_pill_annulus_fused_weights_match_component_reference(method):
         positions, w_in, a_in, b_in, w_out, a_out, b_out, theta_in=theta
     )
 
-    apms = annulus.get_apmask(method=method)
-    for apm, (x, y) in zip(apms, positions):
+    weights = annulus.weights(method=method)
+    boxes = annulus.bboxes()
+    for weight, bbox, (x, y) in zip(weights, boxes, positions, strict=True):
         outer = apers.PillAp((float(x), float(y)), w_out, a_out, b_out, theta)
         inner = apers.PillAp((float(x), float(y)), w_in, a_in, b_in, theta)
         outer_weights = _pill_component_reference(
-            outer, float(x), float(y), apm.bbox, method
+            outer, float(x), float(y), bbox, method
         )
         inner_weights = _pill_component_reference(
-            inner, float(x), float(y), apm.bbox, method
+            inner, float(x), float(y), bbox, method
         )
         expected = np.clip(outer_weights - inner_weights, 0.0, 1.0)
 
-        assert apm.bbox == outer.bbox
-        assert_allclose(apm.weights, expected, rtol=0, atol=5e-14)
+        assert bbox == outer.bboxes()[0]
+        assert_allclose(weight, expected, rtol=0, atol=5e-14)
 
 
 @pytest.mark.parametrize(
@@ -161,26 +155,28 @@ def test_pill_annulus_fused_weights_match_component_reference(method):
         (apers.RectAn((32.2, 31.7), 1.5, 0.9, 4.8, 3.1, theta_in=-0.35), 1e-12),
     ],
 )
-def test_exact_annulus_mask_sum_tracks_analytic_area(annulus, atol):
-    apm = annulus.get_apmask(method="exact")
+def test_exact_annulus_weight_sum_tracks_analytic_area(annulus, atol):
+    weight = annulus.weights(method="exact")[0]
 
-    assert_allclose(apm.weights.sum(), annulus.area, rtol=0, atol=atol)
+    assert_allclose(weight.sum(), annulus.area, rtol=0, atol=atol)
 
 
 @pytest.mark.parametrize("method", ["exact", "center"])
 def test_zero_inner_circular_annulus_matches_circle_weights(method):
     position = (6.2, 7.4)
-    annulus = apers.CircAn(position, r_in=0.0, r_out=3.5).get_apmask(method=method)
-    circle = apers.CircAp(position, r=3.5).get_apmask(method=method)
+    annulus = apers.CircAn(position, r_in=0.0, r_out=3.5)
+    circle = apers.CircAp(position, r=3.5)
+    annulus_weight, annulus_bbox = _weights_box(annulus, method)
+    circle_weight, circle_bbox = _weights_box(circle, method)
 
-    assert annulus.bbox == circle.bbox
-    assert_allclose(annulus.weights, circle.weights, rtol=0, atol=0)
+    assert annulus_bbox == circle_bbox
+    assert_allclose(annulus_weight, circle_weight, rtol=0, atol=0)
 
 
 @pytest.mark.parametrize("method", ["exact", "center"])
 def test_split_theta_annulus_masks_match_subtracted_references(method):
     position = (8.3, 9.1)
-    ellip = apers.EllipAn(
+    ellip_ap = apers.EllipAn(
         position,
         a_in=1.0,
         b_in=0.7,
@@ -188,18 +184,19 @@ def test_split_theta_annulus_masks_match_subtracted_references(method):
         b_out=2.5,
         theta_in=-0.4,
         theta_out=0.35,
-    ).get_apmask(method=method)
-    ellip_outer = apers.EllipAp(position, 4.0, 2.5, 0.35).get_apmask(method=method)
-    ellip_inner = apers.EllipAp(position, 1.0, 0.7, -0.4).get_apmask(method=method)
-    assert ellip.bbox == ellip_outer.bbox
+    )
+    ellip_weight, ellip_bbox = _weights_box(ellip_ap, method)
+    ellip_outer = _weights_box(apers.EllipAp(position, 4.0, 2.5, 0.35), method)
+    ellip_inner = _weights_box(apers.EllipAp(position, 1.0, 0.7, -0.4), method)
+    assert ellip_bbox == ellip_outer[1]
     assert_allclose(
-        ellip.weights,
+        ellip_weight,
         _subtracted_annulus_reference(ellip_outer, ellip_inner),
         rtol=0,
         atol=5e-14,
     )
 
-    rect = apers.RectAn(
+    rect_ap = apers.RectAn(
         position,
         w_in=1.2,
         h_in=0.8,
@@ -207,18 +204,19 @@ def test_split_theta_annulus_masks_match_subtracted_references(method):
         h_out=3.0,
         theta_in=-0.45,
         theta_out=0.25,
-    ).get_apmask(method=method)
-    rect_outer = apers.RectAp(position, 4.5, 3.0, 0.25).get_apmask(method=method)
-    rect_inner = apers.RectAp(position, 1.2, 0.8, -0.45).get_apmask(method=method)
-    assert rect.bbox == rect_outer.bbox
+    )
+    rect_weight, rect_bbox = _weights_box(rect_ap, method)
+    rect_outer = _weights_box(apers.RectAp(position, 4.5, 3.0, 0.25), method)
+    rect_inner = _weights_box(apers.RectAp(position, 1.2, 0.8, -0.45), method)
+    assert rect_bbox == rect_outer[1]
     assert_allclose(
-        rect.weights,
+        rect_weight,
         _subtracted_annulus_reference(rect_outer, rect_inner),
         rtol=0,
         atol=5e-14,
     )
 
-    pill = apers.PillAn(
+    pill_ap = apers.PillAn(
         position,
         w_in=2.0,
         a_in=0.9,
@@ -228,18 +226,19 @@ def test_split_theta_annulus_masks_match_subtracted_references(method):
         b_out=1.2,
         theta_in=-0.25,
         theta_out=0.35,
-    ).get_apmask(method=method)
+    )
+    pill_weight, pill_bbox = _weights_box(pill_ap, method)
     pill_outer = apers.PillAp(position, 5.0, 1.8, 1.2, 0.35)
     pill_inner = apers.PillAp(position, 2.0, 0.9, 0.6, -0.25)
     outer_weights = _pill_component_reference(
-        pill_outer, position[0], position[1], pill.bbox, method
+        pill_outer, position[0], position[1], pill_bbox, method
     )
     inner_weights = _pill_component_reference(
-        pill_inner, position[0], position[1], pill.bbox, method
+        pill_inner, position[0], position[1], pill_bbox, method
     )
-    assert pill.bbox == pill_outer.bbox
+    assert pill_bbox == pill_outer.bboxes()[0]
     assert_allclose(
-        pill.weights,
+        pill_weight,
         np.clip(outer_weights - inner_weights, 0.0, 1.0),
         rtol=0,
         atol=5e-14,
@@ -260,7 +259,8 @@ def test_split_theta_annulus_apsum_uses_clipped_mask_path():
     )
 
     apsum, npix = aperture.apsum(data)
-    expected = aperture.get_apmask().apsum(data)
+    weights, bbox = _weights_box(aperture)
+    expected = bbox.apsum(weights, data)
 
     assert_allclose(apsum, expected[0])
     assert_allclose(npix, expected[1])

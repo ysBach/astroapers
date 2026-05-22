@@ -2,7 +2,7 @@
 
 ## Python aperture objects
 
-Classes for readable aperture construction, plotting, masks, and aperture sums.
+Classes for readable aperture construction, plotting, weights, and aperture sums.
 
 | | |
 | --- | --- |
@@ -17,19 +17,13 @@ Classes for readable aperture construction, plotting, masks, and aperture sums.
 | [WedgeAp](WedgeAp.qmd#astroapers.WedgeAp) | Annular wedge aperture in pixel coordinates. |
 | [PathAp](PathAp.qmd#astroapers.PathAp) | Aperture defined by a closed path of line segments and circular arcs. |
 
-## Masks and Python helpers
+## Bounding boxes
 
-Bbox-tight mask containers and Python-level helper functions.
+Raw bbox-weight operations.
 
 | | |
 | --- | --- |
-| [ApMask](ApMask.qmd#astroapers.ApMask) | Bbox-tight aperture overlap weights plus their pixel bounding box. |
 | [BoundingBox](BoundingBox.qmd#astroapers.BoundingBox) | Pixel-index bounding box with exclusive upper bounds. |
-| [apmask_apsum](apmask_apsum.qmd#astroapers.apmask_apsum) | Return aperture sum, and npix by default, for raw aperture weights. |
-| [apmask_npix](apmask_npix.qmd#astroapers.apmask_npix) | Return the in-frame sum of raw aperture weights for ``shape``. |
-| [apmask_to_image](apmask_to_image.qmd#astroapers.apmask_to_image) | Embed bbox-tight mask weights in a full image array. |
-| [apmask_weighted_cutout](apmask_weighted_cutout.qmd#astroapers.apmask_weighted_cutout) | Return a bbox-tight weighted cutout for raw aperture weights and ``bbox``. |
-| [apmask_weighted_values](apmask_weighted_values.qmd#astroapers.apmask_weighted_values) | Return weighted values for positive raw aperture weights and ``bbox``. |
 
 ## Direct Rust-backed kernels
 

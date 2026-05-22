@@ -12,6 +12,8 @@ npix_wedge_center(
     dtheta_out=None,
     *,
     shape,
+    mask=None,
+    validate=True,
 )
 ```
 
@@ -38,6 +40,10 @@ Return center-selected wedge-aperture effective in-frame pixel counts.
 <code>[**shape**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple[int, int]]{.parameter-annotation}</code>
 
 :   Image shape as ``(ny, nx)`` used to clip the aperture footprint.
+
+<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like of bool, optional]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
+
+:   Boolean image mask with shape ``shape``. ``True`` pixels are excluded from the returned effective pixel count.
 
 ## Returns {.doc-section .doc-section-returns}
 

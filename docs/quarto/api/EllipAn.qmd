@@ -49,3 +49,17 @@ Elliptical annulus in pixel coordinates.
 <code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
 
 :   If `False`, skip input validation and assume finite, positive geometry, ordered axes, and normalized positions.
+
+## Methods
+
+| Name | Description |
+| --- | --- |
+| [bboxes](#astroapers.EllipAn.bboxes) | Override the default python for-loop with a Rust-accelerated batch function. |
+
+### bboxes { #astroapers.EllipAn.bboxes }
+
+```python
+EllipAn.bboxes()
+```
+
+Override the default python for-loop with a Rust-accelerated batch function.

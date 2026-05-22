@@ -19,3 +19,17 @@ Circular aperture in pixel coordinates.
 <code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
 
 :   If `False`, skip input validation and assume finite, positive geometry and normalized positions. This is intended for expert high-throughput code paths.
+
+## Methods
+
+| Name | Description |
+| --- | --- |
+| [bboxes](#astroapers.CircAp.bboxes) | Override the default python for-loop with a Rust-accelerated batch function. |
+
+### bboxes { #astroapers.CircAp.bboxes }
+
+```python
+CircAp.bboxes()
+```
+
+Override the default python for-loop with a Rust-accelerated batch function.

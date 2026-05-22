@@ -1,7 +1,7 @@
 # apsum_circ_exact { #astroapers.apsum_circ_exact }
 
 ```python
-apsum_circ_exact(data, x, y, r, *, mask=None, return_npix=True)
+apsum_circ_exact(data, x, y, r, *, mask=None, return_npix=True, validate=True)
 ```
 
 Return exact circular aperture sums for one or many aperture centers.

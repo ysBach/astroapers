@@ -1,7 +1,18 @@
 # apsum_rect_center { #astroapers.apsum_rect_center }
 
 ```python
-apsum_rect_center(data, x, y, w, h, theta=0.0, *, mask=None, return_npix=True)
+apsum_rect_center(
+    data,
+    x,
+    y,
+    w,
+    h,
+    theta=0.0,
+    *,
+    mask=None,
+    return_npix=True,
+    validate=True,
+)
 ```
 
 Return center-selected rotated-rectangle aperture sums for one or many aperture centers.

@@ -14,6 +14,7 @@ apsum_wedge_center(
     *,
     mask=None,
     return_npix=True,
+    validate=True,
 )
 ```
 

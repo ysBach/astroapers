@@ -9,14 +9,15 @@
 (Astronomy + Apertures + Rust(rs) = astroapers)
 
 `astroapers` is a Rust-backed Python package for exact pixel-aperture overlap,
-bbox-tight aperture masks, and aperture summation in pixel coordinates.
+bbox-tight aperture weights, and aperture summation in pixel coordinates.
 
 The package exposes three public layers:
 
 - `PixelAp` objects such as `CircAp`, `EllipAp`, `RectAp`, `PillAp`, and
-  `WedgeAp` for readable workflows, plotting, masks, and one-shot aperture
+  `WedgeAp` for readable workflows, plotting, weights, and one-shot aperture
   sums.
-- `ApMask` and `apmask_*` helpers for reusing bbox-tight aperture weights.
+- `bboxes()`, `weights()`, and `BoundingBox` methods for reusing bbox-tight
+  aperture weights.
 - `astroapers.kernels` for low-overhead catalog aperture sums once an algorithm is
   fixed.
 
@@ -44,8 +45,9 @@ import astroapers as aap
 
 ap = aap.CircAp((42.3, 17.2), r=3.0)
 apsum, npix = ap.apsum(data, mask=bad_pixels)
-apm = ap.get_apmask()
-weighted_values = apm.weighted_values(data)
+weights = ap.weights(method="exact")[0]
+bbox = ap.bboxes()[0]
+weighted_values = bbox.weighted_values(weights, data)
 
 wedge = aap.WedgeAp((42.3, 17.2), r_in=5.0, r_out=50.0, theta_in=0.0, dtheta_in=0.2)
 wedge_sum, wedge_npix = wedge.apsum(data)
@@ -67,13 +69,15 @@ The direct unmasked kernels have specialized paths for `float64`, `float32`,
 before summation. Coordinate inputs and scalar geometry parameters are also
 converted to Python/NumPy `float64`.
 
-For custom `ApMask` weights, only `float32` and `float64` arrays are preserved.
-Other numeric or boolean weight arrays, including extended precision dtypes such
-as `float128`/`longdouble` where NumPy provides them, are converted to
-`float64`. `ApMask.to_image()`, `weighted_cutout()`, and `weighted_values()`
-preserve `float32` when both data and weights are `float32`, but `ApMask.apsum()`
-and `ApMask.npix()` always accumulate in `float64`. Bad-pixel masks passed as
-`mask=` are converted to boolean, where `True` means excluded.
+Bbox-tight weights from `PixelAp.weights()` are `float64`. When user-supplied
+weights are passed to `BoundingBox` methods, only `float32` and `float64` arrays
+are preserved. Other numeric or boolean weight arrays, including extended
+precision dtypes such as `float128`/`longdouble` where NumPy provides them, are
+converted to `float64`. `BoundingBox.to_image()`, `weighted_cutout()`, and
+`weighted_values()` preserve `float32` when both data and weights are `float32`,
+but `BoundingBox.apsum()` and `BoundingBox.npix()` always accumulate in
+`float64`. Bad-pixel masks passed as `mask=` are converted to boolean, where
+`True` means excluded.
 
 ## Documentation
 

@@ -1,45 +1,46 @@
 ---
-title: "ELLIPSE-style galaxy annuli"
+title: "Split-geometry elliptical annuli"
 ---
 
-Galaxy surface-brightness work often needs elliptical annuli whose shape changes
-with radius. A disk can become flatter, a bar can twist the inner isophotes, and
-the useful sky or science annulus is not always described by one fixed
-ellipticity and position angle. `astroapers.EllipAn` supports that directly:
-the inner and outer ellipses have independent axes and independent angles.
+`EllipAn` represents an elliptical annulus in pixel coordinates. Its useful
+extra feature is that the inner and outer ellipses do not need to have the same
+shape or rotation:
 
-This tutorial builds a small ELLIPSE-style workflow:
+- `a_in`, `b_in`, `theta_in` describe the inner boundary.
+- `a_out`, `b_out`, `theta_out` describe the outer boundary.
 
-1. make a synthetic inclined galaxy image;
-2. define annuli whose axis ratio and angle vary with radius;
-3. measure center-selected annular statistics;
-4. compare them with exact flux-conserving annular sums;
-5. check the matching low-level kernel call.
+This tutorial starts from an image and a user-supplied semimajor-axis array.
+It uses SciPy to optimize the boundary axis ratios and angles, choosing annuli
+with small scatter in center-selected pixel values. Adjacent annuli share
+boundaries, so the result remains a contiguous radial partition. The final
+radial profile still uses exact `annulus.apsum()` measurements.
+
+This is a compact demonstration of how `EllipAn` can support a simple
+isophotal-region workflow. It is not a replacement for a full isophote-fitting
+algorithm with harmonic corrections and convergence controls.
 
 ```{python}
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from scipy.optimize import minimize
 import astroapers as aap
 ```
 
-## A small galaxy image
+## Example image
 
-The image below is deterministic. It combines an inclined disk, a compact
-central component, a mild bar-like twist, a weak sky gradient, and one masked
-artifact.
+The image is synthetic and deterministic. It combines three elliptical Gaussian
+components, then adds a compact foreground star that is masked before fitting
+and photometry.
 
 ```{python}
-ny, nx = 150, 160
+ny, nx = 120, 130
 YY, XX = np.mgrid[:ny, :nx]
+XCEN, YCEN = 64.2, 58.7
 
-XCEN, YCEN = 78.4, 73.8
 
-def ellip_radius(x, y, x0, y0, q, theta):
-    """Elliptical radius
-    x0, y0: center
-
-    """
+def ellip_radius(x, y, x0, y0, q, theta_deg):
+    theta = np.deg2rad(theta_deg)
     dx = x - x0
     dy = y - y0
     cos_t = np.cos(theta)
@@ -49,269 +50,331 @@ def ellip_radius(x, y, x0, y0, q, theta):
     return np.hypot(x_rot, y_rot / q)
 
 
-def exponential_profile(amp, q, theta_deg, rscale, power):
-    theta = np.deg2rad(theta_deg)
-    r = ellip_radius(XX, YY, XCEN, YCEN, q, theta)
-    return amp * np.exp(-r / rscale)**power
+def elliptical_gaussian(amp, q, theta_deg, sigma):
+    r = ellip_radius(XX, YY, XCEN, YCEN, q, theta_deg)
+    return amp * np.exp(-0.5 * (r / sigma) ** 2)
 
-sky = 42.0 + 0.10 * (XX - XCEN) - 0.06 * (YY - YCEN)
-p1 = exponential_profile(amp=100.0, q=0.52, theta_deg=28, rscale=27.0, power=1.0)
-p2 = exponential_profile(amp=1600.0, q=0.70, theta_deg=12, rscale=5.8, power=1.20)
-p3 = exponential_profile(amp=1000.0, q=0.78, theta_deg=-8, rscale=14.0, power=2.0)
 
-data = sky + p1 + p2 + p3
+sky = 25.0
+galaxy = (
+    elliptical_gaussian(900.0, q=0.82, theta_deg=-5.0, sigma=5.0)
+    + elliptical_gaussian(360.0, q=0.40, theta_deg=25.0, sigma=13.0)
+    + elliptical_gaussian(260.0, q=0.58, theta_deg=30.0, sigma=32.0)
+)
 
-bad_pixels = np.zeros(data.shape, dtype=bool)
-bad_pixels[60:70, 95:106] = True
+star_x, star_y = 95.0, 46.0
+star_r2 = (XX - star_x) ** 2 + (YY - star_y) ** 2
+foreground_star = 1100.0 * np.exp(-0.5 * star_r2 / 2.0**2)
+bad_pixels = star_r2 < 5.5**2
+
+data = sky + galaxy + foreground_star
+sky_subtracted = data - sky
 ```
 
 ```{python}
-fig, ax = plt.subplots(figsize=(6, 5))
-ax.imshow(data, origin="lower", cmap="magma", vmin=40, vmax=900)
+fig, ax = plt.subplots(figsize=(5.5, 4.5))
+ax.imshow(data, origin="lower", cmap="magma", vmin=25, vmax=700)
 ax.imshow(bad_pixels, origin="lower", cmap="gray_r", alpha=0.35)
-ax.set_title("Synthetic galaxy with one masked artifact")
+ax.set_title("Synthetic image with a masked foreground star")
 plt.show()
 ```
 
-## Ellipse geometry by radial bin
+## Fit split annulus geometry
 
-Classic ELLIPSE workflows describe each radial bin with a semimajor axis, axis
-ratio, and position angle. Here each bin is an `EllipAn` whose inner and outer
-ellipses can have different shapes. The outer boundary of one bin is the inner
-boundary of the next bin.
+The only radial input is the semimajor-axis array. Each pair
+`sma[i], sma[i + 1]` becomes `a_in, a_out`.
 
-`theta_in` and `theta_out` are radians measured counterclockwise from the
-positive image x axis. If `theta_out=None`, the outer angle reuses `theta_in`;
-use both keywords when the annulus twists across the bin.
+The optimizer minimizes `np.std()` of the center-selected pixels in each
+annulus. The first bin optimizes both inner and outer boundary geometry. Later
+bins reuse the previous outer boundary as their inner boundary, then optimize
+only the next outer boundary. Each trial annulus samples pixels with center
+weights and the matching `BoundingBox.weighted_values(...)`.
 
 ```{python}
-a_edges = np.geomspace(4.0, 62.0, 14)
+sma = np.linspace(3.0, 50.0, num=10)
 
-# These arrays are intentionally not constant: the model flattens and rotates
-# with radius, similar to an isophote-twist table from galaxy fitting.
-edge_phase = (a_edges - a_edges[0]) / (a_edges[-1] - a_edges[0])
-q_edges = 0.78 - 0.24 * (1.0 - np.exp(-2.4 * edge_phase)) / (
-    1.0 - np.exp(-2.4)
-)
-pa_edges_deg = -8.0 + 36.0 * (1.0 - np.exp(-2.2 * edge_phase)) / (
-    1.0 - np.exp(-2.2)
-)
-theta_edges = np.deg2rad(pa_edges_deg)
+q_bounds = (0.35, 0.90)
+theta_bounds = (np.deg2rad(-15.0), np.deg2rad(45.0))
 
-annuli = [
-    aap.EllipAn(
+
+def make_annulus(a_in, a_out, q_in, q_out, theta_in, theta_out):
+    return aap.EllipAn(
         (XCEN, YCEN),
-        a_in=a_edges[i],
-        b_in=a_edges[i] * q_edges[i],
-        a_out=a_edges[i + 1],
-        b_out=a_edges[i + 1] * q_edges[i + 1],
-        theta_in=theta_edges[i],
-        theta_out=theta_edges[i + 1],
+        a_in=a_in,
+        b_in=a_in * q_in,
+        a_out=a_out,
+        b_out=a_out * q_out,
+        theta_in=theta_in,
+        theta_out=theta_out,
     )
-    for i in range(len(a_edges) - 1)
-]
 
-geometry_table = pd.DataFrame(
-    {
-        "a_in": a_edges[:-1],
-        "a_out": a_edges[1:],
-        "q_in": q_edges[:-1],
-        "q_out": q_edges[1:],
-        "pa_in_deg": pa_edges_deg[:-1],
-        "pa_out_deg": pa_edges_deg[1:],
+
+def annulus_loss(annulus):
+    weights = annulus.weights(method="center")[0]
+    bbox = annulus.bboxes()[0]
+    pixels = bbox.weighted_values(weights, sky_subtracted, mask=bad_pixels)
+    if pixels.size < 8:
+        return np.inf, pixels.size
+    return float(np.std(pixels)), pixels.size
+
+
+def fit_annulus(a_in, a_out, initial, fixed_inner=None):
+    if fixed_inner is None:
+        bounds = [q_bounds, q_bounds, theta_bounds, theta_bounds]
+
+        def unpack(params):
+            return params
+
+    else:
+        q_in, theta_in = fixed_inner
+        bounds = [q_bounds, theta_bounds]
+
+        def unpack(params):
+            q_out, theta_out = params
+            return q_in, q_out, theta_in, theta_out
+
+    def objective(params):
+        q_in, q_out, theta_in, theta_out = unpack(params)
+        if a_in * q_in >= a_out * q_out:
+            return np.inf
+        annulus = make_annulus(a_in, a_out, q_in, q_out, theta_in, theta_out)
+        loss, _ = annulus_loss(annulus)
+        return loss
+
+    result = minimize(
+        objective,
+        x0=initial,
+        method="Nelder-Mead",
+        options={"maxiter": 300, "xatol": 1e-3, "fatol": 1e-3},
+    )
+    q_in, q_out, theta_in, theta_out = unpack(result.x)
+    q_in = np.clip(q_in, *q_bounds)
+    q_out = np.clip(q_out, *q_bounds)
+    theta_in = np.clip(theta_in, *theta_bounds)
+    theta_out = np.clip(theta_out, *theta_bounds)
+    annulus = make_annulus(a_in, a_out, q_in, q_out, theta_in, theta_out)
+    loss, n_samples = annulus_loss(annulus)
+    return {
+        "annulus": annulus,
+        "q_in": q_in,
+        "q_out": q_out,
+        "theta_in": theta_in,
+        "theta_out": theta_out,
+        "n_samples": n_samples,
+        "loss": loss,
     }
-)
-assert geometry_table.shape[0] == len(annuli)
-assert np.isfinite(geometry_table.to_numpy()).all()
-geometry_table.round(3)
-```
 
-For physical annuli, choose neighboring ellipses so that the inner boundary
-stays inside the outer boundary. The constructor checks the semiaxis ordering;
-it does not prove full containment for every strongly twisted geometry.
 
-```{python}
-fig, ax = plt.subplots(figsize=(6, 5))
-ax.imshow(data, origin="lower", cmap="magma", vmin=40, vmax=900)
-for idx, an in enumerate(annuli):
-    color = "tab:cyan" if idx % 2 == 0 else "white"
-    an.plot(ax=ax, color=color, lw=1.2, alpha=0.9)
-ax.imshow(bad_pixels, origin="lower", cmap="gray_r", alpha=0.35)
-ax.set_title("Independent inner and outer ellipse shapes")
-plt.show()
-```
-
-## Annular samples
-
-Use `method="center"` when the science question is based on sampled pixels in
-each annulus, such as a robust median intensity profile. A full-image
-`mask=True` pixel is excluded from the sample.
-
-```{python}
-profile_rows = []
-for i, an in enumerate(annuli):
-    samples = an.get_apmask(method="center").weighted_values(data, mask=bad_pixels)
-    median = np.median(samples)
-    mean = np.mean(samples)
-    scatter = 1.4826 * np.median(np.abs(samples - median))
-    profile_rows.append(
-        (
-            0.5 * (a_edges[i] + a_edges[i + 1]),
-            samples.size,
-            median,
-            mean,
-            scatter,
+fits = [
+    fit_annulus(
+        sma[0],
+        sma[1],
+        initial=np.array([0.80, 0.75, np.deg2rad(0.0), np.deg2rad(10.0)]),
+    )
+]
+for i in range(1, len(sma) - 1):
+    previous = fits[-1]
+    fits.append(
+        fit_annulus(
+            sma[i],
+            sma[i + 1],
+            initial=np.array([previous["q_out"], previous["theta_out"]]),
+            fixed_inner=(previous["q_out"], previous["theta_out"]),
         )
     )
+annuli = [fit["annulus"] for fit in fits]
 
-profile = pd.DataFrame(
-    profile_rows,
-    columns=["a_mid", "n_pixels", "median", "mean", "robust_scatter"],
+geometry = pd.DataFrame(
+    {
+        "a_in": sma[:-1],
+        "a_out": sma[1:],
+        "q_in": [fit["q_in"] for fit in fits],
+        "q_out": [fit["q_out"] for fit in fits],
+        "pa_in_deg": [np.rad2deg(fit["theta_in"]) for fit in fits],
+        "pa_out_deg": [np.rad2deg(fit["theta_out"]) for fit in fits],
+        "n_samples": [fit["n_samples"] for fit in fits],
+        "scatter": [fit["loss"] for fit in fits],
+    }
 )
-assert profile.shape[0] == len(annuli)
+
+assert len(annuli) == len(sma) - 1
+assert np.isfinite(geometry.to_numpy()).all()
+geometry.round(3)
+```
+
+For a boundary-by-boundary view, collect the fitted outer boundary from each
+bin. The ellipticity is `1 - q`, and the position angle is shown in degrees.
+
+```{python}
+geometry_profile = pd.DataFrame(
+    {
+        "sma": sma,
+        "ellipticity": [1.0 - fits[0]["q_in"]]
+        + [1.0 - fit["q_out"] for fit in fits],
+        "pa_deg": [np.rad2deg(fits[0]["theta_in"])]
+        + [np.rad2deg(fit["theta_out"]) for fit in fits],
+    }
+)
+assert np.isfinite(geometry_profile.to_numpy()).all()
+geometry_profile.round(3)
+```
+
+The fitted geometry can vary between the inner and outer boundary of a bin.
+That is the part `EllipAn` makes convenient: one annulus can represent a region
+whose flattening or angle changes across the radial interval.
+
+```{python}
+fig, ax = plt.subplots(figsize=(5.5, 4.5))
+ax.imshow(sky_subtracted, origin="lower", cmap="magma", vmin=0, vmax=650)
+for i, annulus in enumerate(annuli):
+    color = "cyan" if i % 2 == 0 else "white"
+    annulus.plot(ax=ax, color=color, lw=1.0, alpha=0.9)
+ax.imshow(bad_pixels, origin="lower", cmap="gray_r", alpha=0.35)
+ax.set_title("Scatter-minimized EllipAn regions")
+plt.show()
+```
+
+```{python}
+fig, axes = plt.subplots(1, 2, figsize=(9.5, 3.5), constrained_layout=True)
+
+axes[0].plot(geometry_profile["sma"], geometry_profile["ellipticity"], marker="o")
+axes[0].set_xlabel("semimajor axis (pixels)")
+axes[0].set_ylabel("ellipticity (1 - q)")
+
+axes[1].plot(geometry_profile["sma"], geometry_profile["pa_deg"], marker="o")
+axes[1].set_xlabel("semimajor axis (pixels)")
+axes[1].set_ylabel("position angle (deg)")
+
+plt.show()
+```
+
+## Radial profile
+
+The center-selected samples above choose the geometry. For flux and surface
+brightness, use the exact annular sum and effective pixel area from
+`annulus.apsum()`.
+
+```{python}
+rows = []
+for i, annulus in enumerate(annuli):
+    flux, npix = annulus.apsum(sky_subtracted, mask=bad_pixels)
+    rows.append(
+        {
+            "a_mid": 0.5 * (sma[i] + sma[i + 1]),
+            "flux": float(flux),
+            "npix": float(npix),
+            "surface_brightness": float(flux / npix),
+        }
+    )
+
+profile = pd.DataFrame(rows)
+assert (profile["npix"] > 0).all()
 assert np.isfinite(profile.to_numpy()).all()
 profile.round(3)
 ```
 
-The columns are semimajor-axis midpoint, number of unmasked center-selected
-pixels, median intensity, mean intensity, and robust scatter.
-
 ```{python}
 fig, ax = plt.subplots(figsize=(5.5, 3.5))
-ax.plot(profile["a_mid"], profile["median"], marker="o", label="median")
-ax.plot(profile["a_mid"], profile["mean"], marker="s", label="mean")
+ax.plot(profile["a_mid"], profile["surface_brightness"], marker="o")
 ax.set_xlabel("semimajor axis (pixels)")
-ax.set_ylabel("annular intensity")
-ax.legend()
+ax.set_ylabel("sky-subtracted surface brightness")
+ax.set_yscale("log")
 plt.show()
 ```
 
-## Exact annular flux and surface brightness
+## Residual diagnostic
 
-Use exact fractional weights when the measurement is a flux or a flux-weighted
-mean. On a uniform image, exact annular flux equals the contributing effective
-pixel count. On real data, the same `npix` is the area factor for a mean
-surface brightness.
+The same exact annulus masks can turn the one-dimensional profile into a simple
+piecewise annular image. The display code divides by the accumulated exact-mask
+coverage, which handles fractional boundary pixels cleanly. This diagnostic
+shows what the annular profile captures and what remains.
 
 ```{python}
-exact_rows = []
-for i, an in enumerate(annuli):
-    ann_sum, ann_npix = an.apsum(data, mask=bad_pixels)
-    exact_rows.append(
-        (
-            0.5 * (a_edges[i] + a_edges[i + 1]),
-            float(ann_sum),
-            float(ann_npix),
-            float(ann_sum / ann_npix),
-        )
-    )
+model_weighted = np.zeros_like(sky_subtracted, dtype=float)
+model_coverage = np.zeros_like(sky_subtracted, dtype=float)
 
-exact_profile = pd.DataFrame(
-    exact_rows,
-    columns=["a_mid", "annulus_sum", "npix", "exact_mean"],
-)
-assert exact_profile.shape[0] == len(annuli)
-assert np.isfinite(exact_profile.to_numpy()).all()
-exact_profile.round(3)
+for annulus, surface_brightness in zip(annuli, profile["surface_brightness"]):
+    weights = annulus.weights(method="exact")[0]
+    bbox = annulus.bboxes()[0]
+    annulus_image = bbox.to_image(weights, sky_subtracted.shape)
+    model_weighted += surface_brightness * annulus_image
+    model_coverage += annulus_image
+
+covered = model_coverage > 0
+annular_model = np.full_like(sky_subtracted, np.nan, dtype=float)
+annular_model[covered] = model_weighted[covered] / model_coverage[covered]
+
+residual = sky_subtracted - annular_model
+display_mask = bad_pixels | (model_coverage < 0.5)
+residual_scale = np.nanpercentile(np.abs(residual[~display_mask]), 98)
+
+assert np.nanmax(model_coverage) > 0
+assert np.isfinite(annular_model[covered]).all()
+assert residual_scale > 0
 ```
 
 ```{python}
-fig, ax = plt.subplots(figsize=(5.5, 3.5))
-ax.plot(profile["a_mid"], profile["median"], marker="o", label="center median")
-ax.plot(exact_profile["a_mid"], exact_profile["exact_mean"], marker="s", label="exact mean")
-ax.set_xlabel("semimajor axis (pixels)")
-ax.set_ylabel("annular intensity")
-ax.legend()
+fig, axes = plt.subplots(1, 3, figsize=(11.5, 3.8), constrained_layout=True)
+
+panels = [
+    (np.ma.array(sky_subtracted, mask=bad_pixels), "image", "magma", 0, 650),
+    (np.ma.array(annular_model, mask=display_mask), "annular profile", "magma", 0, 650),
+    (
+        np.ma.array(residual, mask=display_mask),
+        "residual",
+        "coolwarm",
+        -residual_scale,
+        residual_scale,
+    ),
+]
+for ax, (image, title, cmap, vmin, vmax) in zip(axes, panels):
+    im = ax.imshow(image, origin="lower", cmap=cmap, vmin=vmin, vmax=vmax)
+    ax.set_title(title)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+
 plt.show()
 ```
 
-The object method and the explicit bbox-tight exact mask are the same
-measurement. This is a useful check when building a pipeline that later stores
-or reuses masks.
+## Equivalent low-level call
 
-```{python}
-twisted = annuli[3]
-obj_sum, obj_npix = twisted.apsum(data, mask=bad_pixels)
-mask_sum, mask_npix = twisted.get_apmask(method="exact").apsum(
-    data, mask=bad_pixels
-)
-
-assert np.allclose(obj_sum, mask_sum)
-assert np.allclose(obj_npix, mask_npix)
-
-unit_sum, unit_npix = twisted.apsum(np.ones_like(data), mask=bad_pixels)
-assert np.allclose(unit_sum, unit_npix)
-
-obj_sum, obj_npix, obj_sum / obj_npix
-```
-
-## Low-level kernel check
-
-For a single galaxy, the object layer is usually the clearest code. For many
-galaxies or many bins, pass coordinate arrays directly to `astroapers.kernels`.
-The low-level exact annular sum uses the same geometry values.
+The object API is usually clearer. The same split geometry can also be passed
+to the low-level exact kernel for vectorized workflows.
 
 ```{python}
 import astroapers.kernels as aapk
 
+i = 2
+fit = fits[i]
 xpos = np.array([XCEN])
 ypos = np.array([YCEN])
-i = 4
 
-weights, boxes = aapk.weights_ellip_ann_center(
+kernel_flux, kernel_npix = aapk.apsum_ellip_ann_exact(
+    sky_subtracted,
     xpos,
     ypos,
-    a_edges[i],
-    a_edges[i] * q_edges[i],
-    a_edges[i + 1],
-    a_edges[i + 1] * q_edges[i + 1],
-    theta_edges[i],
-    theta_edges[i + 1],
-)
-kernel_samples = aap.apmask_weighted_values(
-    weights[0],
-    boxes[0],
-    data,
+    sma[i],
+    sma[i] * fit["q_in"],
+    sma[i + 1],
+    sma[i + 1] * fit["q_out"],
+    fit["theta_in"],
+    fit["theta_out"],
     mask=bad_pixels,
 )
-object_samples = annuli[i].get_apmask(method="center").weighted_values(
-    data, mask=bad_pixels
-)
+object_flux, object_npix = annuli[i].apsum(sky_subtracted, mask=bad_pixels)
 
-assert np.allclose(kernel_samples, object_samples)
-np.median(kernel_samples), kernel_samples.size
-```
-
-The exact annular flux path is also vectorized:
-
-```{python}
-kernel_sum, kernel_npix = aapk.apsum_ellip_ann_exact(
-    data,
-    xpos,
-    ypos,
-    a_edges[i],
-    a_edges[i] * q_edges[i],
-    a_edges[i + 1],
-    a_edges[i + 1] * q_edges[i + 1],
-    theta_edges[i],
-    theta_edges[i + 1],
-    mask=bad_pixels,
-)
-object_sum, object_npix = annuli[i].apsum(data, mask=bad_pixels)
-
-assert np.allclose(kernel_sum[0], object_sum)
+assert np.allclose(kernel_flux[0], object_flux)
 assert np.allclose(kernel_npix[0], object_npix)
-kernel_sum[0] / kernel_npix[0]
+kernel_flux[0] / kernel_npix[0]
 ```
 
 ## Practical rules
 
-- Use `method="center"` for ELLIPSE-like sample statistics: medians, clipped
-  means, scatter estimates, and outlier rejection.
-- Use exact weights for fluxes, mean intensities, and comparisons that should
-  be stable under subpixel shifts.
-- Keep `theta_in` and `theta_out` explicit when the annulus shape changes
-  across the bin.
-- Keep neighboring ellipses physically nested when interpreting the result as a
-  galaxy isophote annulus.
-- Keep bad-pixel masks full-image-shaped with `True` meaning excluded.
+- Use `weights(method="center")` with `bboxes()` when the task is to score
+  candidate annulus geometries from sampled pixels.
+- Use `annulus.apsum(data, mask=bad_pixels)` after geometry selection for exact
+  annular flux and area.
+- Keep masks full-image-shaped with `True` meaning excluded.
+- Treat the scatter-minimized geometry as a lightweight demonstration, not as a
+  full isophote-fitting algorithm.

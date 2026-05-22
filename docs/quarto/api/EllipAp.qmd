@@ -27,3 +27,17 @@ Elliptical aperture in pixel coordinates.
 <code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
 
 :   If `False`, skip input validation and assume finite, positive geometry and normalized positions.
+
+## Methods
+
+| Name | Description |
+| --- | --- |
+| [bboxes](#astroapers.EllipAp.bboxes) | Override the default python for-loop with a Rust-accelerated batch function. |
+
+### bboxes { #astroapers.EllipAp.bboxes }
+
+```python
+EllipAp.bboxes()
+```
+
+Override the default python for-loop with a Rust-accelerated batch function.

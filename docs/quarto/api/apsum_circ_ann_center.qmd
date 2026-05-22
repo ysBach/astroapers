@@ -1,7 +1,17 @@
 # apsum_circ_ann_center { #astroapers.apsum_circ_ann_center }
 
 ```python
-apsum_circ_ann_center(data, x, y, r_in, r_out, *, mask=None, return_npix=True)
+apsum_circ_ann_center(
+    data,
+    x,
+    y,
+    r_in,
+    r_out,
+    *,
+    mask=None,
+    return_npix=True,
+    validate=True,
+)
 ```
 
 Return center-selected circular-annulus aperture sums for one or many aperture centers.

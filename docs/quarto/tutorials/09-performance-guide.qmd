@@ -4,7 +4,7 @@ title: "Performance guide"
 
 Use the direct kernel namespace for catalog aperture sums when your source coordinates already live in arrays. The object API is the most readable way to express one measurement; the kernel API is the lowest-overhead function-style form when you already have a large array of positions.
 
-The `astroapers.kernels` (or `aapk`) functions are the same as what `PixelAp` and `ApMask` uses. Calls with `mask=None` use the fastest unmasked Rust path; calls with `mask=bad_pixels` apply bbox-tight masks.
+The `astroapers.kernels` (or `aapk`) functions are the same kernels used by `PixelAp` methods. Calls with `mask=None` use the fastest unmasked Rust path; calls with `mask=bad_pixels` apply bbox-tight weights.
 
 For supported unmasked aperture sums, object methods such as `CircAp(...).apsum(data)` delegate to this same kernel layer. Direct calls mostly save Python object construction, constructor validation, and result-shaping overhead. That margin is most visible for small aperture counts; as the number of apertures grows, the Rust kernel work dominates and object and direct calls can benchmark close to each other.
 

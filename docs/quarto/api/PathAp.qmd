@@ -37,17 +37,3 @@ center. Angles are radians counterclockwise from the positive x axis.
 <code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
 
 :   If `False`, skip Python-side validation.
-
-## Methods
-
-| Name | Description |
-| --- | --- |
-| [get_apmask](#astroapers.PathAp.get_apmask) | Return bbox-tight path masks as `ApMask` objects. |
-
-### get_apmask { #astroapers.PathAp.get_apmask }
-
-```python
-PathAp.get_apmask(method='exact')
-```
-
-Return bbox-tight path masks as `ApMask` objects.

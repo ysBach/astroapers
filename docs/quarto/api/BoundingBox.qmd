@@ -39,7 +39,84 @@ Bounding boxes may extend outside an image. Use
 
 | Name | Description |
 | --- | --- |
+| [apsum](#astroapers.BoundingBox.apsum) | Return aperture sum, and npix by default, for raw aperture weights. |
+| [npix](#astroapers.BoundingBox.npix) | Return the in-frame sum of raw aperture weights for ``shape``. |
 | [overlap_slices](#astroapers.BoundingBox.overlap_slices) | Return image and mask slices for the overlap with ``shape``. |
+| [to_image](#astroapers.BoundingBox.to_image) | Embed bbox-tight mask weights in a full image array. |
+| [weighted_cutout](#astroapers.BoundingBox.weighted_cutout) | Return a bbox-tight weighted cutout for raw aperture weights. |
+| [weighted_values](#astroapers.BoundingBox.weighted_values) | Return weighted values for positive raw aperture weights. |
+
+### apsum { #astroapers.BoundingBox.apsum }
+
+```python
+BoundingBox.apsum(weights, image, mask=None, *, return_npix=True, validate=True)
+```
+
+Return aperture sum, and npix by default, for raw aperture weights.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+<code>[**weights**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like]{.parameter-annotation}</code>
+
+:   Bbox-tight aperture weights with shape ``self.shape``.
+
+<code>[**image**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like]{.parameter-annotation}</code>
+
+:   Two-dimensional image to sample.
+
+<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like of bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
+
+:   Boolean image mask with the same shape as ``image``. ``True`` pixels contribute zero weight.
+
+<code>[**return_npix**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
+
+:   If `True`, return ``(apsum, npix)``. If `False`, return only ``apsum``.
+
+<code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
+
+:   If `False`, trust that ``weights``, ``image``, and ``mask`` are already valid and aligned.
+
+#### Returns {.doc-section .doc-section-returns}
+
+<code>[**apsum**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Sum of ``image * weight`` over the overlapping, unmasked footprint. Accumulation uses `float64`, even when both the image and stored weights are `float32`.
+
+<code>[**npix**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Sum of the contributing aperture weights. This can be smaller than the analytic aperture area when the aperture is clipped by the image edge or by ``mask``. Accumulation uses `float64`. Returned only when ``return_npix=True``.
+
+### npix { #astroapers.BoundingBox.npix }
+
+```python
+BoundingBox.npix(weights, shape, mask=None, *, validate=True)
+```
+
+Return the in-frame sum of raw aperture weights for ``shape``.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+<code>[**weights**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like]{.parameter-annotation}</code>
+
+:   Bbox-tight aperture weights with shape ``self.shape``.
+
+<code>[**shape**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple\[int, int\]]{.parameter-annotation}</code>
+
+:   Full image shape as ``(ny, nx)``. This controls image-edge clipping.
+
+<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like of bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
+
+:   Boolean image mask with shape ``shape``. ``True`` pixels are excluded from the returned effective pixel count.
+
+<code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
+
+:   If `False`, trust that ``weights``, ``shape``, and ``mask`` are already valid and aligned.
+
+#### Returns {.doc-section .doc-section-returns}
+
+<code>[**npix**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Sum of in-frame, unmasked aperture weights. Accumulation uses `float64`, even when the stored weights are `float32`.
 
 ### overlap_slices { #astroapers.BoundingBox.overlap_slices }
 
@@ -60,3 +137,110 @@ Return image and mask slices for the overlap with ``shape``.
 <code>[]{.parameter-name} [:]{.parameter-annotation-sep} [tuple of tuple of slice, or None]{.parameter-annotation}</code>
 
 :   ``(data_slices, mask_slices)`` when the bounding box overlaps the image. ``data_slices`` select the in-frame pixels from the full image; ``mask_slices`` select the matching region from the bbox-tight mask. Returns ``None`` when the bounding box is fully outside the image.
+
+### to_image { #astroapers.BoundingBox.to_image }
+
+```python
+BoundingBox.to_image(weights, shape, fill_value=0.0, *, validate=True)
+```
+
+Embed bbox-tight mask weights in a full image array.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+<code>[**weights**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like]{.parameter-annotation}</code>
+
+:   Bbox-tight aperture weights with shape ``self.shape``.
+
+<code>[**shape**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple\[int, int\]]{.parameter-annotation}</code>
+
+:   Output image shape as ``(ny, nx)``.
+
+<code>[**fill_value**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation} [ = ]{.parameter-default-sep} [0.0]{.parameter-default}</code>
+
+:   Value assigned to pixels outside the aperture mask footprint.
+
+<code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
+
+:   If `False`, trust that ``weights`` and ``shape`` are already valid.
+
+#### Returns {.doc-section .doc-section-returns}
+
+<code>[]{.parameter-name} [:]{.parameter-annotation-sep} [ndarray]{.parameter-annotation}</code>
+
+:   Floating image with shape ``shape``. If this bounding box is partly outside the image, only the overlapping weights are copied. If it is fully outside, the returned image contains only ``fill_value``.
+
+### weighted_cutout { #astroapers.BoundingBox.weighted_cutout }
+
+```python
+BoundingBox.weighted_cutout(
+    weights,
+    image,
+    mask=None,
+    fill_value=np.nan,
+    *,
+    validate=True,
+)
+```
+
+Return a bbox-tight weighted cutout for raw aperture weights.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+<code>[**weights**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like]{.parameter-annotation}</code>
+
+:   Bbox-tight aperture weights with shape ``self.shape``.
+
+<code>[**image**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like]{.parameter-annotation}</code>
+
+:   Two-dimensional image to sample.
+
+<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like of bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
+
+:   Boolean image mask with the same shape as ``image``. ``True`` pixels are excluded by setting their aperture weights to zero before multiplication.
+
+<code>[**fill_value**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation} [ = ]{.parameter-default-sep} [np.nan]{.parameter-default}</code>
+
+:   Value used in returned cutout pixels that do not overlap ``image``.
+
+<code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
+
+:   If `False`, trust that ``weights``, ``image``, and ``mask`` are already valid and aligned.
+
+#### Returns {.doc-section .doc-section-returns}
+
+<code>[]{.parameter-name} [:]{.parameter-annotation-sep} [ndarray]{.parameter-annotation}</code>
+
+:   Floating cutout with shape ``self.shape``. Overlapping pixels contain ``image * weight``; non-overlapping pixels contain ``fill_value``.
+
+### weighted_values { #astroapers.BoundingBox.weighted_values }
+
+```python
+BoundingBox.weighted_values(weights, image, mask=None, *, validate=True)
+```
+
+Return weighted values for positive raw aperture weights.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+<code>[**weights**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like]{.parameter-annotation}</code>
+
+:   Bbox-tight aperture weights with shape ``self.shape``.
+
+<code>[**image**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like]{.parameter-annotation}</code>
+
+:   Two-dimensional image to sample.
+
+<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like of bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
+
+:   Boolean image mask with the same shape as ``image``. ``True`` pixels are omitted from the returned vector.
+
+<code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
+
+:   If `False`, trust that ``weights``, ``image``, and ``mask`` are already valid and aligned.
+
+#### Returns {.doc-section .doc-section-returns}
+
+<code>[]{.parameter-name} [:]{.parameter-annotation-sep} [ndarray]{.parameter-annotation}</code>
+
+:   One-dimensional floating array containing ``image * weight`` for in-frame pixels with positive aperture weight. Masked pixels and off-image pixels are omitted.

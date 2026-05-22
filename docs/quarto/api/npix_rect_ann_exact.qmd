@@ -12,6 +12,8 @@ npix_rect_ann_exact(
     theta_out=None,
     *,
     shape,
+    mask=None,
+    validate=True,
 )
 ```
 
@@ -43,6 +45,10 @@ Return exact rotated-rectangle-annulus effective in-frame pixel counts.
 
 :   Image shape as ``(ny, nx)`` used to clip the aperture footprint.
 
+<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like of bool, optional]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
+
+:   Boolean image mask with shape ``shape``. ``True`` pixels are excluded from the returned effective pixel count.
+
 ## Returns {.doc-section .doc-section-returns}
 
 <code>[**npix**]{.parameter-name} [:]{.parameter-annotation-sep} [ndarray]{.parameter-annotation}</code>
@@ -51,4 +57,4 @@ Return exact rotated-rectangle-annulus effective in-frame pixel counts.
 
 ## Notes {.doc-section .doc-section-notes}
 
-For matched inner and outer angles, this uses outer-minus-inner direct aperture summation. For split-angle annuli, it uses Rust-generated bbox-tight annulus weights and the same reduction as ``ApMask.apsum``.
+For matched inner and outer angles, this uses outer-minus-inner direct aperture summation. For split-angle annuli, it uses Rust-generated bbox-tight annulus weights and the same ``BoundingBox.apsum`` reduction.

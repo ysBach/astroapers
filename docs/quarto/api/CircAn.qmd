@@ -23,3 +23,17 @@ Circular annulus in pixel coordinates.
 <code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
 
 :   If `False`, skip input validation and assume finite geometry, ordered radii, and normalized positions.
+
+## Methods
+
+| Name | Description |
+| --- | --- |
+| [bboxes](#astroapers.CircAn.bboxes) | Override the default python for-loop with a Rust-accelerated batch function. |
+
+### bboxes { #astroapers.CircAn.bboxes }
+
+```python
+CircAn.bboxes()
+```
+
+Override the default python for-loop with a Rust-accelerated batch function.

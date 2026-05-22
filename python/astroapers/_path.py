@@ -17,8 +17,8 @@ from ._utils import require_even_int_at_least
 from .kernels import (
     _masked_apsum,
     _weights_many,
-    weights_exact,
     weights_center,
+    weights_exact,
 )
 
 # Segment kind constants matching Rust SEG_* values
@@ -187,15 +187,19 @@ def _validate_with_rust(kinds: np.ndarray, data: np.ndarray) -> None:
 
 
 def weights_path_exact(
-    x, y, kinds: np.ndarray, data: np.ndarray
+    x, y, kinds: np.ndarray, data: np.ndarray, *, validate: bool = True
 ) -> tuple[list[np.ndarray], list[BoundingBox]]:
-    return _weights_many("weights_path_exact_many", x, y, kinds, data)
+    return _weights_many(
+        "weights_path_exact_many", x, y, kinds, data, validate=validate
+    )
 
 
 def weights_path_center(
-    x, y, kinds: np.ndarray, data: np.ndarray
+    x, y, kinds: np.ndarray, data: np.ndarray, *, validate: bool = True
 ) -> tuple[list[np.ndarray], list[BoundingBox]]:
-    return _weights_many("weights_path_center_many", x, y, kinds, data)
+    return _weights_many(
+        "weights_path_center_many", x, y, kinds, data, validate=validate
+    )
 
 
 class PathAp(PixelAp):
@@ -269,22 +273,18 @@ class PathAp(PixelAp):
             int(ixmins[0]), int(ixmaxs[0]), int(iymins[0]), int(iymaxs[0])
         )
 
-    def _bboxes(self) -> list[BoundingBox]:
+    def bboxes(self) -> list[BoundingBox]:
         from . import _rust
         from .kernels import _boxes_from_tuple
 
         return _boxes_from_tuple(
             _rust.bboxes_path_many(
-                self.positions[:, 0],
-                self.positions[:, 1],
+                self._x,
+                self._y,
                 self._kinds,
                 self._data,
             )
         )
-
-    def get_apmask(self, method: str = "exact"):
-        """Return bbox-tight path masks as `ApMask` objects."""
-        return super().get_apmask(method=method)
 
     def _exact_weights_one(self, x: float, y: float, bbox: BoundingBox) -> np.ndarray:
         return weights_exact(
@@ -300,17 +300,17 @@ class PathAp(PixelAp):
             (x, y, self._kinds, self._data),
         )
 
-    def _weight_arrays(
-        self, method: str = "exact"
-    ) -> tuple[list[np.ndarray], list[BoundingBox]]:
+    def weights(self, method: str = "exact") -> list[np.ndarray]:
         method = self._weight_method(method)
         weights_func = weights_path_exact if method == "exact" else weights_path_center
-        return weights_func(
-            self.positions[:, 0],
-            self.positions[:, 1],
+        weights, _ = weights_func(
+            self._x,
+            self._y,
             self._kinds,
             self._data,
+            validate=self._validate,
         )
+        return weights
 
     def apsum(
         self, data, mask=None, *, method: str = "exact", return_npix: bool = True
@@ -321,11 +321,12 @@ class PathAp(PixelAp):
             weights_func,
             data,
             mask,
-            self.positions[:, 0],
-            self.positions[:, 1],
+            self._x,
+            self._y,
             self._kinds,
             self._data,
             return_npix=return_npix,
+            validate=self._validate,
         )
         if not return_npix:
             return _shape_apsum_result(self, result)

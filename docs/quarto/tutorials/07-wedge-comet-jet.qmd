@@ -86,8 +86,9 @@ jet_ap = aap.WedgeAp((x0, y0), r_in, r_out, theta_jet, dtheta)
 jet_apsum, jet_npix = jet_ap.apsum(data, method="exact")
 
 an = aap.CircAn((x0, y0), 30, 40)
-anm = an.get_apmask(method="center")  # use "center" to get only in-annulus full pixels
-msky = np.nanmedian(anm.weighted_values(data))
+an_weights = an.weights(method="center")[0]  # use "center" for full pixels
+an_bbox = an.bboxes()[0]
+msky = np.nanmedian(an_bbox.weighted_values(an_weights, data))
 
 jet_srcsum = jet_apsum - msky * jet_npix
 

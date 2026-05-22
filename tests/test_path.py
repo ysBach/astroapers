@@ -188,7 +188,7 @@ class TestBboxIncludesArcExtrema:
         r = 5.0
         segs = _circle_segments(r, n_arcs=4)
         cx, cy = 10.0, 10.0
-        bbox = aap.PathAp((cx, cy), segs).bbox
+        bbox = aap.PathAp((cx, cy), segs).bboxes()[0]
         assert bbox.ixmin <= int(cx - r)
         assert bbox.ixmax >= int(cx + r)
         assert bbox.iymin <= int(cy - r)
@@ -205,7 +205,7 @@ class TestBboxIncludesArcExtrema:
             ("close",),
         ]
         cx, cy = 20.0, 20.0
-        bbox = aap.PathAp((cx, cy), segs).bbox
+        bbox = aap.PathAp((cx, cy), segs).bboxes()[0]
         # The arc spans only the first quadrant; x goes up to r, y goes up to r
         assert bbox.ixmax >= int(cx + r)
         assert bbox.iymax >= int(cy + r)
@@ -289,21 +289,18 @@ class TestMaskedApsum:
         assert float(npix_masked) < float(npix_unmasked)
 
 
-class TestGetApmask:
-    def test_exact_apmask_values_in_range(self):
+class TestWeights:
+    def test_exact_weights_values_in_range(self):
         segs = _circle_segments(4.0, n_arcs=4)
         ap = aap.PathAp((10.5, 10.5), segs)
-        apm = ap.get_apmask(method="exact")
-        assert isinstance(apm, aap.ApMask)
-        w = apm.weights
+        w = ap.weights(method="exact")[0]
         assert w.min() >= 0.0 - 1e-12
         assert w.max() <= 1.0 + 1e-12
 
-    def test_center_apmask_binary(self):
+    def test_center_weights_binary(self):
         segs = _rect_segments(4.0, 4.0)
         ap = aap.PathAp((10.0, 10.0), segs)
-        apm = ap.get_apmask(method="center")
-        w = apm.weights
+        w = ap.weights(method="center")[0]
         assert set(np.unique(w)).issubset({0.0, 1.0})
 
 
@@ -342,6 +339,31 @@ class TestKernelApsum:
         segs = _rect_segments(4.0, 4.0)
         boxes = aapk.bboxes_path([10.0, 15.0], [10.0, 15.0], segs)
         assert len(boxes) == 2
+
+
+@pytest.mark.parametrize("method", ["exact", "center"])
+def test_path_object_npix_and_weights(method):
+    segs = _rect_segments(4.0, 4.0)
+    positions = np.array([[10.0, 10.0], [15.0, 15.0]])
+    aperture = aap.PathAp(positions, segs)
+    npix_func = aapk.npix_path_exact if method == "exact" else aapk.npix_path_center
+    bad = np.zeros((24, 24), dtype=bool)
+    bad[10, 10] = True
+
+    weights = aperture.weights(method=method)
+    boxes = aperture.bboxes()
+
+    assert len(weights) == len(boxes) == len(positions)
+    for weight, box in zip(weights, boxes, strict=True):
+        assert weight.shape == box.shape
+    assert_allclose(
+        aperture.npix(bad.shape, method=method),
+        npix_func(positions[:, 0], positions[:, 1], segs, shape=bad.shape),
+    )
+    assert_allclose(
+        aperture.npix(bad.shape, method=method, mask=bad),
+        aperture.apsum(np.ones(bad.shape), method=method, mask=bad)[1],
+    )
 
 
 class TestHoleAnnulus:

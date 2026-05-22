@@ -9,10 +9,16 @@ import numpy as np
 from ._apertures import EllipAp, PixelAp, RectAp, _shape_apsum_result
 from ._containers import BoundingBox
 from .kernels import (
+    apsum_pill_ann_center,
     apsum_pill_ann_exact,
+    apsum_pill_center,
     apsum_pill_exact,
     bboxes_pill,
     bboxes_pill_ann,
+    npix_pill_ann_center,
+    npix_pill_ann_exact,
+    npix_pill_center,
+    npix_pill_exact,
     weights_pill_ann_center,
     weights_pill_ann_exact,
     weights_pill_center,
@@ -106,17 +112,24 @@ class PillAp(PixelAp):
 
     def _bbox_one(self, x: float, y: float) -> BoundingBox:
         return bboxes_pill(
-            np.array([x]), np.array([y]), self.w, self.a, self.b, self.theta
-        )[0]
-
-    def _bboxes(self) -> list[BoundingBox]:
-        return bboxes_pill(
-            self.positions[:, 0],
-            self.positions[:, 1],
+            np.array([x]),
+            np.array([y]),
             self.w,
             self.a,
             self.b,
             self.theta,
+            validate=self._validate,
+        )[0]
+
+    def bboxes(self) -> list[BoundingBox]:
+        return bboxes_pill(
+            self._x,
+            self._y,
+            self.w,
+            self.a,
+            self.b,
+            self.theta,
+            validate=self._validate,
         )
 
     def _exact_weights_one(self, x: float, y: float, bbox: BoundingBox) -> np.ndarray:
@@ -129,22 +142,24 @@ class PillAp(PixelAp):
             "weights_pill_center", bbox, (x, y, self.w, self.a, self.b, self.theta)
         )
 
-    def _weight_arrays(
-        self, method: str = "exact"
-    ) -> tuple[list[np.ndarray], list[BoundingBox]]:
+    def weights(self, method: str = "exact") -> list[np.ndarray]:
         method = self._weight_method(method)
         weights_func = weights_pill_exact if method == "exact" else weights_pill_center
-        return weights_func(
-            self.positions[:, 0],
-            self.positions[:, 1],
+        weights, _ = weights_func(
+            self._x,
+            self._y,
             self.w,
             self.a,
             self.b,
             self.theta,
+            validate=self._validate,
         )
+        return weights
 
-    def apsum(self, data, mask=None, *, return_npix: bool = True):
-        """Return exact pill-aperture sums, and npix by default.
+    def apsum(
+        self, data, mask=None, *, method: str = "exact", return_npix: bool = True
+    ):
+        """Return pill-aperture sums, and npix by default.
 
         Parameters
         ----------
@@ -157,21 +172,42 @@ class PillAp(PixelAp):
             If `True`, return ``(apsum, npix)``. If `False`, return only
             ``apsum``.
         """
-        result = apsum_pill_exact(
+        method = self._weight_method(method)
+        apsum_func = apsum_pill_exact if method == "exact" else apsum_pill_center
+        result = apsum_func(
             data,
-            self.positions[:, 0],
-            self.positions[:, 1],
+            self._x,
+            self._y,
             self.w,
             self.a,
             self.b,
             self.theta,
             mask=mask,
             return_npix=return_npix,
+            validate=self._validate,
         )
         if not return_npix:
             return _shape_apsum_result(self, result)
         apsum, npix = result
         return _shape_apsum_result(self, apsum, npix)
+
+    def npix(self, shape: tuple[int, int], *, method: str = "exact", mask=None):
+        method = self._weight_method(method)
+        npix_func = npix_pill_exact if method == "exact" else npix_pill_center
+        return _shape_apsum_result(
+            self,
+            npix_func(
+                self._x,
+                self._y,
+                self.w,
+                self.a,
+                self.b,
+                self.theta,
+                shape=shape,
+                mask=mask,
+                validate=self._validate,
+            ),
+        )
 
     def _patch_one(self, x: float, y: float, origin, **kwargs):
         import matplotlib.patches as mpatches
@@ -305,12 +341,13 @@ class PillAn(PixelAp):
             self.b_out,
             self.theta_in,
             self.theta_out,
+            validate=self._validate,
         )[0]
 
-    def _bboxes(self) -> list[BoundingBox]:
+    def bboxes(self) -> list[BoundingBox]:
         return bboxes_pill_ann(
-            self.positions[:, 0],
-            self.positions[:, 1],
+            self._x,
+            self._y,
             self.w_in,
             self.a_in,
             self.b_in,
@@ -319,6 +356,7 @@ class PillAn(PixelAp):
             self.b_out,
             self.theta_in,
             self.theta_out,
+            validate=self._validate,
         )
 
     def _exact_weights_one(self, x: float, y: float, bbox: BoundingBox) -> np.ndarray:
@@ -357,16 +395,14 @@ class PillAn(PixelAp):
             ),
         )
 
-    def _weight_arrays(
-        self, method: str = "exact"
-    ) -> tuple[list[np.ndarray], list[BoundingBox]]:
+    def weights(self, method: str = "exact") -> list[np.ndarray]:
         method = self._weight_method(method)
         weights_func = (
             weights_pill_ann_exact if method == "exact" else weights_pill_ann_center
         )
-        return weights_func(
-            self.positions[:, 0],
-            self.positions[:, 1],
+        weights, _ = weights_func(
+            self._x,
+            self._y,
             self.w_in,
             self.a_in,
             self.b_in,
@@ -375,10 +411,14 @@ class PillAn(PixelAp):
             self.b_out,
             self.theta_in,
             self.theta_out,
+            validate=self._validate,
         )
+        return weights
 
-    def apsum(self, data, mask=None, *, return_npix: bool = True):
-        """Return exact pill-annulus sums, and npix by default.
+    def apsum(
+        self, data, mask=None, *, method: str = "exact", return_npix: bool = True
+    ):
+        """Return pill-annulus sums, and npix by default.
 
         Parameters
         ----------
@@ -391,10 +431,14 @@ class PillAn(PixelAp):
             If `True`, return ``(apsum, npix)``. If `False`, return only
             ``apsum``.
         """
-        result = apsum_pill_ann_exact(
+        method = self._weight_method(method)
+        apsum_func = (
+            apsum_pill_ann_exact if method == "exact" else apsum_pill_ann_center
+        )
+        result = apsum_func(
             data,
-            self.positions[:, 0],
-            self.positions[:, 1],
+            self._x,
+            self._y,
             self.w_in,
             self.a_in,
             self.b_in,
@@ -405,11 +449,34 @@ class PillAn(PixelAp):
             self.theta_out,
             mask=mask,
             return_npix=return_npix,
+            validate=self._validate,
         )
         if not return_npix:
             return _shape_apsum_result(self, result)
         apsum, npix = result
         return _shape_apsum_result(self, apsum, npix)
+
+    def npix(self, shape: tuple[int, int], *, method: str = "exact", mask=None):
+        method = self._weight_method(method)
+        npix_func = npix_pill_ann_exact if method == "exact" else npix_pill_ann_center
+        return _shape_apsum_result(
+            self,
+            npix_func(
+                self._x,
+                self._y,
+                self.w_in,
+                self.a_in,
+                self.b_in,
+                self.w_out,
+                self.a_out,
+                self.b_out,
+                self.theta_in,
+                self.theta_out,
+                shape=shape,
+                mask=mask,
+                validate=self._validate,
+            ),
+        )
 
     def _patch_one(self, x: float, y: float, origin, **kwargs):
         import matplotlib.patches as mpatches

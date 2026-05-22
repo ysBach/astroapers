@@ -71,11 +71,11 @@ def test_object_apsum_supports_return_npix_false_for_direct_and_mask_paths():
         )
 
 
-def test_vector_circle_raw_mask_rejects_unreasonably_large_radius():
+def test_vector_circle_weights_reject_unreasonably_large_radius():
     aperture = apers.CircAp([(0.0, 0.0), (1.0, 1.0)], r=1.0e20)
 
     with pytest.raises((MemoryError, ValueError)):
-        aperture.get_apmask()
+        aperture.weights()
 
 
 def test_annulus_theta_keyword_is_not_supported():
@@ -141,7 +141,9 @@ def test_weighted_values_center_returns_unweighted_center_selected_data():
     aperture = apers.CircAp((2.0, 2.0), r=1.1)
 
     values = aperture.weighted_values(data)
-    selected = aperture.get_apmask(method="center").to_image(data.shape).astype(bool)
+    weights = aperture.weights(method="center")[0]
+    bbox = aperture.bboxes()[0]
+    selected = bbox.to_image(weights, data.shape).astype(bool)
 
     assert_allclose(values, data[selected].ravel())
 
@@ -152,9 +154,10 @@ def test_weighted_values_exact_returns_positive_weighted_data():
     aperture = apers.CircAp((2.1, 2.2), r=1.4)
 
     values = aperture.weighted_values(data, method="exact")
-    apm = aperture.get_apmask(method="exact")
-    weighted = apm.weighted_cutout(data)
-    expected = weighted[apm.weights > 0.0].ravel()
+    weights = aperture.weights(method="exact")[0]
+    bbox = aperture.bboxes()[0]
+    weighted = bbox.weighted_cutout(weights, data)
+    expected = weighted[weights > 0.0].ravel()
 
     assert_allclose(values, expected)
 
@@ -186,14 +189,14 @@ def test_weighted_values_returns_empty_array_for_out_of_frame_aperture():
     assert values.dtype == np.float64
 
 
-def test_vector_aperture_returns_vector_masks_and_apsum():
+def test_vector_aperture_returns_vector_weights_and_apsum():
     data = np.ones((16, 16), dtype=np.float64)
     aperture = apers.RectAp([(4.0, 4.0), (8.5, 9.0)], w=3.0, h=2.0)
 
-    apms = aperture.get_apmask()
+    weights = aperture.weights()
     apsum, npix = aperture.apsum(data)
 
-    assert len(apms) == 2
+    assert len(weights) == 2
     assert apsum.shape == (2,)
     assert_allclose(apsum, npix)
     assert_allclose(npix, [6.0, 6.0], atol=1e-12)
@@ -233,12 +236,11 @@ def test_validate_false_skips_position_finiteness_check():
     assert aperture.positions is positions
 
 
-def test_object_and_apmask_sum_aliases_are_not_exposed():
+def test_object_sum_aliases_are_not_exposed():
     aperture = apers.CircAp((4.0, 4.0), r=2.0)
 
     assert not hasattr(aperture, "sum")
     assert not hasattr(aperture, "do_photometry")
-    assert not hasattr(aperture.get_apmask(), "sum")
 
 
 def test_mask_method_validation_is_not_disabled_by_validate_false():
@@ -246,9 +248,47 @@ def test_mask_method_validation_is_not_disabled_by_validate_false():
     aperture = apers.CircAp((4.0, 4.0), r=2.0, validate=False)
 
     with pytest.raises(ValueError, match="method must be"):
-        aperture.get_apmask(method="not-a-method")
+        aperture.weights(method="not-a-method")
     with pytest.raises(ValueError, match="method must be"):
         aperture.weighted_values(data, method="not-a-method")
+
+
+def test_validate_false_object_apsum_skips_kernel_parameter_validation(monkeypatch):
+    data = np.ones((16, 16), dtype=np.float64)
+    aperture = apers.EllipAn(
+        (4.0, 4.0),
+        a_in=1.0,
+        b_in=0.5,
+        a_out=2.0,
+        b_out=1.5,
+        validate=False,
+    )
+
+    def fail_validation(*args, **kwargs):
+        raise AssertionError("kernel validation should be skipped")
+
+    monkeypatch.setattr(apers.kernels, "_validate_inner_outer_axes", fail_validation)
+
+    apsum, npix = aperture.apsum(data)
+
+    assert np.isfinite(apsum)
+    assert np.isfinite(npix)
+
+
+def test_validate_false_object_npix_skips_mask_shape_validation(monkeypatch):
+    aperture = apers.CircAp((4.0, 4.0), r=2.0, validate=False)
+    mask = np.zeros((16, 16), dtype=bool)
+
+    bad_mask = np.zeros((3, 3), dtype=bool)
+    with pytest.raises(ValueError, match="mask must have the same shape"):
+        apers.CircAp((4.0, 4.0), r=2.0).npix((16, 16), mask=bad_mask)
+
+    def fail_validation(*args, **kwargs):
+        raise AssertionError("mask validation should be skipped")
+
+    monkeypatch.setattr(apers.kernels, "validate_mask", fail_validation)
+
+    aperture.npix((16, 16), mask=mask)
 
 
 @pytest.mark.parametrize("bad_r_in", [-1.0, np.nan])
@@ -281,7 +321,9 @@ def test_pill_annulus_on_uniform_data_tracks_area_and_center_mask():
     )
 
     apsum, npix = annulus.apsum(data)
-    center = annulus.get_apmask(method="center").to_image(data.shape)
+    center_weights = annulus.weights(method="center")[0]
+    center_bbox = annulus.bboxes()[0]
+    center = center_bbox.to_image(center_weights, data.shape)
 
     assert_allclose(apsum, npix)
     assert_allclose(npix, annulus.area, rtol=0, atol=0.5)
@@ -305,6 +347,20 @@ def test_public_top_level_exports_prefer_short_names():
     assert "npix_circ_ann_center" in apers.__all__
     assert "kernels" in apers.__all__
     assert apers.kernels.apsum_circ_exact is apers.apsum_circ_exact
+    removed_names = {
+        "apmask_apsum",
+        "apmask_npix",
+        "apmask_to_image",
+        "apmask_weighted_cutout",
+        "apmask_weighted_values",
+        "bbox_apsum",
+        "bbox_npix",
+        "bbox_to_image",
+        "bbox_weighted_cutout",
+        "bbox_weighted_values",
+    }
+    assert removed_names.isdisjoint(apers.__all__)
+    assert all(not hasattr(apers, name) for name in removed_names)
 
 
 def test_public_kernels_namespace_exports_direct_apsum_functions():
@@ -351,7 +407,9 @@ def test_public_kernels_namespace_exports_weight_and_bbox_helpers():
         "wedge",
     }
     expected = {
-        f"weights_{shape}_{method}" for shape in shapes for method in {"exact", "center"}
+        f"weights_{shape}_{method}"
+        for shape in shapes
+        for method in {"exact", "center"}
     } | {f"bboxes_{shape}" for shape in shapes}
 
     assert expected.issubset(aapk.__all__)
@@ -505,11 +563,12 @@ def test_public_kernels_namespace_has_complete_apsum_surface():
     ]
 
     def expected_from_masks(aperture, method, mask=None):
-        apms = aperture.get_apmask(method=method)
         sums = []
         npixs = []
-        for apm in apms:
-            apsum, npix = apm.apsum(data, mask=mask)
+        for weight, bbox in zip(
+            aperture.weights(method=method), aperture.bboxes(), strict=True
+        ):
+            apsum, npix = bbox.apsum(weight, data, mask=mask)
             sums.append(apsum)
             npixs.append(npix)
         return np.asarray(sums), np.asarray(npixs)
@@ -546,3 +605,64 @@ def test_old_sum_exact_names_are_not_public_api():
 def test_stats_helpers_are_not_public_api():
     assert not hasattr(apers, "ApStats")
     assert not hasattr(apers.CircAp((4.0, 4.0), r=2.0), "stats")
+
+
+def test_mask_wrapper_api_is_removed_from_public_surface():
+    aperture = apers.CircAp((4.0, 4.0), r=2.0)
+
+    assert not hasattr(apers, "ApMask")
+    assert not hasattr(aperture, "get_apmask")
+    assert not hasattr(aperture, "bbox")
+
+
+def test_bboxes_and_weights_are_always_lists_for_scalar_aperture():
+    aperture = apers.CircAp((4.0, 4.0), r=2.0)
+
+    boxes = aperture.bboxes()
+    weights = aperture.weights(method="exact")
+
+    assert isinstance(boxes, list)
+    assert isinstance(weights, list)
+    assert len(boxes) == len(weights) == 1
+    assert weights[0].shape == boxes[0].shape
+
+
+def test_method_aware_object_apsum_uses_kernel_path_without_weights(monkeypatch):
+    data = np.ones((32, 32), dtype=np.float64)
+    aperture = apers.CircAp([(10.0, 11.0), (16.0, 17.0)], 3.0)
+
+    def fail_weights(*args, **kwargs):
+        raise AssertionError("optimized object apsum should not build weight arrays")
+
+    monkeypatch.setattr(aperture, "weights", fail_weights)
+
+    got_apsum, got_npix = aperture.apsum(data, method="center")
+    expected_apsum, expected_npix = apers.apsum_circ_center(
+        data, [10.0, 16.0], [11.0, 17.0], 3.0
+    )
+
+    assert_allclose(got_apsum, expected_apsum)
+    assert_allclose(got_npix, expected_npix)
+
+
+def test_masked_object_npix_uses_weight_sum_without_apsum(monkeypatch):
+    aperture = apers.CircAp([(10.0, 11.0), (16.0, 17.0)], 3.0)
+    bad = np.zeros((32, 32), dtype=bool)
+    bad[11, 10] = True
+
+    def fail_apsum(*args, **kwargs):
+        raise AssertionError("masked npix should not allocate image data or call apsum")
+
+    monkeypatch.setattr(aperture, "apsum", fail_apsum)
+
+    got = aperture.npix(bad.shape, method="center", mask=bad)
+    expected = np.array(
+        [
+            bbox.npix(weight, bad.shape, mask=bad)
+            for weight, bbox in zip(
+                aperture.weights(method="center"), aperture.bboxes(), strict=True
+            )
+        ]
+    )
+
+    assert_allclose(got, expected)

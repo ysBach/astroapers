@@ -67,21 +67,3 @@ used by wedge-photometry workflows.
 | Name | Description |
 | --- | --- |
 | [area](#astroapers.WedgeAp.area) | Analytic wedge area, before image clipping or bad-pixel masking. |
-
-## Methods
-
-| Name | Description |
-| --- | --- |
-| [get_apmask](#astroapers.WedgeAp.get_apmask) | Return bbox-tight wedge masks as `ApMask` objects. |
-
-### get_apmask { #astroapers.WedgeAp.get_apmask }
-
-```python
-WedgeAp.get_apmask(method='exact')
-```
-
-Return bbox-tight wedge masks as `ApMask` objects.
-
-``method="exact"`` computes analytic fractional pixel overlap.
-``method="center"`` assigns pixels by their centers, matching the
-original wedge-photometry definition.

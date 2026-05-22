@@ -10,6 +10,7 @@ apsum_path_exact(
     *,
     mask=None,
     return_npix=True,
+    validate=True,
 )
 ```
 

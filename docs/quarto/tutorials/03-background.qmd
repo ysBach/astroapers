@@ -33,7 +33,9 @@ ap = aap.CircAp((x0, y0), r=5.0)
 an = aap.CircAn((x0, y0), r_in=9.0, r_out=15.0)
 
 apsum, src_npix = ap.apsum(data)
-sky_values = an.get_apmask(method="center").weighted_values(data)
+sky_weights = an.weights(method="center")[0]
+sky_bbox = an.bboxes()[0]
+sky_values = sky_bbox.weighted_values(sky_weights, data)
 # you can do complicated math to get best sky value.
 # Here I just use median:
 sky_median = np.median(sky_values)
@@ -57,9 +59,8 @@ ap.plot(ax=ax[0], color="r", lw=1)
 an.plot(ax=ax[0], color="w", lw=1)
 ax[0].set_title("Source aperture and sky annulus")
 
-# apmask("center") is 0/1 bool mask,
-# so the weighted_values are just the selected pixels:
-skyvals = an.get_apmask("center").weighted_values(data)
+# center weights are 0/1, so the weighted_values are just the selected pixels:
+skyvals = sky_bbox.weighted_values(sky_weights, data)
 ax[1].hist(skyvals, bins=20, color="gray", edgecolor="k")
 ax[1].set_title("Sky values")
 ax[1].axvline(sky_median, color="r", ls="--", label=f"Median={sky_median:.2f}")
@@ -77,9 +78,7 @@ excluded.
 bad_pixels = np.zeros(data.shape, dtype=bool)
 bad_pixels[40:45, 45:52] = True
 
-sky_values_masked = an.get_apmask(method="center").weighted_values(
-    data, mask=bad_pixels
-)
+sky_values_masked = sky_bbox.weighted_values(sky_weights, data, mask=bad_pixels)
 sky_median_masked = np.median(sky_values_masked)
 apsum_masked, src_npix_masked = ap.apsum(data, mask=bad_pixels)
 srcsum_masked = apsum_masked - src_npix_masked * sky_median_masked
@@ -102,22 +101,21 @@ ax.set_title("Bad pixels excluded from aperture and annulus")
 plt.show()
 ```
 
-## Bbox-Tight Mask Helpers
+## Bbox-Tight Weight Helpers
 
-For large images or production-level pipelines, use the bbox-tight `ApMask`
-arrays directly. This avoids making full image-shaped float masks and keeps the
-work restricted to the aperture and annulus bounding boxes.
+For large images or production-level pipelines, use bbox-tight weights together
+with their matching `BoundingBox` objects. This avoids making full image-shaped
+float masks and keeps the work restricted to the aperture and annulus bounding
+boxes.
 
 ```{python}
-src_apm = ap.get_apmask(method="exact")
-sky_apm = an.get_apmask(method="center")
+src_weights = ap.weights(method="exact")[0]
+src_bbox = ap.bboxes()[0]
+sky_weights = an.weights(method="center")[0]
+sky_bbox = an.bboxes()[0]
 
-raw_apsum, raw_src_npix = aap.apmask_apsum(
-    src_apm.weights, src_apm.bbox, data, mask=bad_pixels
-)
-raw_sky_values = aap.apmask_weighted_values(
-    sky_apm.weights, sky_apm.bbox, data, mask=bad_pixels
-)
+raw_apsum, raw_src_npix = src_bbox.apsum(src_weights, data, mask=bad_pixels)
+raw_sky_values = sky_bbox.weighted_values(sky_weights, data, mask=bad_pixels)
 raw_sky_median = np.median(raw_sky_values)
 raw_srcsum = raw_apsum - raw_src_npix * raw_sky_median
 
@@ -134,12 +132,12 @@ slice explicitly:
 
 ```{python}
 sky_bpm = np.zeros(data.shape, dtype=bool)
-overlap = sky_apm.bbox.overlap_slices(data.shape)
+overlap = sky_bbox.overlap_slices(data.shape)
 if overlap is not None:
     data_slices, weight_slices = overlap
-    sky_bpm[data_slices] = sky_apm.weights[weight_slices] > 0
+    sky_bpm[data_slices] = sky_weights[weight_slices] > 0
 
-assert np.array_equal(sky_bpm, sky_apm.to_image(data.shape) > 0)
+assert np.array_equal(sky_bpm, sky_bbox.to_image(sky_weights, data.shape) > 0)
 ```
 
 ## Low-Level Kernels for Lowest Overhead
@@ -151,7 +149,7 @@ mostly save Python object overhead; the relative gain is largest for small
 aperture counts and can shrink to a near tie for large batches. For the annulus
 background, the annulus sum is not the useful quantity: the median needs the
 center-selected annulus sample values. Use the low-level center weights with
-`apmask_weighted_values()` for that part.
+`BoundingBox.weighted_values()` for that part.
 
 ```{python}
 import astroapers.kernels as aapk
@@ -172,9 +170,8 @@ sky_weights, sky_boxes = aapk.weights_circ_ann_center(
     9.0,
     15.0,
 )
-kernel_sky_values = aap.apmask_weighted_values(
+kernel_sky_values = sky_boxes[0].weighted_values(
     sky_weights[0],
-    sky_boxes[0],
     data,
     mask=bad_pixels,
 )
