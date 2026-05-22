@@ -105,9 +105,7 @@ def test_ellipse_exact_apsum_matches_photutils_and_sep(image_name, image):
 
 
 @pytest.mark.parametrize(("image_name", "image"), _image_cases())
-def test_rectangle_exact_apsum_matches_photutils_subpixel_reference(
-    image_name, image
-):
+def test_rectangle_exact_apsum_matches_photutils_subpixel_reference(image_name, image):
     photutils_aperture = pytest.importorskip("photutils.aperture")
     x = POSITIONS[:, 0]
     y = POSITIONS[:, 1]
@@ -166,9 +164,7 @@ def test_circular_annulus_exact_apsum_matches_photutils_and_sep(image_name, imag
 
 
 @pytest.mark.parametrize(("image_name", "image"), _image_cases())
-def test_elliptical_annulus_exact_apsum_matches_photutils_and_sep(
-    image_name, image
-):
+def test_elliptical_annulus_exact_apsum_matches_photutils_and_sep(image_name, image):
     photutils_aperture = pytest.importorskip("photutils.aperture")
     sep = pytest.importorskip("sep")
     x = POSITIONS[:, 0]

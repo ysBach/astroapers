@@ -123,6 +123,8 @@ dev = [
     { name = "photutils", version = "3.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "pytest" },
     { name = "ruff" },
+    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "sep" },
 ]
 docs = [
@@ -134,6 +136,8 @@ docs = [
     { name = "photutils", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "photutils", version = "3.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "quartodoc" },
+    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "sep" },
 ]
 
@@ -152,6 +156,8 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "quartodoc", marker = "extra == 'docs'" },
     { name = "ruff", marker = "extra == 'dev'" },
+    { name = "scipy", marker = "extra == 'dev'" },
+    { name = "scipy", marker = "extra == 'docs'" },
     { name = "sep", marker = "extra == 'dev'" },
     { name = "sep", marker = "extra == 'docs'" },
 ]
