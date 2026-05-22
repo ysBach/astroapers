@@ -59,9 +59,11 @@ def test_center_apsum_functions_match_center_masks():
         npix_only = npix_func(x, y, *params, shape=data.shape)
         expected_apsum = []
         expected_npix = []
-        for apm in aperture.get_apmask(method="center"):
-            expected_apsum.append(apm.apsum(data)[0])
-            expected_npix.append(apm.weights.sum())
+        for weight, bbox in zip(
+            aperture.weights(method="center"), aperture.bboxes(), strict=True
+        ):
+            expected_apsum.append(bbox.apsum(weight, data)[0])
+            expected_npix.append(weight.sum())
         assert_allclose(apsum, expected_apsum)
         assert_allclose(npix, expected_npix)
         assert_allclose(npix_only, expected_npix)
@@ -84,7 +86,10 @@ def test_circular_annulus_npix_functions_match_apsum_and_masks():
 
     annulus = apers.CircAn(np.column_stack([x, y]), r_in, r_out)
     expected_center = [
-        apm.npix(data.shape) for apm in annulus.get_apmask(method="center")
+        bbox.npix(weight, data.shape)
+        for weight, bbox in zip(
+            annulus.weights(method="center"), annulus.bboxes(), strict=True
+        )
     ]
     assert_allclose(
         apers.npix_circ_ann_center(x, y, r_in, r_out, shape=data.shape),
@@ -196,7 +201,10 @@ def test_direct_center_apsum_accepts_mask():
 
     for aperture, func, params in cases:
         expected = [
-            apm.apsum(data, mask=bad) for apm in aperture.get_apmask(method="center")
+            bbox.apsum(weight, data, mask=bad)
+            for weight, bbox in zip(
+                aperture.weights(method="center"), aperture.bboxes(), strict=True
+            )
         ]
         expected_apsum = np.array([item[0] for item in expected])
         expected_npix = np.array([item[1] for item in expected])
@@ -525,6 +533,27 @@ def test_low_level_center_npix_handles_edges_and_nonfinite_positions():
         assert values[0] >= 0.0
         assert values[1] >= 0.0
         assert np.isnan(values[2])
+
+
+def test_positions_validate_false_returns_expert_arrays_by_identity(monkeypatch):
+    import astroapers.kernels as aapk
+
+    x = np.ascontiguousarray(np.array([1.0, 2.0], dtype=np.float64))
+    y = np.ascontiguousarray(np.array([3.0], dtype=np.float64))
+
+    with pytest.raises(ValueError, match="matching shapes"):
+        aapk._positions(x, y)
+
+    def fail_conversion(*args, **kwargs):
+        raise AssertionError("validate=False must not normalize positions")
+
+    monkeypatch.setattr(aapk.np, "ascontiguousarray", fail_conversion)
+    monkeypatch.setattr(aapk.np, "atleast_1d", fail_conversion)
+
+    got_x, got_y = aapk._positions(x, y, validate=False)
+
+    assert got_x is x
+    assert got_y is y
 
 
 def test_low_level_apsum_rejects_non_2d_data_before_dispatch():

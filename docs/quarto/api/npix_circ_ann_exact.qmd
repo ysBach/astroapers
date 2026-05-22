@@ -1,7 +1,7 @@
 # npix_circ_ann_exact { #astroapers.npix_circ_ann_exact }
 
 ```python
-npix_circ_ann_exact(x, y, r_in, r_out, *, shape)
+npix_circ_ann_exact(x, y, r_in, r_out, *, shape, mask=None, validate=True)
 ```
 
 Return exact circular-annulus effective in-frame pixel counts.
@@ -19,6 +19,10 @@ Return exact circular-annulus effective in-frame pixel counts.
 <code>[**shape**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple[int, int]]{.parameter-annotation}</code>
 
 :   Image shape as ``(ny, nx)`` used to clip the aperture footprint.
+
+<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like of bool, optional]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
+
+:   Boolean image mask with shape ``shape``. ``True`` pixels are excluded from the returned effective pixel count.
 
 ## Returns {.doc-section .doc-section-returns}
 

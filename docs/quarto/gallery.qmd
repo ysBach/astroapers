@@ -31,7 +31,9 @@ def _style_outline_axis(ax, label, *, limit=8.0):
 
 def _show_mask(ax, make_ap, method, *, limit=8.0):
     ap = make_ap(image_center)
-    mask = ap.get_apmask(method=method).to_image(image_shape)
+    weights = ap.weights(method=method)[0]
+    bbox = ap.bboxes()[0]
+    mask = bbox.to_image(weights, image_shape)
     assert mask.sum() > 0.0
     ny, nx = image_shape
     ax.imshow(
@@ -94,7 +96,7 @@ def plot_shape_gallery(
 
 `astroapers` provides object classes for common circular, elliptical,
 rectangular, pill, and wedge aperture geometries. The same objects support
-plotting, bbox-tight masks, aperture sums, and effective pixel counts.
+plotting, bbox-tight weights, aperture sums, and effective pixel counts.
 
 ```{python}
 apertures = [

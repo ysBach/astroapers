@@ -16,15 +16,7 @@ from ._apertures import (
     RectAp,
 )
 from ._calibration import ParallelThresholdCalibration, calibrate_parallel_threshold
-from ._containers import (
-    ApMask,
-    BoundingBox,
-    apmask_apsum,
-    apmask_npix,
-    apmask_to_image,
-    apmask_weighted_cutout,
-    apmask_weighted_values,
-)
+from ._containers import BoundingBox
 from .kernels import (
     apsum_circ_ann_center,
     apsum_circ_ann_exact,
@@ -73,7 +65,6 @@ from ._pill import PillAn, PillAp
 from ._wedge import WedgeAp
 
 __all__ = [
-    "ApMask",
     "BoundingBox",
     "CircAn",
     "CircAp",
@@ -87,11 +78,6 @@ __all__ = [
     "RectAp",
     "PathAp",
     "WedgeAp",
-    "apmask_apsum",
-    "apmask_npix",
-    "apmask_to_image",
-    "apmask_weighted_cutout",
-    "apmask_weighted_values",
     "calibrate_parallel_threshold",
     "apsum_circ_ann_center",
     "apsum_circ_ann_exact",

@@ -81,15 +81,15 @@ If ``theta_out`` is `None`, it defaults to ``theta_in``.
 
 | Name | Description |
 | --- | --- |
-| [apsum](#astroapers.PillAn.apsum) | Return exact pill-annulus sums, and npix by default. |
+| [apsum](#astroapers.PillAn.apsum) | Return pill-annulus sums, and npix by default. |
 
 ### apsum { #astroapers.PillAn.apsum }
 
 ```python
-PillAn.apsum(data, mask=None, *, return_npix=True)
+PillAn.apsum(data, mask=None, *, method='exact', return_npix=True)
 ```
 
-Return exact pill-annulus sums, and npix by default.
+Return pill-annulus sums, and npix by default.
 
 #### Parameters {.doc-section .doc-section-parameters}
 

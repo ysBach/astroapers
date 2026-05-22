@@ -1,8 +1,9 @@
 ---
-title: "Custom masks and composition"
+title: "Custom weights and composition"
 ---
 
-This tutorial shows how to combine `ApMask` objects for more complex shapes, instead of using a simple ndarray-typed `mask`.
+This tutorial shows how to combine bbox-tight weight arrays for more complex
+shapes, instead of using a simple ndarray-typed `mask`.
 
 ```{python}
 import numpy as np
@@ -20,57 +21,63 @@ x0, y0 = 26.0, 24.0
 data = 8.0 + 0.02 * x - 0.01 * y
 data += 120.0 * np.exp(-0.5 * ((x - x0) ** 2 + (y - y0) ** 2) / 3.0**2)
 
-apm_outer = aap.CircAp((x0, y0), r=8.0).get_apmask(method="exact")
-apm_hole = aap.EllipAp((x0 + 2.0, y0), a=3.0, b=1.4, theta=0.5).get_apmask(
-    method="exact"
-)
+outer = aap.CircAp((x0, y0), r=8.0)
+hole = aap.EllipAp((x0 + 2.0, y0), a=3.0, b=1.4, theta=0.5)
 
-print(f"Outer bbox: {apm_outer.bbox}")
-print(f"Outer weights shape: {apm_outer.weights.shape}")
-print(f"Hole bbox: {apm_hole.bbox}")
-print(f"Hole weights shape: {apm_hole.weights.shape}")
+outer_weights = outer.weights(method="exact")[0]
+outer_bbox = outer.bboxes()[0]
+hole_weights = hole.weights(method="exact")[0]
+hole_bbox = hole.bboxes()[0]
+
+print(f"Outer bbox: {outer_bbox}")
+print(f"Outer weights shape: {outer_weights.shape}")
+print(f"Hole bbox: {hole_bbox}")
+print(f"Hole weights shape: {hole_weights.shape}")
 ```
 
-The two masks are bbox-tight. They usually have different origins and shapes, so arithmetic only makes sense after placing them on a **common bounding box**.
+The two weight arrays are bbox-tight. They usually have different origins and
+shapes, so arithmetic only makes sense after placing them on a **common
+bounding box**.
 
-## Align bbox-tight masks before arithmetic
+## Align bbox-tight weights before arithmetic
 
 ```{python}
-def union_bbox(apms):
+def union_bbox(boxes):
     return aap.BoundingBox(
-        ixmin=min(apm.bbox.ixmin for apm in apms),
-        ixmax=max(apm.bbox.ixmax for apm in apms),
-        iymin=min(apm.bbox.iymin for apm in apms),
-        iymax=max(apm.bbox.iymax for apm in apms),
+        ixmin=min(box.ixmin for box in boxes),
+        ixmax=max(box.ixmax for box in boxes),
+        iymin=min(box.iymin for box in boxes),
+        iymax=max(box.iymax for box in boxes),
     )
 
 
-def place_on_bbox(apm, bbox):
-    out = np.zeros(bbox.shape, dtype=apm.weights.dtype)
-    y0 = apm.bbox.iymin - bbox.iymin
-    y1 = y0 + apm.weights.shape[0]
-    x0 = apm.bbox.ixmin - bbox.ixmin
-    x1 = x0 + apm.weights.shape[1]
-    out[y0:y1, x0:x1] = apm.weights
+def place_on_bbox(weights, box, bbox):
+    out = np.zeros(bbox.shape, dtype=weights.dtype)
+    y0 = box.iymin - bbox.iymin
+    y1 = y0 + weights.shape[0]
+    x0 = box.ixmin - bbox.ixmin
+    x1 = x0 + weights.shape[1]
+    out[y0:y1, x0:x1] = weights
     return out
 
 
-bbox = union_bbox([apm_outer, apm_hole])
-outer_on_bbox = place_on_bbox(apm_outer, bbox)
-hole_on_bbox = place_on_bbox(apm_hole, bbox)
+bbox = union_bbox([outer_bbox, hole_bbox])
+outer_on_bbox = place_on_bbox(outer_weights, outer_bbox, bbox)
+hole_on_bbox = place_on_bbox(hole_weights, hole_bbox, bbox)
 
 weights = np.clip(outer_on_bbox - hole_on_bbox, 0.0, 1.0)
-custom_apm = aap.ApMask(weights, bbox)
 ```
 
-Now `custom_apm` is a single `ApMask` object representing the union of the outer circle and the hole. The weights are clipped to `[0, 1]` to preserve the semantics of an aperture mask, but you could also create a non-binary mask by skipping the clipping step.
+Now `weights` and `bbox` represent the union of the outer circle and the hole.
+The weights are clipped to `[0, 1]` to preserve aperture-mask semantics, but you
+could also create a non-binary mask by skipping the clipping step.
 
 ```{python}
 fig, axes = plt.subplots(1, 3, figsize=(9, 3))
 for ax, image, title in [
     (axes[0], outer_on_bbox, "outer circle"),
     (axes[1], hole_on_bbox, "elliptical exclusion"),
-    (axes[2], custom_apm.weights, "composed weights"),
+    (axes[2], weights, "composed weights"),
 ]:
     ax.imshow(image, origin="lower", vmin=0, vmax=1)
     ax.set_title(title)
@@ -79,15 +86,14 @@ plt.show()
 
 ## Use the composed mask
 
-`ApMask` has the same aperture-sum methods as masks returned by built-in
-apertures. Bad-pixel masks are separate full-image boolean arrays where `True`
-means excluded.
+Use `BoundingBox` methods with the composed weights. Bad-pixel masks are
+separate full-image boolean arrays where `True` means excluded.
 
 ```{python}
 bad_pixels = np.zeros(data.shape, dtype=bool)
 bad_pixels[26:30, 31:36] = True
 
-apsum, npix = custom_apm.apsum(data, mask=bad_pixels)
+apsum, npix = bbox.apsum(weights, data, mask=bad_pixels)
 mean_value = apsum / npix
 
 apsum, npix, mean_value
@@ -96,7 +102,7 @@ apsum, npix, mean_value
 ```{python}
 fig, ax = plt.subplots(figsize=(5, 4))
 ax.imshow(data, origin="lower", cmap="viridis")
-ax.imshow(custom_apm.to_image(data.shape) > 0, origin="lower", cmap="gray", alpha=0.25)
+ax.imshow(bbox.to_image(weights, data.shape) > 0, origin="lower", cmap="gray", alpha=0.25)
 ax.imshow(bad_pixels, origin="lower", cmap="gray_r", alpha=0.35)
 ax.set_title("Composed aperture and bad pixels")
 plt.show()
@@ -118,23 +124,19 @@ raw_weights = np.array(
     dtype=np.float32,
 )
 raw_bbox = aap.BoundingBox(ixmin=20, ixmax=24, iymin=18, iymax=21)
-raw_apm = aap.ApMask(raw_weights, raw_bbox)
-
-raw_apsum, raw_npix = raw_apm.apsum(data)
-
-# another way:
-raw_apsum_direct, raw_npix_direct = aap.apmask_apsum(
-    raw_weights,
-    raw_bbox,
-    data,
-)
-
-assert np.allclose(raw_apsum, raw_apsum_direct)
-assert np.allclose(raw_npix, raw_npix_direct)
+raw_apsum, raw_npix = raw_bbox.apsum(raw_weights, data)
 raw_apsum, raw_npix
 ```
 
-When doing this, `weights.shape` must match `bbox.shape`, which is `(iymax - iymin, ixmax - ixmin)`. `ApMask` stores sampled weights, not analytic geometry, so it has no automatic `.area`, plot path, or polygon engine.
+When doing this, `weights.shape` must match `bbox.shape`, which is
+`(iymax - iymin, ixmax - ixmin)`. Raw bbox-tight weights are sampled weights,
+not analytic geometry, so they have no automatic `.area`, plot path, or polygon
+engine.
 
-`ApMask` preserves user-supplied `float32` and `float64` weight arrays. Other numeric or boolean weight dtypes are converted to `float64`, including extended-precision dtypes such as `float128`/`longdouble` on platforms where NumPy exposes them. Array-producing helpers such as `.to_image()`, `.weighted_cutout()`, and `.weighted_values()` preserve `float32` when both data and weights are `float32`, but `ApMask.apsum()` and `ApMask.npix()` always accumulate in `float64`.
-
+`BoundingBox` methods preserve user-supplied `float32` and `float64` weight
+arrays where practical. Other numeric or boolean weight dtypes are converted to
+`float64`, including extended-precision dtypes such as `float128`/`longdouble`
+on platforms where NumPy exposes them. Array-producing helpers such as
+`.to_image()`, `.weighted_cutout()`, and `.weighted_values()` preserve `float32`
+when both data and weights are `float32`, but `BoundingBox.apsum()` and
+`BoundingBox.npix()` always accumulate in `float64`.

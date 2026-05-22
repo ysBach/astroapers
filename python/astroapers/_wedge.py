@@ -12,6 +12,8 @@ from .kernels import (
     apsum_wedge_center,
     apsum_wedge_exact,
     bboxes_wedge,
+    npix_wedge_center,
+    npix_wedge_exact,
     weights_center,
     weights_exact,
     weights_wedge_center,
@@ -112,12 +114,10 @@ class WedgeAp(PixelAp):
             dtype=np.float64,
         )
         quad_area = _polygon_area(quad)
-        outer_segment = 0.5 * self.r_out**2 * (
-            self.dtheta_out - math.sin(self.dtheta_out)
+        outer_segment = (
+            0.5 * self.r_out**2 * (self.dtheta_out - math.sin(self.dtheta_out))
         )
-        inner_segment = 0.5 * self.r_in**2 * (
-            self.dtheta_in - math.sin(self.dtheta_in)
-        )
+        inner_segment = 0.5 * self.r_in**2 * (self.dtheta_in - math.sin(self.dtheta_in))
         return quad_area + outer_segment - inner_segment
 
     def _bbox_one(self, x: float, y: float) -> BoundingBox:
@@ -130,28 +130,21 @@ class WedgeAp(PixelAp):
             self.dtheta_in,
             self.theta_out,
             self.dtheta_out,
+            validate=self._validate,
         )[0]
 
-    def _bboxes(self) -> list[BoundingBox]:
+    def bboxes(self) -> list[BoundingBox]:
         return bboxes_wedge(
-            self.positions[:, 0],
-            self.positions[:, 1],
+            self._x,
+            self._y,
             self.r_in,
             self.r_out,
             self.theta_in,
             self.dtheta_in,
             self.theta_out,
             self.dtheta_out,
+            validate=self._validate,
         )
-
-    def get_apmask(self, method: str = "exact"):
-        """Return bbox-tight wedge masks as `ApMask` objects.
-
-        ``method="exact"`` computes analytic fractional pixel overlap.
-        ``method="center"`` assigns pixels by their centers, matching the
-        original wedge-photometry definition.
-        """
-        return super().get_apmask(method=method)
 
     def _exact_weights_one(self, x: float, y: float, bbox: BoundingBox) -> np.ndarray:
         return weights_exact(
@@ -185,31 +178,33 @@ class WedgeAp(PixelAp):
             ),
         )
 
-    def _weight_arrays(
-        self, method: str = "exact"
-    ) -> tuple[list[np.ndarray], list[BoundingBox]]:
+    def weights(self, method: str = "exact") -> list[np.ndarray]:
         method = self._weight_method(method)
         weights_func = (
             weights_wedge_exact if method == "exact" else weights_wedge_center
         )
-        return weights_func(
-            self.positions[:, 0],
-            self.positions[:, 1],
+        weights, _ = weights_func(
+            self._x,
+            self._y,
             self.r_in,
             self.r_out,
             self.theta_in,
             self.dtheta_in,
             self.theta_out,
             self.dtheta_out,
+            validate=self._validate,
         )
+        return weights
 
-    def apsum(self, data, mask=None, *, method: str = "exact", return_npix: bool = True):
+    def apsum(
+        self, data, mask=None, *, method: str = "exact", return_npix: bool = True
+    ):
         method = self._weight_method(method)
         apsum_func = apsum_wedge_exact if method == "exact" else apsum_wedge_center
         result = apsum_func(
             data,
-            self.positions[:, 0],
-            self.positions[:, 1],
+            self._x,
+            self._y,
             self.r_in,
             self.r_out,
             self.theta_in,
@@ -218,11 +213,32 @@ class WedgeAp(PixelAp):
             self.dtheta_out,
             mask=mask,
             return_npix=return_npix,
+            validate=self._validate,
         )
         if not return_npix:
             return _shape_apsum_result(self, result)
         apsum, npix = result
         return _shape_apsum_result(self, apsum, npix)
+
+    def npix(self, shape: tuple[int, int], *, method: str = "exact", mask=None):
+        method = self._weight_method(method)
+        npix_func = npix_wedge_exact if method == "exact" else npix_wedge_center
+        return _shape_apsum_result(
+            self,
+            npix_func(
+                self._x,
+                self._y,
+                self.r_in,
+                self.r_out,
+                self.theta_in,
+                self.dtheta_in,
+                self.theta_out,
+                self.dtheta_out,
+                shape=shape,
+                mask=mask,
+                validate=self._validate,
+            ),
+        )
 
     def _weight_method(self, method: str) -> str:
         if method not in {"exact", "center"}:
@@ -286,9 +302,7 @@ def _wedge_bounds(
 ) -> tuple[float, float, float, float]:
     right_in = theta_in - 0.5 * dtheta_in
     left_in = right_in + dtheta_in
-    right_out = right_in + _angular_signed_delta(
-        right_in, theta_out - 0.5 * dtheta_out
-    )
+    right_out = right_in + _angular_signed_delta(right_in, theta_out - 0.5 * dtheta_out)
     left_out = right_out + dtheta_out
     return right_in, left_in, right_out, left_out
 

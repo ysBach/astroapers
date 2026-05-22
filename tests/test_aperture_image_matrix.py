@@ -172,8 +172,10 @@ def _expected_from_masks(
 ) -> tuple[np.ndarray, np.ndarray]:
     sums = []
     npixs = []
-    for apm in aperture.get_apmask(method=method):
-        apsum, npix = apm.apsum(data, mask=mask)
+    for weight, bbox in zip(
+        aperture.weights(method=method), aperture.bboxes(), strict=True
+    ):
+        apsum, npix = bbox.apsum(weight, data, mask=mask)
         sums.append(apsum)
         npixs.append(npix)
     return np.asarray(sums), np.asarray(npixs)
@@ -217,6 +219,13 @@ def test_constant_images_cover_dtypes_methods_masks_and_shapes(
     assert_allclose(got_apsum_only, got_apsum, rtol=0, atol=STRICT_ATOL)
     if mask is None:
         assert_allclose(got_npix_only, got_npix, rtol=0, atol=STRICT_ATOL)
+    else:
+        assert_allclose(
+            npix_func(x, y, *case.params, shape=IMAGE_SHAPE, mask=mask),
+            got_npix,
+            rtol=0,
+            atol=STRICT_ATOL,
+        )
     if fill_value == 0:
         assert_allclose(got_apsum, 0.0, rtol=0, atol=0.0)
     else:
@@ -231,15 +240,58 @@ def test_constant_images_cover_dtypes_methods_masks_and_shapes(
         assert np.all(got_npix > 0.0)
         assert np.all(got_npix[2:] <= case.area)
 
-    if method == "exact":
-        object_apsum, object_npix = aperture.apsum(data, mask=mask)
-        optimized_apsum, optimized_npix = case.aperture(validate=False).apsum(
-            data, mask=mask
+    object_apsum, object_npix = aperture.apsum(data, mask=mask, method=method)
+    optimized_apsum, optimized_npix = case.aperture(validate=False).apsum(
+        data, mask=mask, method=method
+    )
+    assert_allclose(object_apsum, got_apsum, rtol=0, atol=STRICT_ATOL)
+    assert_allclose(object_npix, got_npix, rtol=0, atol=STRICT_ATOL)
+    assert_allclose(optimized_apsum, got_apsum, rtol=0, atol=STRICT_ATOL)
+    assert_allclose(optimized_npix, got_npix, rtol=0, atol=STRICT_ATOL)
+
+    object_npix_only = aperture.npix(IMAGE_SHAPE, method=method)
+    assert_allclose(object_npix_only, got_npix_only, rtol=0, atol=STRICT_ATOL)
+    if mask is not None:
+        assert_allclose(
+            aperture.npix(IMAGE_SHAPE, method=method, mask=mask),
+            got_npix,
+            rtol=0,
+            atol=STRICT_ATOL,
         )
-        assert_allclose(object_apsum, got_apsum, rtol=0, atol=STRICT_ATOL)
-        assert_allclose(object_npix, got_npix, rtol=0, atol=STRICT_ATOL)
-        assert_allclose(optimized_apsum, got_apsum, rtol=0, atol=STRICT_ATOL)
-        assert_allclose(optimized_npix, got_npix, rtol=0, atol=STRICT_ATOL)
+
+
+@pytest.mark.parametrize("method", ["exact", "center"])
+@pytest.mark.parametrize("case", APERTURE_CASES, ids=lambda case: case.name)
+def test_object_bboxes_and_weights_are_aligned_lists(case: ApertureCase, method: str):
+    aperture = case.aperture()
+
+    weights = aperture.weights(method=method)
+    boxes = aperture.bboxes()
+
+    assert isinstance(weights, list)
+    assert isinstance(boxes, list)
+    assert len(weights) == len(boxes) == len(POSITIONS)
+    for weight, box in zip(weights, boxes, strict=True):
+        assert weight.dtype == np.float64
+        assert weight.shape == box.shape
+
+
+@pytest.mark.parametrize("method", ["exact", "center"])
+@pytest.mark.parametrize("case", APERTURE_CASES, ids=lambda case: case.name)
+def test_scalar_object_api_preserves_scalar_sum_shapes_and_raw_weight_lists(
+    case: ApertureCase, method: str
+):
+    data = np.ones(IMAGE_SHAPE, dtype=np.float64)
+    aperture = case.aperture(positions=POSITIONS[0])
+
+    apsum, npix = aperture.apsum(data, method=method)
+    weights = aperture.weights(method=method)
+    boxes = aperture.bboxes()
+
+    assert apsum.shape == ()
+    assert npix.shape == ()
+    assert aperture.npix(IMAGE_SHAPE, method=method).shape == ()
+    assert len(weights) == len(boxes) == 1
 
 
 def _realistic_scene(dtype) -> np.ndarray:
@@ -331,15 +383,27 @@ def test_realistic_scene_regresses_aperture_sum_and_sky_median(dtype, method: st
     expected_source, expected_sky, expected_masked_sky = expected
 
     source_sums = np.array(
-        [apm.apsum(data)[0] for apm in source.get_apmask(method=method)]
+        [
+            bbox.apsum(weight, data)[0]
+            for weight, bbox in zip(
+                source.weights(method=method), source.bboxes(), strict=True
+            )
+        ]
     )
     sky_median = np.array(
-        [np.median(apm.weighted_values(data)) for apm in sky.get_apmask(method=method)]
+        [
+            np.median(bbox.weighted_values(weight, data))
+            for weight, bbox in zip(
+                sky.weights(method=method), sky.bboxes(), strict=True
+            )
+        ]
     )
     masked_sky_median = np.array(
         [
-            np.median(apm.weighted_values(data, mask=_sky_mask(data.shape)))
-            for apm in sky.get_apmask(method=method)
+            np.median(bbox.weighted_values(weight, data, mask=_sky_mask(data.shape)))
+            for weight, bbox in zip(
+                sky.weights(method=method), sky.bboxes(), strict=True
+            )
         ]
     )
 

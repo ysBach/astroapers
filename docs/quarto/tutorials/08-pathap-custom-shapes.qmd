@@ -157,8 +157,8 @@ axes[0].imshow(data, origin="lower", cmap="viridis")
 box_with_hole.plot(ax=axes[0], color="w", lw=1.8)
 axes[0].set_title("Compound path")
 
-apm = box_with_hole.get_apmask(method="exact")
-axes[1].imshow(apm.weights, origin="lower", vmin=0, vmax=1)
+weights = box_with_hole.weights(method="exact")[0]
+axes[1].imshow(weights, origin="lower", vmin=0, vmax=1)
 axes[1].set_title("bbox-tight weights")
 plt.show()
 ```
@@ -241,6 +241,6 @@ except ValueError as exc:
     print(type(exc).__name__, str(exc))
 ```
 
-Use `ApMask` composition when the shape already exists as sampled weights.
+Use bbox-tight weight composition when the shape already exists as sampled weights.
 Use `PathAp` when the boundary is truly geometric and can be written with
 straight lines and circular arcs.

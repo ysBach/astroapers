@@ -13,17 +13,35 @@ import math
 
 import numpy as np
 
-from ._containers import ApMask, BoundingBox
+from ._containers import BoundingBox
 from .kernels import (
+    apsum_circ_ann_center,
     apsum_circ_ann_exact,
+    apsum_circ_center,
     apsum_circ_exact,
+    apsum_ellip_ann_center,
     apsum_ellip_ann_exact,
+    apsum_ellip_center,
     apsum_ellip_exact,
+    apsum_rect_ann_center,
     apsum_rect_ann_exact,
+    apsum_rect_center,
     apsum_rect_exact,
     bboxes_circ,
     bboxes_ellip,
     bboxes_rect,
+    npix_circ_ann_center,
+    npix_circ_ann_exact,
+    npix_circ_center,
+    npix_circ_exact,
+    npix_ellip_ann_center,
+    npix_ellip_ann_exact,
+    npix_ellip_center,
+    npix_ellip_exact,
+    npix_rect_ann_center,
+    npix_rect_ann_exact,
+    npix_rect_center,
+    npix_rect_exact,
     weights_circ_ann_center,
     weights_circ_ann_exact,
     weights_circ_center,
@@ -54,14 +72,14 @@ class PixelAp:
 
     Classes derived from `PixelAp` are lightweight geometry objects. The
     public method and attribute names are short but familiar for aperture
-    work (`positions`, `area`, `get_apmask()`, `apsum()`, `plot()`, and
+    work (`positions`, `area`, `weights()`, `apsum()`, `plot()`, and
     `to_patches()`), while heavy aperture summation routes through Rust-backed kernels.
 
     The intended performance split is:
 
     - use shape-specific `apsum_*_exact()` functions for fastest bulk aperture summation;
-    - use `get_apmask()` when bbox-tight masks or `ApMask` helpers are useful;
-    - use top-level `apmask_*` helpers when you already have raw weights.
+    - use `weights()` and `bboxes()` when bbox-tight weights are useful;
+    - use `BoundingBox` methods when you already have raw weights and boxes.
 
     Constructors accept ``validate=False`` as an expert-only path for high-N
     workflows. It assumes positions and geometry parameters are already valid,
@@ -71,6 +89,7 @@ class PixelAp:
     """
 
     def __init__(self, positions, *, validate: bool = True):
+        self._validate = bool(validate)
         if validate:
             self.positions, self.isscalar = normalize_positions(positions)
         else:
@@ -81,6 +100,8 @@ class PixelAp:
             )
             self.positions = arr.reshape(1, 2) if arr.ndim == 1 else arr
             self.isscalar = arr.ndim == 1
+        self._x = np.ascontiguousarray(self.positions[:, 0], dtype=np.float64)
+        self._y = np.ascontiguousarray(self.positions[:, 1], dtype=np.float64)
 
     @property
     def area(self) -> float:
@@ -88,54 +109,66 @@ class PixelAp:
         # image-clipped area.
         raise NotImplementedError
 
-    @property
-    def bbox(self):
-        """Return bbox-tight mask bounding boxes for the aperture positions.
+    def bboxes(self) -> list[BoundingBox]:
+        """Return bbox-tight bounding boxes for all aperture positions.
 
-        The result is a single `BoundingBox` for scalar-position apertures and
-        a list of `BoundingBox` objects for vector-position apertures.
+        The boxes are computed on demand. This method returns a list for both
+        scalar and vector apertures so callers can handle both cases uniformly.
+        It does not compute aperture weights; use :meth:`weights` for the
+        corresponding bbox-tight weight arrays.
         """
-        boxes = self._bboxes()
-        return boxes[0] if self.isscalar else boxes
+        return [self._bbox_one(float(x), float(y)) for x, y in self.positions]
 
-    def get_apmask(self, method: str = "exact"):
-        """Return bbox-tight aperture masks as `ApMask` objects.
+    def weights(self, method: str = "exact") -> list[np.ndarray]:
+        """Return bbox-tight aperture weights for all positions.
 
         Parameters
         ----------
         method : {"exact", "center"}, optional
-            ``"exact"`` returns fractional pixel overlap weights.
-            ``"center"`` returns binary weights where a pixel is selected when
-            its center is inside the aperture or annulus. Center masks follow
-            the Photutils boundary convention for supported shapes: pixels
-            exactly on the outer boundary are excluded, and annuli include the
-            inner boundary while excluding the outer boundary.
+            Weighting method. ``"exact"`` returns fractional pixel overlap
+            weights; ``"center"`` returns center-selected binary weights.
+
         Returns
         -------
-        ApMask or list[ApMask]
-            A single result for scalar positions, otherwise one result per
-            position.
+        list of ndarray
+            One bbox-tight weight array per aperture position. The returned
+            list is aligned by index with :meth:`bboxes`.
         """
-        arrays, boxes = self._weight_arrays(method)
-        apms = [ApMask(data, bbox) for data, bbox in zip(arrays, boxes)]
-        return apms[0] if self.isscalar else apms
-
-    def _weight_arrays(
-        self, method: str = "exact"
-    ) -> tuple[list[np.ndarray], list[BoundingBox]]:
         method = self._weight_method(method)
         arrays = []
-        boxes = self._bboxes()
-        for (x, y), bbox in zip(self.positions, boxes):
+        for (x, y), bbox in zip(self.positions, self.bboxes(), strict=True):
             x = float(x)
             y = float(y)
             if method == "center":
                 arrays.append(self._center_weights_one(x, y, bbox))
             else:
                 arrays.append(self._exact_weights_one(x, y, bbox))
-        return arrays, boxes
+        return arrays
 
-    def apsum(self, data, mask=None, *, return_npix: bool = True):
+    def npix(self, shape: tuple[int, int], *, method: str = "exact", mask=None):
+        """Return in-frame effective pixel counts.
+
+        Parameters
+        ----------
+        shape : tuple[int, int]
+            Image shape as ``(ny, nx)``.
+        method : {"exact", "center"}, optional
+            Weighting method.
+        mask : array_like of bool, optional
+            Boolean image mask with shape ``shape``. ``True`` pixels are
+            excluded from the returned effective pixel count.
+        """
+        method = self._weight_method(method)
+        weights = self.weights(method)
+        boxes = self.bboxes()
+        npix = np.empty(len(weights), dtype=np.float64)
+        for idx, (weight, bbox) in enumerate(zip(weights, boxes, strict=True)):
+            npix[idx] = bbox.npix(weight, shape, mask=mask, validate=self._validate)
+        return _shape_apsum_result(self, npix)
+
+    def apsum(
+        self, data, mask=None, *, method: str = "exact", return_npix: bool = True
+    ):
         """Return aperture apsum sums, and in-frame npix by default.
 
         This is the main object-level aperture-sum method. It uses fractional
@@ -143,18 +176,24 @@ class PixelAp:
         rectangle apertures, prefer the shape-specific bulk functions such as
         `apsum_circ_exact()`, `apsum_ellip_exact()`, and `apsum_rect_exact()`.
         """
+        method = self._weight_method(method)
         arr = np.asarray(data)
         if arr.ndim != 2:
             raise ValueError("data must be a 2-D array")
-        apms = np.atleast_1d(self.get_apmask())
-        apsum = np.empty(len(apms), dtype=np.float64)
+        weights = self.weights(method)
+        boxes = self.bboxes()
+        apsum = np.empty(len(weights), dtype=np.float64)
         if return_npix:
-            npix = np.empty(len(apms), dtype=np.float64)
-            for idx, apm in enumerate(apms):
-                apsum[idx], npix[idx] = apm.apsum(arr, mask=mask, return_npix=True)
+            npix = np.empty(len(weights), dtype=np.float64)
+            for idx, (weight, bbox) in enumerate(zip(weights, boxes, strict=True)):
+                apsum[idx], npix[idx] = bbox.apsum(
+                    weight, arr, mask=mask, return_npix=True, validate=self._validate
+                )
             return _shape_apsum_result(self, apsum, npix)
-        for idx, apm in enumerate(apms):
-            apsum[idx] = apm.apsum(arr, mask=mask, return_npix=False)
+        for idx, (weight, bbox) in enumerate(zip(weights, boxes, strict=True)):
+            apsum[idx] = bbox.apsum(
+                weight, arr, mask=mask, return_npix=False, validate=self._validate
+            )
         return _shape_apsum_result(self, apsum)
 
     def weighted_values(self, data, method: str = "center"):
@@ -240,15 +279,12 @@ class PixelAp:
     def _bbox_one(self, x: float, y: float) -> BoundingBox:
         """Return one scalar bounding box.
 
-        Fundamental vector aperture paths override `_bboxes()` and call Rust.
+        Fundamental vector aperture paths override `bboxes()` and call Rust.
         `_bbox_one()` stays scalar and Python-side for object convenience,
         plotting, weighted value extraction, and composite shapes where a Rust
         round trip per aperture would dominate this O(1) geometry.
         """
         raise NotImplementedError
-
-    def _bboxes(self) -> list[BoundingBox]:
-        return [self._bbox_one(float(x), float(y)) for x, y in self.positions]
 
     def _exact_weights_one(self, x: float, y: float, bbox: BoundingBox) -> np.ndarray:
         raise NotImplementedError
@@ -299,30 +335,59 @@ class CircAp(PixelAp):
     def _bbox_one(self, x: float, y: float) -> BoundingBox:
         return bbox_from_extent(x, y, self.r, self.r)
 
-    def _bboxes(self) -> list[BoundingBox]:
+    def bboxes(self) -> list[BoundingBox]:
         """Override the default python for-loop with a Rust-accelerated batch function."""
-        return bboxes_circ(self.positions[:, 0], self.positions[:, 1], self.r)
+        return bboxes_circ(
+            self._x,
+            self._y,
+            self.r,
+            validate=self._validate,
+        )
 
-    def _weight_arrays(
-        self, method: str = "exact"
-    ) -> tuple[list[np.ndarray], list[BoundingBox]]:
+    def weights(self, method: str = "exact") -> list[np.ndarray]:
         method = self._weight_method(method)
         weights_func = weights_circ_exact if method == "exact" else weights_circ_center
-        return weights_func(self.positions[:, 0], self.positions[:, 1], self.r)
+        weights, _ = weights_func(
+            self._x,
+            self._y,
+            self.r,
+            validate=self._validate,
+        )
+        return weights
 
-    def apsum(self, data, mask=None, *, return_npix: bool = True):
-        result = apsum_circ_exact(
+    def apsum(
+        self, data, mask=None, *, method: str = "exact", return_npix: bool = True
+    ):
+        method = self._weight_method(method)
+        apsum_func = apsum_circ_exact if method == "exact" else apsum_circ_center
+        result = apsum_func(
             data,
-            self.positions[:, 0],
-            self.positions[:, 1],
+            self._x,
+            self._y,
             self.r,
             mask=mask,
             return_npix=return_npix,
+            validate=self._validate,
         )
         if not return_npix:
             return _shape_apsum_result(self, result)
         apsum, npix = result
         return _shape_apsum_result(self, apsum, npix)
+
+    def npix(self, shape: tuple[int, int], *, method: str = "exact", mask=None):
+        method = self._weight_method(method)
+        npix_func = npix_circ_exact if method == "exact" else npix_circ_center
+        return _shape_apsum_result(
+            self,
+            npix_func(
+                self._x,
+                self._y,
+                self.r,
+                shape=shape,
+                mask=mask,
+                validate=self._validate,
+            ),
+        )
 
     def _exact_weights_one(self, x: float, y: float, bbox: BoundingBox) -> np.ndarray:
         return weights_exact("weights_circ_exact", bbox, (x, y, self.r))
@@ -380,10 +445,15 @@ class EllipAp(PixelAp):
         dy = math.sqrt((self.a * sin_t) ** 2 + (self.b * cos_t) ** 2)
         return bbox_from_extent(x, y, dx, dy)
 
-    def _bboxes(self) -> list[BoundingBox]:
+    def bboxes(self) -> list[BoundingBox]:
         """Override the default python for-loop with a Rust-accelerated batch function."""
         return bboxes_ellip(
-            self.positions[:, 0], self.positions[:, 1], self.a, self.b, self.theta
+            self._x,
+            self._y,
+            self.a,
+            self.b,
+            self.theta,
+            validate=self._validate,
         )
 
     def _exact_weights_one(self, x: float, y: float, bbox: BoundingBox) -> np.ndarray:
@@ -396,32 +466,58 @@ class EllipAp(PixelAp):
             "weights_ellip_center", bbox, (x, y, self.a, self.b, self.theta)
         )
 
-    def _weight_arrays(
-        self, method: str = "exact"
-    ) -> tuple[list[np.ndarray], list[BoundingBox]]:
+    def weights(self, method: str = "exact") -> list[np.ndarray]:
         method = self._weight_method(method)
         weights_func = (
             weights_ellip_exact if method == "exact" else weights_ellip_center
         )
-        return weights_func(
-            self.positions[:, 0], self.positions[:, 1], self.a, self.b, self.theta
+        weights, _ = weights_func(
+            self._x,
+            self._y,
+            self.a,
+            self.b,
+            self.theta,
+            validate=self._validate,
         )
+        return weights
 
-    def apsum(self, data, mask=None, *, return_npix: bool = True):
-        result = apsum_ellip_exact(
+    def apsum(
+        self, data, mask=None, *, method: str = "exact", return_npix: bool = True
+    ):
+        method = self._weight_method(method)
+        apsum_func = apsum_ellip_exact if method == "exact" else apsum_ellip_center
+        result = apsum_func(
             data,
-            self.positions[:, 0],
-            self.positions[:, 1],
+            self._x,
+            self._y,
             self.a,
             self.b,
             self.theta,
             mask=mask,
             return_npix=return_npix,
+            validate=self._validate,
         )
         if not return_npix:
             return _shape_apsum_result(self, result)
         apsum, npix = result
         return _shape_apsum_result(self, apsum, npix)
+
+    def npix(self, shape: tuple[int, int], *, method: str = "exact", mask=None):
+        method = self._weight_method(method)
+        npix_func = npix_ellip_exact if method == "exact" else npix_ellip_center
+        return _shape_apsum_result(
+            self,
+            npix_func(
+                self._x,
+                self._y,
+                self.a,
+                self.b,
+                self.theta,
+                shape=shape,
+                mask=mask,
+                validate=self._validate,
+            ),
+        )
 
     def _patch_one(self, x: float, y: float, origin, **kwargs):
         import matplotlib.patches as mpatches
@@ -482,10 +578,15 @@ class RectAp(PixelAp):
         dy = abs(0.5 * self.w * sin_t) + abs(0.5 * self.h * cos_t)
         return bbox_from_extent(x, y, dx, dy)
 
-    def _bboxes(self) -> list[BoundingBox]:
+    def bboxes(self) -> list[BoundingBox]:
         """Override the default python for-loop with a Rust-accelerated batch function."""
         return bboxes_rect(
-            self.positions[:, 0], self.positions[:, 1], self.w, self.h, self.theta
+            self._x,
+            self._y,
+            self.w,
+            self.h,
+            self.theta,
+            validate=self._validate,
         )
 
     def _exact_weights_one(self, x: float, y: float, bbox: BoundingBox) -> np.ndarray:
@@ -498,30 +599,56 @@ class RectAp(PixelAp):
             "weights_rect_center", bbox, (x, y, self.w, self.h, self.theta)
         )
 
-    def _weight_arrays(
-        self, method: str = "exact"
-    ) -> tuple[list[np.ndarray], list[BoundingBox]]:
+    def weights(self, method: str = "exact") -> list[np.ndarray]:
         method = self._weight_method(method)
         weights_func = weights_rect_exact if method == "exact" else weights_rect_center
-        return weights_func(
-            self.positions[:, 0], self.positions[:, 1], self.w, self.h, self.theta
+        weights, _ = weights_func(
+            self._x,
+            self._y,
+            self.w,
+            self.h,
+            self.theta,
+            validate=self._validate,
         )
+        return weights
 
-    def apsum(self, data, mask=None, *, return_npix: bool = True):
-        result = apsum_rect_exact(
+    def apsum(
+        self, data, mask=None, *, method: str = "exact", return_npix: bool = True
+    ):
+        method = self._weight_method(method)
+        apsum_func = apsum_rect_exact if method == "exact" else apsum_rect_center
+        result = apsum_func(
             data,
-            self.positions[:, 0],
-            self.positions[:, 1],
+            self._x,
+            self._y,
             self.w,
             self.h,
             self.theta,
             mask=mask,
             return_npix=return_npix,
+            validate=self._validate,
         )
         if not return_npix:
             return _shape_apsum_result(self, result)
         apsum, npix = result
         return _shape_apsum_result(self, apsum, npix)
+
+    def npix(self, shape: tuple[int, int], *, method: str = "exact", mask=None):
+        method = self._weight_method(method)
+        npix_func = npix_rect_exact if method == "exact" else npix_rect_center
+        return _shape_apsum_result(
+            self,
+            npix_func(
+                self._x,
+                self._y,
+                self.w,
+                self.h,
+                self.theta,
+                shape=shape,
+                mask=mask,
+                validate=self._validate,
+            ),
+        )
 
     def _patch_one(self, x: float, y: float, origin, **kwargs):
         import matplotlib.patches as mpatches
@@ -581,9 +708,14 @@ class CircAn(PixelAp):
     def _bbox_one(self, x: float, y: float) -> BoundingBox:
         return bbox_from_extent(x, y, self.r_out, self.r_out)
 
-    def _bboxes(self) -> list[BoundingBox]:
+    def bboxes(self) -> list[BoundingBox]:
         """Override the default python for-loop with a Rust-accelerated batch function."""
-        return bboxes_circ(self.positions[:, 0], self.positions[:, 1], self.r_out)
+        return bboxes_circ(
+            self._x,
+            self._y,
+            self.r_out,
+            validate=self._validate,
+        )
 
     def _exact_weights_one(self, x: float, y: float, bbox: BoundingBox) -> np.ndarray:
         return weights_exact(
@@ -595,31 +727,57 @@ class CircAn(PixelAp):
             "weights_circ_ann_center", bbox, (x, y, self.r_in, self.r_out)
         )
 
-    def _weight_arrays(
-        self, method: str = "exact"
-    ) -> tuple[list[np.ndarray], list[BoundingBox]]:
+    def weights(self, method: str = "exact") -> list[np.ndarray]:
         method = self._weight_method(method)
         weights_func = (
             weights_circ_ann_exact if method == "exact" else weights_circ_ann_center
         )
-        return weights_func(
-            self.positions[:, 0], self.positions[:, 1], self.r_in, self.r_out
+        weights, _ = weights_func(
+            self._x,
+            self._y,
+            self.r_in,
+            self.r_out,
+            validate=self._validate,
         )
+        return weights
 
-    def apsum(self, data, mask=None, *, return_npix: bool = True):
-        result = apsum_circ_ann_exact(
+    def apsum(
+        self, data, mask=None, *, method: str = "exact", return_npix: bool = True
+    ):
+        method = self._weight_method(method)
+        apsum_func = (
+            apsum_circ_ann_exact if method == "exact" else apsum_circ_ann_center
+        )
+        result = apsum_func(
             data,
-            self.positions[:, 0],
-            self.positions[:, 1],
+            self._x,
+            self._y,
             self.r_in,
             self.r_out,
             mask=mask,
             return_npix=return_npix,
+            validate=self._validate,
         )
         if not return_npix:
             return _shape_apsum_result(self, result)
         apsum, npix = result
         return _shape_apsum_result(self, apsum, npix)
+
+    def npix(self, shape: tuple[int, int], *, method: str = "exact", mask=None):
+        method = self._weight_method(method)
+        npix_func = npix_circ_ann_exact if method == "exact" else npix_circ_ann_center
+        return _shape_apsum_result(
+            self,
+            npix_func(
+                self._x,
+                self._y,
+                self.r_in,
+                self.r_out,
+                shape=shape,
+                mask=mask,
+                validate=self._validate,
+            ),
+        )
 
     def _patch_one(self, x: float, y: float, origin, **kwargs):
         import matplotlib.patches as mpatches
@@ -694,14 +852,15 @@ class EllipAn(PixelAp):
             (x, y), self.a_out, self.b_out, self.theta_out, validate=False
         )._bbox_one(x, y)
 
-    def _bboxes(self) -> list[BoundingBox]:
+    def bboxes(self) -> list[BoundingBox]:
         """Override the default python for-loop with a Rust-accelerated batch function."""
         return bboxes_ellip(
-            self.positions[:, 0],
-            self.positions[:, 1],
+            self._x,
+            self._y,
             self.a_out,
             self.b_out,
             self.theta_out,
+            validate=self._validate,
         )
 
     def _exact_weights_one(self, x: float, y: float, bbox: BoundingBox) -> np.ndarray:
@@ -736,29 +895,35 @@ class EllipAn(PixelAp):
             ),
         )
 
-    def _weight_arrays(
-        self, method: str = "exact"
-    ) -> tuple[list[np.ndarray], list[BoundingBox]]:
+    def weights(self, method: str = "exact") -> list[np.ndarray]:
         method = self._weight_method(method)
         weights_func = (
             weights_ellip_ann_exact if method == "exact" else weights_ellip_ann_center
         )
-        return weights_func(
-            self.positions[:, 0],
-            self.positions[:, 1],
+        weights, _ = weights_func(
+            self._x,
+            self._y,
             self.a_in,
             self.b_in,
             self.a_out,
             self.b_out,
             self.theta_in,
             self.theta_out,
+            validate=self._validate,
         )
+        return weights
 
-    def apsum(self, data, mask=None, *, return_npix: bool = True):
-        result = apsum_ellip_ann_exact(
+    def apsum(
+        self, data, mask=None, *, method: str = "exact", return_npix: bool = True
+    ):
+        method = self._weight_method(method)
+        apsum_func = (
+            apsum_ellip_ann_exact if method == "exact" else apsum_ellip_ann_center
+        )
+        result = apsum_func(
             data,
-            self.positions[:, 0],
-            self.positions[:, 1],
+            self._x,
+            self._y,
             self.a_in,
             self.b_in,
             self.a_out,
@@ -767,11 +932,32 @@ class EllipAn(PixelAp):
             self.theta_out,
             mask=mask,
             return_npix=return_npix,
+            validate=self._validate,
         )
         if not return_npix:
             return _shape_apsum_result(self, result)
         apsum, npix = result
         return _shape_apsum_result(self, apsum, npix)
+
+    def npix(self, shape: tuple[int, int], *, method: str = "exact", mask=None):
+        method = self._weight_method(method)
+        npix_func = npix_ellip_ann_exact if method == "exact" else npix_ellip_ann_center
+        return _shape_apsum_result(
+            self,
+            npix_func(
+                self._x,
+                self._y,
+                self.a_in,
+                self.b_in,
+                self.a_out,
+                self.b_out,
+                self.theta_in,
+                self.theta_out,
+                shape=shape,
+                mask=mask,
+                validate=self._validate,
+            ),
+        )
 
     def _patch_one(self, x: float, y: float, origin, **kwargs):
         import matplotlib.patches as mpatches
@@ -861,14 +1047,15 @@ class RectAn(PixelAp):
             (x, y), self.w_out, self.h_out, self.theta_out, validate=False
         )._bbox_one(x, y)
 
-    def _bboxes(self) -> list[BoundingBox]:
+    def bboxes(self) -> list[BoundingBox]:
         """Override the default python for-loop with a Rust-accelerated batch function."""
         return bboxes_rect(
-            self.positions[:, 0],
-            self.positions[:, 1],
+            self._x,
+            self._y,
             self.w_out,
             self.h_out,
             self.theta_out,
+            validate=self._validate,
         )
 
     def _exact_weights_one(self, x: float, y: float, bbox: BoundingBox) -> np.ndarray:
@@ -903,29 +1090,35 @@ class RectAn(PixelAp):
             ),
         )
 
-    def _weight_arrays(
-        self, method: str = "exact"
-    ) -> tuple[list[np.ndarray], list[BoundingBox]]:
+    def weights(self, method: str = "exact") -> list[np.ndarray]:
         method = self._weight_method(method)
         weights_func = (
             weights_rect_ann_exact if method == "exact" else weights_rect_ann_center
         )
-        return weights_func(
-            self.positions[:, 0],
-            self.positions[:, 1],
+        weights, _ = weights_func(
+            self._x,
+            self._y,
             self.w_in,
             self.h_in,
             self.w_out,
             self.h_out,
             self.theta_in,
             self.theta_out,
+            validate=self._validate,
         )
+        return weights
 
-    def apsum(self, data, mask=None, *, return_npix: bool = True):
-        result = apsum_rect_ann_exact(
+    def apsum(
+        self, data, mask=None, *, method: str = "exact", return_npix: bool = True
+    ):
+        method = self._weight_method(method)
+        apsum_func = (
+            apsum_rect_ann_exact if method == "exact" else apsum_rect_ann_center
+        )
+        result = apsum_func(
             data,
-            self.positions[:, 0],
-            self.positions[:, 1],
+            self._x,
+            self._y,
             self.w_in,
             self.h_in,
             self.w_out,
@@ -934,11 +1127,32 @@ class RectAn(PixelAp):
             self.theta_out,
             mask=mask,
             return_npix=return_npix,
+            validate=self._validate,
         )
         if not return_npix:
             return _shape_apsum_result(self, result)
         apsum, npix = result
         return _shape_apsum_result(self, apsum, npix)
+
+    def npix(self, shape: tuple[int, int], *, method: str = "exact", mask=None):
+        method = self._weight_method(method)
+        npix_func = npix_rect_ann_exact if method == "exact" else npix_rect_ann_center
+        return _shape_apsum_result(
+            self,
+            npix_func(
+                self._x,
+                self._y,
+                self.w_in,
+                self.h_in,
+                self.w_out,
+                self.h_out,
+                self.theta_in,
+                self.theta_out,
+                shape=shape,
+                mask=mask,
+                validate=self._validate,
+            ),
+        )
 
     def _patch_one(self, x: float, y: float, origin, **kwargs):
         import matplotlib.patches as mpatches

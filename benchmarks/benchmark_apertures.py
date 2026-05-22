@@ -2,8 +2,8 @@
 
 The benchmark validates numerical agreement before reporting timings.  It uses
 exact aperture modes where available and skips cases that do not exist.  The
-``mask`` task materializes bbox-tight aperture masks for aperture-object backends
-and validates them by comparing summed mask weights. The photutils.geometry
+``mask`` task materializes bbox-tight aperture weights for aperture-object
+backends and validates them by comparing summed weights. The photutils.geometry
 mask rows are low-level npix-style references, not reusable mask objects. Timing
 samples are collected in global round-robin passes across benchmark cases rather
 than exhausting one case before moving to the next.
@@ -296,10 +296,8 @@ def mask_benchmarks(
         radius = 5.0
         positions = np.column_stack((case.x, case.y))
         return {
-            AAP_OPT: lambda: apers.CircAp(
-                positions, radius, validate=False
-            ).get_apmask(),
-            AAP: lambda: apers.CircAp(positions, radius).get_apmask(),
+            AAP_OPT: lambda: apers.CircAp(positions, radius, validate=False).weights(),
+            AAP: lambda: apers.CircAp(positions, radius).weights(),
             "photutils.geometry": lambda: circular_grid_mask_npix(
                 case.x, case.y, radius
             ),
@@ -313,8 +311,8 @@ def mask_benchmarks(
         return {
             AAP_OPT: lambda: apers.EllipAp(
                 positions, a, b, theta, validate=False
-            ).get_apmask(),
-            AAP: lambda: apers.EllipAp(positions, a, b, theta).get_apmask(),
+            ).weights(),
+            AAP: lambda: apers.EllipAp(positions, a, b, theta).weights(),
             "photutils.geometry": lambda: elliptical_grid_mask_npix(
                 case.x, case.y, a, b, theta
             ),
@@ -330,8 +328,8 @@ def mask_benchmarks(
         return {
             AAP_OPT: lambda: apers.RectAp(
                 positions, w, h, theta, validate=False
-            ).get_apmask(),
-            AAP: lambda: apers.RectAp(positions, w, h, theta).get_apmask(),
+            ).weights(),
+            AAP: lambda: apers.RectAp(positions, w, h, theta).weights(),
             "photutils.Aperture": lambda: as_mask_list(
                 RectangularAperture(positions, w=w, h=h, theta=theta).to_mask(
                     method="subpixel", subpixels=args.photutils_rectangle_subpixels
@@ -344,8 +342,8 @@ def mask_benchmarks(
         return {
             AAP_OPT: lambda: apers.PillAp(
                 positions, w, a, b, theta, validate=False
-            ).get_apmask(),
-            AAP: lambda: apers.PillAp(positions, w, a, b, theta).get_apmask(),
+            ).weights(),
+            AAP: lambda: apers.PillAp(positions, w, a, b, theta).weights(),
         }
     if shape == "circle_annulus":
         r_in, r_out = 2.0, 5.0
@@ -353,8 +351,8 @@ def mask_benchmarks(
         return {
             AAP_OPT: lambda: apers.CircAn(
                 positions, r_in, r_out, validate=False
-            ).get_apmask(),
-            AAP: lambda: apers.CircAn(positions, r_in, r_out).get_apmask(),
+            ).weights(),
+            AAP: lambda: apers.CircAn(positions, r_in, r_out).weights(),
             "photutils.geometry": lambda: circular_annulus_grid_mask_npix(
                 case.x, case.y, r_in, r_out
             ),
@@ -372,10 +370,10 @@ def mask_benchmarks(
         return {
             AAP_OPT: lambda: apers.EllipAn(
                 positions, a_in, b_in, a_out, b_out, theta_in=theta, validate=False
-            ).get_apmask(),
+            ).weights(),
             AAP: lambda: apers.EllipAn(
                 positions, a_in, b_in, a_out, b_out, theta_in=theta
-            ).get_apmask(),
+            ).weights(),
             "photutils.geometry": lambda: elliptical_annulus_grid_mask_npix(
                 case.x, case.y, a, b, r_in, r_out, theta
             ),
@@ -396,10 +394,10 @@ def mask_benchmarks(
         return {
             AAP_OPT: lambda: apers.RectAn(
                 positions, w_in, h_in, w_out, h_out, theta_in=theta, validate=False
-            ).get_apmask(),
+            ).weights(),
             AAP: lambda: apers.RectAn(
                 positions, w_in, h_in, w_out, h_out, theta_in=theta
-            ).get_apmask(),
+            ).weights(),
             "photutils.Aperture": lambda: as_mask_list(
                 RectangularAnnulus(
                     positions,
@@ -427,10 +425,10 @@ def mask_benchmarks(
                 b_out,
                 theta_in=theta,
                 validate=False,
-            ).get_apmask(),
+            ).weights(),
             AAP: lambda: apers.PillAn(
                 positions, w_in, a_in, b_in, w_out, a_out, b_out, theta_in=theta
-            ).get_apmask(),
+            ).weights(),
         }
     raise ValueError(f"unsupported shape: {shape}")
 

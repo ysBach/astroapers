@@ -51,15 +51,15 @@ composite rectangle-plus-cap semantics.
 
 | Name | Description |
 | --- | --- |
-| [apsum](#astroapers.PillAp.apsum) | Return exact pill-aperture sums, and npix by default. |
+| [apsum](#astroapers.PillAp.apsum) | Return pill-aperture sums, and npix by default. |
 
 ### apsum { #astroapers.PillAp.apsum }
 
 ```python
-PillAp.apsum(data, mask=None, *, return_npix=True)
+PillAp.apsum(data, mask=None, *, method='exact', return_npix=True)
 ```
 
-Return exact pill-aperture sums, and npix by default.
+Return pill-aperture sums, and npix by default.
 
 #### Parameters {.doc-section .doc-section-parameters}
 

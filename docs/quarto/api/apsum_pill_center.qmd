@@ -12,6 +12,7 @@ apsum_pill_center(
     *,
     mask=None,
     return_npix=True,
+    validate=True,
 )
 ```
 
@@ -55,4 +56,4 @@ Return center-selected pill aperture sums for one or many aperture centers.
 
 ## Notes {.doc-section .doc-section-notes}
 
-Pill center-mode aperture summation currently uses Rust-generated bbox-tight binary pill weights and the same reduction as ``ApMask.apsum``.
+Pill center-mode aperture summation currently uses Rust-generated bbox-tight binary pill weights and the same ``BoundingBox.apsum`` reduction.

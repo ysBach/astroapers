@@ -163,19 +163,24 @@ ax.set(
 plt.show()
 ```
 
-## Aperture masks return a list
+## Weights and boxes return lists
 
-`get_apmask()` returns one `ApMask` per vector position. This makes clipping and
-reusing each bbox-tight mask explicit.
+`weights()` and `bboxes()` each return one item per vector position, even when
+the aperture is scalar. Match them by index when clipping or reusing bbox-tight
+weights.
 
 ```{python}
-masks = ap.get_apmask(method="center")
-assert len(masks) == len(positions)
-[mask.weights.sum() for mask in masks]
+weights = ap.weights(method="center")
+boxes = ap.bboxes()
+assert len(weights) == len(positions)
+[weight.sum() for weight in weights]
 ```
 
 ```{python}
-full_masks = [mask.to_image(data.shape) > 0 for mask in masks]
+full_masks = [
+    box.to_image(weight, data.shape) > 0
+    for weight, box in zip(weights, boxes, strict=True)
+]
 [mask.sum() for mask in full_masks]
 ```
 

@@ -49,3 +49,17 @@ Rotated rectangular annulus in pixel coordinates.
 <code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
 
 :   If `False`, skip input validation and assume finite, positive geometry, ordered dimensions, and normalized positions.
+
+## Methods
+
+| Name | Description |
+| --- | --- |
+| [bboxes](#astroapers.RectAn.bboxes) | Override the default python for-loop with a Rust-accelerated batch function. |
+
+### bboxes { #astroapers.RectAn.bboxes }
+
+```python
+RectAn.bboxes()
+```
+
+Override the default python for-loop with a Rust-accelerated batch function.

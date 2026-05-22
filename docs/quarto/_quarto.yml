@@ -23,15 +23,15 @@ website:
           - href: tutorials/01-quickstart.qmd
             text: Quickstart aperture sums
           - href: tutorials/02-masks.qmd
-            text: Bbox-tight masks
+            text: Bbox-tight weights
           - href: tutorials/03-background.qmd
             text: Annulus background
           - href: tutorials/04-multiple-apertures.qmd
             text: Multiple apertures and radial profiles
           - href: tutorials/05-custom-masks.qmd
-            text: Custom masks and composition
+            text: Custom weights and composition
           - href: tutorials/06-ellipse-annuli-galaxies.qmd
-            text: ELLIPSE-style galaxy annuli
+            text: Split-geometry elliptical annuli
           - href: tutorials/07-wedge-comet-jet.qmd
             text: Wedge aperture sums for comet jets
           - href: tutorials/08-pathap-custom-shapes.qmd
@@ -68,7 +68,7 @@ quartodoc:
   css: api/_styles-quartodoc.css
   sections:
     - title: Python aperture objects
-      desc: Classes for readable aperture construction, plotting, masks, and aperture sums.
+      desc: Classes for readable aperture construction, plotting, weights, and aperture sums.
       contents:
         - CircAp
         - CircAn
@@ -80,16 +80,10 @@ quartodoc:
         - PillAn
         - WedgeAp
         - PathAp
-    - title: Masks and Python helpers
-      desc: Bbox-tight mask containers and Python-level helper functions.
+    - title: Bounding boxes
+      desc: Raw bbox-weight operations.
       contents:
-        - ApMask
         - BoundingBox
-        - apmask_apsum
-        - apmask_npix
-        - apmask_to_image
-        - apmask_weighted_cutout
-        - apmask_weighted_values
     - title: Direct Rust-backed kernels
       desc: Low-overhead catalog functions for fixed geometry workflows.
       contents:
