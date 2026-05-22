@@ -4,7 +4,9 @@ The benchmark validates numerical agreement before reporting timings.  It uses
 exact aperture modes where available and skips cases that do not exist.  The
 ``mask`` task materializes bbox-tight aperture masks for aperture-object backends
 and validates them by comparing summed mask weights. The photutils.geometry
-mask rows are low-level npix-style references, not reusable mask objects.
+mask rows are low-level npix-style references, not reusable mask objects. Timing
+samples are collected in global round-robin passes across benchmark cases rather
+than exhausting one case before moving to the next.
 """
 
 from __future__ import annotations
@@ -45,9 +47,7 @@ REQUIRED_KERNELS_API = (
 )
 
 missing_api = [name for name in REQUIRED_ASTROAPERS_API if not hasattr(apers, name)]
-missing_kernels_api = [
-    name for name in REQUIRED_KERNELS_API if not hasattr(aapk, name)
-]
+missing_kernels_api = [name for name in REQUIRED_KERNELS_API if not hasattr(aapk, name)]
 if missing_api or missing_kernels_api:
     missing = ", ".join((*missing_api, *missing_kernels_api))
     raise SystemExit(
@@ -116,10 +116,19 @@ class Timing:
     speedup: float | None = None
 
 
+@dataclass(frozen=True)
+class BenchmarkGroup:
+    task: str
+    shape: str
+    dtype: str
+    n_apertures: int
+    functions: dict[str, Callable[[], object]]
+
+
 def main() -> None:
     args = parse_args()
 
-    timings: list[Timing] = []
+    groups: list[BenchmarkGroup] = []
     first_dtype = args.dtypes[0]
     for dtype in args.dtypes:
         rng = np.random.default_rng(args.seed)
@@ -128,7 +137,9 @@ def main() -> None:
             case = make_case(data, dtype, n_apertures, rng)
             run_mask = dtype == first_dtype
             for shape in args.shapes:
-                timings.extend(run_shape(case, shape, args, run_mask=run_mask))
+                groups.extend(prepare_shape(case, shape, args, run_mask=run_mask))
+
+    timings = time_benchmark_groups(groups, args)
 
     if args.format == "csv":
         print_timings_csv(timings, args)
@@ -177,8 +188,16 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=5,
         help=(
-            "timing repeats per benchmark; reported time is the median after "
-            "dropping fastest/slowest when possible"
+            "global round-robin timing passes per benchmark; reported time is "
+            "the median after dropping fastest/slowest when possible"
+        ),
+    )
+    parser.add_argument(
+        "--no-adaptive-repeats",
+        action="store_true",
+        help=(
+            "disable slow-backend repeat caps so every backend receives exactly "
+            "--repeats timing samples"
         ),
     )
     parser.add_argument("--seed", type=int, default=12345, help="random seed")
@@ -237,39 +256,37 @@ def make_case(
     return Case(shape="", dtype=dtype, n_apertures=n_apertures, image=data, x=x, y=y)
 
 
-def run_shape(
+def prepare_shape(
     case: Case, shape: str, args: argparse.Namespace, *, run_mask: bool
-) -> list[Timing]:
+) -> list[BenchmarkGroup]:
     mask_functions = mask_benchmarks(case, shape, args)
     apsum_functions = apsum_benchmarks(case, shape, args)
-    timings: list[Timing] = []
+    groups: list[BenchmarkGroup] = []
 
     if "mask" in args.tasks and run_mask and mask_functions:
         validate_mask_results(shape, case.n_apertures, mask_functions, args)
-        timings.extend(
-            time_functions(
+        groups.append(
+            BenchmarkGroup(
                 "mask",
                 shape,
                 case.dtype,
                 case.n_apertures,
                 mask_functions,
-                args.repeats,
             )
         )
 
     if "apsum" in args.tasks:
         validate_results("apsum", shape, case.n_apertures, apsum_functions, args)
-        timings.extend(
-            time_functions(
+        groups.append(
+            BenchmarkGroup(
                 "apsum",
                 shape,
                 case.dtype,
                 case.n_apertures,
                 apsum_functions,
-                args.repeats,
             )
         )
-    return timings
+    return groups
 
 
 def mask_benchmarks(
@@ -940,81 +957,116 @@ def validate_mask_samples(
         assert_allclose(candidate, reference, rtol=args.rtol, atol=args.atol)
 
 
-def time_functions(
-    task: str,
-    shape: str,
-    dtype: str,
-    n_apertures: int,
-    functions: dict[str, Callable[[], np.ndarray]],
-    repeats: int,
+def time_benchmark_groups(
+    groups: list[BenchmarkGroup], args: argparse.Namespace
 ) -> list[Timing]:
-    repeat_counts = {
-        name: adaptive_repeats(name, n_apertures, repeats) for name in functions
-    }
-    raw = interleaved_median_times(functions, repeat_counts)
+    raw_by_group = global_round_robin_median_times(groups, args)
 
-    timings = [
-        Timing(task, shape, dtype, n_apertures, name, seconds)
-        for name, seconds in raw.items()
-    ]
-    aap_opt_time = raw.get(AAP_OPT)
-    if aap_opt_time is not None:
-        for name, seconds in raw.items():
-            if name == AAP_OPT:
-                continue
-            timings.append(
-                Timing(
-                    task=task,
-                    shape=shape,
-                    dtype=dtype,
-                    n_apertures=n_apertures,
-                    library=AAP_OPT,
-                    seconds=aap_opt_time,
-                    speedup_vs_library=name,
-                    speedup=seconds / aap_opt_time,
-                )
+    timings: list[Timing] = []
+    for group_idx, group in enumerate(groups):
+        raw = raw_by_group[group_idx]
+        timings.extend(
+            Timing(
+                group.task,
+                group.shape,
+                group.dtype,
+                group.n_apertures,
+                name,
+                seconds,
             )
+            for name, seconds in raw.items()
+        )
+        aap_opt_time = raw.get(AAP_OPT)
+        if aap_opt_time is not None:
+            for name, seconds in raw.items():
+                if name == AAP_OPT:
+                    continue
+                timings.append(
+                    Timing(
+                        task=group.task,
+                        shape=group.shape,
+                        dtype=group.dtype,
+                        n_apertures=group.n_apertures,
+                        library=AAP_OPT,
+                        seconds=aap_opt_time,
+                        speedup_vs_library=name,
+                        speedup=seconds / aap_opt_time,
+                    )
+                )
     return timings
 
 
-def interleaved_median_times(
-    functions: dict[str, Callable[[], np.ndarray]],
-    repeat_counts: dict[str, int],
-) -> dict[str, float]:
-    for function in functions.values():
-        result = function()
-        if result_size(result) == 0:
-            raise RuntimeError("benchmark function returned an empty result")
+def global_round_robin_median_times(
+    groups: list[BenchmarkGroup], args: argparse.Namespace
+) -> dict[int, dict[str, float]]:
+    for group in groups:
+        for function in group.functions.values():
+            result = function()
+            if result_size(result) == 0:
+                raise RuntimeError("benchmark function returned an empty result")
 
-    names = list(functions)
-    samples = {name: [] for name in names}
-    max_repeats = max(repeat_counts.values(), default=0)
+    samples = {
+        group_idx: {name: [] for name in group.functions}
+        for group_idx, group in enumerate(groups)
+    }
+    repeat_counts = {
+        group_idx: {
+            name: repeat_count_for_backend(name, group.n_apertures, args)
+            for name in group.functions
+        }
+        for group_idx, group in enumerate(groups)
+    }
+
+    max_repeats = max(
+        (count for counts in repeat_counts.values() for count in counts.values()),
+        default=0,
+    )
     rng = random.Random(12345)
     gc_was_enabled = gc.isenabled()
     gc.disable()
     try:
         for repeat_idx in range(max_repeats):
-            order = names.copy()
-            rng.shuffle(order)
-            for name in order:
-                if repeat_idx >= repeat_counts[name]:
-                    continue
-                start = time.perf_counter()
-                result = functions[name]()
-                elapsed = time.perf_counter() - start
-                if result_size(result) == 0:
-                    raise RuntimeError("benchmark function returned an empty result")
-                samples[name].append(elapsed)
+            group_order = list(enumerate(groups))
+            rng.shuffle(group_order)
+            for group_idx, group in group_order:
+                library_order = list(group.functions)
+                rng.shuffle(library_order)
+                for name in library_order:
+                    if repeat_idx >= repeat_counts[group_idx][name]:
+                        continue
+                    start = time.perf_counter()
+                    result = group.functions[name]()
+                    elapsed = time.perf_counter() - start
+                    if result_size(result) == 0:
+                        raise RuntimeError(
+                            "benchmark function returned an empty result"
+                        )
+                    samples[group_idx][name].append(elapsed)
     finally:
         if gc_was_enabled:
             gc.enable()
-    return {name: trimmed_median(sample) for name, sample in samples.items()}
+    return {
+        group_idx: {
+            name: trimmed_median(sample)
+            for name, sample in group_samples.items()
+            if sample
+        }
+        for group_idx, group_samples in samples.items()
+    }
 
 
 def trimmed_median(samples: list[float]) -> float:
     if len(samples) >= 3:
         samples = sorted(samples)[1:-1]
     return float(np.median(samples))
+
+
+def repeat_count_for_backend(
+    library: str, n_apertures: int, args: argparse.Namespace
+) -> int:
+    if args.no_adaptive_repeats:
+        return args.repeats
+    return adaptive_repeats(library, n_apertures, args.repeats)
 
 
 def adaptive_repeats(library: str, n_apertures: int, repeats: int) -> int:
@@ -1045,9 +1097,19 @@ def print_notes(args: argparse.Namespace) -> None:
         "one slowest repeat when at least three timing samples are available"
     )
     print(
-        "# backend timings are interleaved in deterministic shuffled order to "
-        "reduce fixed-order cache and thread-pool warmup bias"
+        "# benchmark cases and backend timings are sampled in deterministic "
+        "global round-robin order to reduce fixed-order cache and thread-pool "
+        "warmup bias"
     )
+    if args.no_adaptive_repeats:
+        print(
+            "# adaptive repeat caps are disabled; every backend uses --repeats samples"
+        )
+    else:
+        print(
+            "# adaptive repeat caps are enabled for slow large-n photutils/SEP rows; "
+            "use --no-adaptive-repeats to disable"
+        )
     print(
         "# Photutils rectangular Aperture validation: "
         f"rtol={args.photutils_rectangle_rtol:g}, "
