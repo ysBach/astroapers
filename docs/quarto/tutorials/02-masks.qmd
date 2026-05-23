@@ -55,6 +55,16 @@ exact_image = bbox.to_image(weights_exact, shape)
 center_image = bbox.to_image(weights_center, shape)
 ```
 
+`BoundingBox` can also return the FITS-standard section string (useful for DS9 or archaic astronomical software such as IRAF). FITS sections use 1-indexed, `x,y` order with inclusive upper bounds, so passing `shape` is recommended especially in case when bbox is clipped at image edges.
+
+```{python}
+print(bbox.to_fits_section(shape))
+
+edge_bbox = ap_edge.bboxes()[0]
+print(edge_bbox)
+print(edge_bbox.to_fits_section(shape))
+```
+
 The top row below shows the small bbox-tight arrays used for computation. The
 bottom row shows the same weights embedded back into the full image grid.
 

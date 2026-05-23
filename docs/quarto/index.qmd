@@ -19,11 +19,12 @@ bbox-tight weights, and aperture summation in pixel coordinates.
   * `an = aap.CircAn((x, y), r_in, r_out)`
   * An annulus is a special kind of aperture, defined by two closed-curve geometries: an inner one and an outer one.
 * **Bounding Box** (class `BoundingBox`):
-  * `boxes = ap.bboxes()`.
+  * `bboxes = ap.bboxes()`.
   * General users will not need to access this at all.
   * The smallest rectangle that contains the aperture.
   * Defined using four `int`s: `(ixmin, ixmax, iymin, iymax)`.
   * It is a small helper to reduce calculation time and memory usage in `aap` by working only with the pixels relevant to the aperture, instead of the full image.
+  * Use `bbox.to_fits_section(shape)` for DS9 or IRAF-style FITS image section (`[x1:x2,y1:y2]`, 1-indexed).
 * **Weights** (class `ndarray`)
   * `weights = ap.weights(method="exact")` returns bbox-tight fractional pixel overlaps.
   * In real usage, users generally won't need weights directly because the aperture methods (especially `apsum`) will use them internally.
@@ -94,7 +95,7 @@ This site has two kinds of documentation:
 1. [Quickstart aperture sums](tutorials/01-quickstart.qmd): create a synthetic
    image and measure circular aperture flux.
 2. [Bbox-tight weights](tutorials/02-masks.qmd): inspect `ap.weights()`,
-   `ap.bboxes()`, and `BoundingBox.to_image()`.
+   `ap.bboxes()`, `BoundingBox.to_image()`, and `BoundingBox.to_fits_section()`.
 3. [Annulus background](tutorials/03-background.qmd): estimate a local
    background from an annulus and subtract it from source flux.
 4. [Multiple apertures and radial profiles](tutorials/04-multiple-apertures.qmd):

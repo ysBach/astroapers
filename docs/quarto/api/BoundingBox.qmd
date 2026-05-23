@@ -42,6 +42,7 @@ Bounding boxes may extend outside an image. Use
 | [apsum](#astroapers.BoundingBox.apsum) | Return aperture sum, and npix by default, for raw aperture weights. |
 | [npix](#astroapers.BoundingBox.npix) | Return the in-frame sum of raw aperture weights for ``shape``. |
 | [overlap_slices](#astroapers.BoundingBox.overlap_slices) | Return image and mask slices for the overlap with ``shape``. |
+| [to_fits_section](#astroapers.BoundingBox.to_fits_section) | Return this box as a FITS image section string. |
 | [to_image](#astroapers.BoundingBox.to_image) | Embed bbox-tight mask weights in a full image array. |
 | [weighted_cutout](#astroapers.BoundingBox.weighted_cutout) | Return a bbox-tight weighted cutout for raw aperture weights. |
 | [weighted_values](#astroapers.BoundingBox.weighted_values) | Return weighted values for positive raw aperture weights. |
@@ -137,6 +138,32 @@ Return image and mask slices for the overlap with ``shape``.
 <code>[]{.parameter-name} [:]{.parameter-annotation-sep} [tuple of tuple of slice, or None]{.parameter-annotation}</code>
 
 :   ``(data_slices, mask_slices)`` when the bounding box overlaps the image. ``data_slices`` select the in-frame pixels from the full image; ``mask_slices`` select the matching region from the bbox-tight mask. Returns ``None`` when the bounding box is fully outside the image.
+
+### to_fits_section { #astroapers.BoundingBox.to_fits_section }
+
+```python
+BoundingBox.to_fits_section(shape=None)
+```
+
+Return this box as a FITS image section string.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+<code>[**shape**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple\[int, int\], optional]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
+
+:   Full image shape as ``(ny, nx)``. If supplied, the returned section is clipped to the image overlap. If omitted, the raw bounding box must already be valid in FITS coordinates.
+
+#### Returns {.doc-section .doc-section-returns}
+
+<code>[]{.parameter-name} [:]{.parameter-annotation-sep} [str]{.parameter-annotation}</code>
+
+:   FITS-standard image section in 1-indexed, ``x,y`` order, with inclusive upper bounds.
+
+#### Raises {.doc-section .doc-section-raises}
+
+<code>[**ValueError**]{.parameter-name}</code>
+
+:   If the raw bounding box has nonpositive extent, if an unclipped box would start before FITS pixel 1, or if the box does not overlap ``shape``.
 
 ### to_image { #astroapers.BoundingBox.to_image }
 
