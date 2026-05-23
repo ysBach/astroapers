@@ -72,6 +72,48 @@ class BoundingBox:
         )
         return data_slices, mask_slices
 
+    def to_fits_section(self, shape: tuple[int, int] | None = None) -> str:
+        """Return this box as a FITS image section string.
+
+        Parameters
+        ----------
+        shape : tuple[int, int], optional
+            Full image shape as ``(ny, nx)``. If supplied, the returned section
+            is clipped to the image overlap. If omitted, the raw bounding box
+            must already be valid in FITS coordinates.
+
+        Returns
+        -------
+        str
+            FITS-standard image section in 1-indexed, ``x,y`` order, with
+            inclusive upper bounds.
+
+        Raises
+        ------
+        ValueError
+            If the raw bounding box has nonpositive extent, if an unclipped
+            box would start before FITS pixel 1, or if the box does not
+            overlap ``shape``.
+        """
+        if shape is None:
+            if self.ixmax <= self.ixmin or self.iymax <= self.iymin:
+                raise ValueError("bounding box must have positive x and y extents")
+            if self.ixmin < 0 or self.iymin < 0:
+                raise ValueError(
+                    "shape is required to convert an off-image bounding box "
+                    "to a valid FITS section"
+                )
+            return _slices_to_fits_section(
+                slice(self.iymin, self.iymax), slice(self.ixmin, self.ixmax)
+            )
+
+        shape = _validate_imshape(shape)
+        overlap = self.overlap_slices(shape)
+        if overlap is None:
+            raise ValueError("bounding box does not overlap shape")
+        data_slices, _ = overlap
+        return _slices_to_fits_section(data_slices[0], data_slices[1])
+
     def to_image(
         self,
         weights,
@@ -319,6 +361,19 @@ def _validate_weights(weights, bbox: BoundingBox) -> np.ndarray:
     if np.issubdtype(arr.dtype, np.number) or np.issubdtype(arr.dtype, np.bool_):
         return arr.astype(np.float64, copy=False)
     raise TypeError(f"mask weights must be numeric, got dtype {arr.dtype}")
+
+
+def _slices_to_fits_section(y_slice: slice, x_slice: slice) -> str:
+    return (
+        f"[{_fits_start(x_slice.start)}:{x_slice.stop},"
+        f"{_fits_start(y_slice.start)}:{y_slice.stop}]"
+    )
+
+
+def _fits_start(start: int | None) -> int:
+    if start is None:
+        return 1
+    return start + 1
 
 
 def _mask_dtype(weights: np.ndarray) -> np.dtype:

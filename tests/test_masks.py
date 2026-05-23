@@ -146,6 +146,46 @@ def test_bbox_npix_returns_zero_outside_image():
     assert bbox.apsum(weights, np.ones((5, 5)), return_npix=False) == 0.0
 
 
+def test_bbox_to_fits_section_returns_xy_1_indexed_inclusive_section():
+    bbox = apers.BoundingBox(ixmin=1, ixmax=3, iymin=2, iymax=4)
+
+    assert bbox.to_fits_section() == "[2:3,3:4]"
+
+
+def test_bbox_to_fits_section_clips_to_shape():
+    bbox = apers.BoundingBox(ixmin=-2, ixmax=3, iymin=4, iymax=8)
+
+    assert bbox.to_fits_section((6, 10)) == "[1:3,5:6]"
+
+
+def test_bbox_to_fits_section_requires_shape_for_negative_raw_box():
+    bbox = apers.BoundingBox(ixmin=-1, ixmax=2, iymin=0, iymax=2)
+
+    with pytest.raises(ValueError, match="shape is required"):
+        bbox.to_fits_section()
+
+
+def test_bbox_to_fits_section_rejects_no_overlap_and_degenerate_boxes():
+    outside = apers.BoundingBox(ixmin=10, ixmax=12, iymin=10, iymax=12)
+    degenerate = apers.BoundingBox(ixmin=2, ixmax=2, iymin=1, iymax=3)
+
+    with pytest.raises(ValueError, match="does not overlap"):
+        outside.to_fits_section((5, 5))
+    with pytest.raises(ValueError, match="positive x and y extents"):
+        degenerate.to_fits_section()
+
+
+def test_bbox_to_fits_section_matches_astro_ndslice_when_available():
+    astro_ndslice = pytest.importorskip("astro_ndslice")
+    bbox = apers.BoundingBox(ixmin=-2, ixmax=3, iymin=4, iymax=8)
+    data_slices, _ = bbox.overlap_slices((6, 10))
+
+    assert bbox.to_fits_section((6, 10)) == astro_ndslice.slice_to_string(
+        data_slices,
+        fits_convention=True,
+    )
+
+
 def test_bbox_raw_weights_annulus_supports_weighted_values():
     data = np.arange(12 * 12, dtype=np.float64).reshape(12, 12)
     annulus = apers.CircAn((5.5, 6.0), r_in=2.0, r_out=4.0)
