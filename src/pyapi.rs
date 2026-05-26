@@ -4,7 +4,8 @@
 //! centered at `(i, j)` and covers `[i - 0.5, i + 0.5]` in x and y.
 
 use numpy::{
-    Element, PyArray1, PyArrayMethods, PyReadonlyArray1, PyReadonlyArray2, PyUntypedArrayMethods,
+    Element, PyArray1, PyArrayMethods, PyReadonlyArray1, PyReadonlyArray2, PyReadonlyArrayDyn,
+    PyUntypedArrayMethods,
 };
 use pyo3::exceptions::{PyMemoryError, PyValueError};
 use pyo3::prelude::*;
@@ -32,6 +33,7 @@ type WeightManyResult = (
 
 mod apsum;
 mod bbox;
+mod mask;
 mod npix;
 mod parallel_api;
 mod path;
@@ -44,6 +46,7 @@ pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     apsum::register(m)?;
     npix::register(m)?;
     bbox::register(m)?;
+    mask::register(m)?;
     parallel_api::register(m)?;
     path::register(m)?;
     weights::register(m)?;

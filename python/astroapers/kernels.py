@@ -45,6 +45,7 @@ __all__ = [
     "bboxes_rect",
     "bboxes_rect_ann",
     "bboxes_wedge",
+    "farthest_mask_pixel",
     "weights_circ_ann_center",
     "weights_circ_ann_exact",
     "weights_circ_center",
@@ -91,6 +92,45 @@ __all__ = [
     "get_parallel_threshold",
     "set_parallel_threshold",
 ]
+
+
+def farthest_mask_pixel(mask, center, *, return_pos: bool = False):
+    """Return the farthest `True` mask pixel distance from ``center``.
+
+    Parameters
+    ----------
+    mask : array_like of bool
+        N-dimensional boolean mask. `True` pixels are candidates.
+    center : sequence of float
+        Center coordinate in NumPy index order. Its length must match
+        ``mask.ndim``.
+    return_pos : bool, optional
+        If `True`, also return all farthest pixel positions as a
+        ``(n_ties, mask.ndim)`` array.
+
+    Returns
+    -------
+    radius : float
+        Euclidean distance from ``center`` to the farthest `True` pixel.
+    positions : ndarray, optional
+        Returned only when ``return_pos=True``. A two-dimensional integer array
+        containing every farthest coordinate in NumPy C-order.
+    """
+    mask_arr = np.ascontiguousarray(mask, dtype=bool)
+    center_arr = np.ascontiguousarray(center, dtype=np.float64)
+    if center_arr.ndim != 1:
+        raise ValueError("center must be one-dimensional")
+
+    radius, ndim, flat_positions = _rust._farthest_mask_pixel(
+        mask_arr,
+        center_arr,
+        return_pos,
+    )
+    if not return_pos:
+        return radius
+
+    positions = np.asarray(flat_positions, dtype=np.intp)
+    return radius, positions.reshape(-1, ndim)
 
 
 def apsum_circ_exact(
