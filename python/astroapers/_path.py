@@ -286,21 +286,21 @@ class PathAp(PixelAp):
             )
         )
 
-    def _exact_weights_one(self, x: float, y: float, bbox: BoundingBox) -> np.ndarray:
+    def _weights_exact_one(self, x: float, y: float, bbox: BoundingBox) -> np.ndarray:
         return weights_exact(
             "weights_path_exact",
             bbox,
             (x, y, self._kinds, self._data),
         )
 
-    def _center_weights_one(self, x: float, y: float, bbox: BoundingBox) -> np.ndarray:
+    def _weights_center_one(self, x: float, y: float, bbox: BoundingBox) -> np.ndarray:
         return weights_center(
             "weights_path_center",
             bbox,
             (x, y, self._kinds, self._data),
         )
 
-    def weights(self, method: str = "exact") -> list[np.ndarray]:
+    def _weights_with_method(self, method: str) -> list[np.ndarray]:
         method = self._weight_method(method)
         weights_func = weights_path_exact if method == "exact" else weights_path_center
         weights, _ = weights_func(
@@ -312,8 +312,8 @@ class PathAp(PixelAp):
         )
         return weights
 
-    def apsum(
-        self, data, mask=None, *, method: str = "exact", return_npix: bool = True
+    def _apsum_with_method(
+        self, data, mask=None, *, method: str, return_npix: bool = True
     ):
         method = self._weight_method(method)
         weights_func = weights_path_exact if method == "exact" else weights_path_center

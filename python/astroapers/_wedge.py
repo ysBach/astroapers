@@ -146,7 +146,7 @@ class WedgeAp(PixelAp):
             validate=self._validate,
         )
 
-    def _exact_weights_one(self, x: float, y: float, bbox: BoundingBox) -> np.ndarray:
+    def _weights_exact_one(self, x: float, y: float, bbox: BoundingBox) -> np.ndarray:
         return weights_exact(
             "weights_wedge_exact",
             bbox,
@@ -162,7 +162,7 @@ class WedgeAp(PixelAp):
             ),
         )
 
-    def _center_weights_one(self, x: float, y: float, bbox: BoundingBox) -> np.ndarray:
+    def _weights_center_one(self, x: float, y: float, bbox: BoundingBox) -> np.ndarray:
         return weights_center(
             "weights_wedge_center",
             bbox,
@@ -178,7 +178,7 @@ class WedgeAp(PixelAp):
             ),
         )
 
-    def weights(self, method: str = "exact") -> list[np.ndarray]:
+    def _weights_with_method(self, method: str) -> list[np.ndarray]:
         method = self._weight_method(method)
         weights_func = (
             weights_wedge_exact if method == "exact" else weights_wedge_center
@@ -196,8 +196,8 @@ class WedgeAp(PixelAp):
         )
         return weights
 
-    def apsum(
-        self, data, mask=None, *, method: str = "exact", return_npix: bool = True
+    def _apsum_with_method(
+        self, data, mask=None, *, method: str, return_npix: bool = True
     ):
         method = self._weight_method(method)
         apsum_func = apsum_wedge_exact if method == "exact" else apsum_wedge_center
@@ -220,7 +220,7 @@ class WedgeAp(PixelAp):
         apsum, npix = result
         return _shape_apsum_result(self, apsum, npix)
 
-    def npix(self, shape: tuple[int, int], *, method: str = "exact", mask=None):
+    def _npix_with_method(self, shape: tuple[int, int], *, method: str, mask=None):
         method = self._weight_method(method)
         npix_func = npix_wedge_exact if method == "exact" else npix_wedge_center
         return _shape_apsum_result(

@@ -132,17 +132,17 @@ class PillAp(PixelAp):
             validate=self._validate,
         )
 
-    def _exact_weights_one(self, x: float, y: float, bbox: BoundingBox) -> np.ndarray:
+    def _weights_exact_one(self, x: float, y: float, bbox: BoundingBox) -> np.ndarray:
         return weights_exact(
             "weights_pill_exact", bbox, (x, y, self.w, self.a, self.b, self.theta)
         )
 
-    def _center_weights_one(self, x: float, y: float, bbox: BoundingBox) -> np.ndarray:
+    def _weights_center_one(self, x: float, y: float, bbox: BoundingBox) -> np.ndarray:
         return weights_center(
             "weights_pill_center", bbox, (x, y, self.w, self.a, self.b, self.theta)
         )
 
-    def weights(self, method: str = "exact") -> list[np.ndarray]:
+    def _weights_with_method(self, method: str) -> list[np.ndarray]:
         method = self._weight_method(method)
         weights_func = weights_pill_exact if method == "exact" else weights_pill_center
         weights, _ = weights_func(
@@ -156,8 +156,8 @@ class PillAp(PixelAp):
         )
         return weights
 
-    def apsum(
-        self, data, mask=None, *, method: str = "exact", return_npix: bool = True
+    def _apsum_with_method(
+        self, data, mask=None, *, method: str, return_npix: bool = True
     ):
         """Return pill-aperture sums, and npix by default.
 
@@ -191,7 +191,7 @@ class PillAp(PixelAp):
         apsum, npix = result
         return _shape_apsum_result(self, apsum, npix)
 
-    def npix(self, shape: tuple[int, int], *, method: str = "exact", mask=None):
+    def _npix_with_method(self, shape: tuple[int, int], *, method: str, mask=None):
         method = self._weight_method(method)
         npix_func = npix_pill_exact if method == "exact" else npix_pill_center
         return _shape_apsum_result(
@@ -359,7 +359,7 @@ class PillAn(PixelAp):
             validate=self._validate,
         )
 
-    def _exact_weights_one(self, x: float, y: float, bbox: BoundingBox) -> np.ndarray:
+    def _weights_exact_one(self, x: float, y: float, bbox: BoundingBox) -> np.ndarray:
         return weights_exact(
             "weights_pill_ann_exact",
             bbox,
@@ -377,7 +377,7 @@ class PillAn(PixelAp):
             ),
         )
 
-    def _center_weights_one(self, x: float, y: float, bbox: BoundingBox) -> np.ndarray:
+    def _weights_center_one(self, x: float, y: float, bbox: BoundingBox) -> np.ndarray:
         return weights_center(
             "weights_pill_ann_center",
             bbox,
@@ -395,7 +395,7 @@ class PillAn(PixelAp):
             ),
         )
 
-    def weights(self, method: str = "exact") -> list[np.ndarray]:
+    def _weights_with_method(self, method: str) -> list[np.ndarray]:
         method = self._weight_method(method)
         weights_func = (
             weights_pill_ann_exact if method == "exact" else weights_pill_ann_center
@@ -415,8 +415,8 @@ class PillAn(PixelAp):
         )
         return weights
 
-    def apsum(
-        self, data, mask=None, *, method: str = "exact", return_npix: bool = True
+    def _apsum_with_method(
+        self, data, mask=None, *, method: str, return_npix: bool = True
     ):
         """Return pill-annulus sums, and npix by default.
 
@@ -456,7 +456,7 @@ class PillAn(PixelAp):
         apsum, npix = result
         return _shape_apsum_result(self, apsum, npix)
 
-    def npix(self, shape: tuple[int, int], *, method: str = "exact", mask=None):
+    def _npix_with_method(self, shape: tuple[int, int], *, method: str, mask=None):
         method = self._weight_method(method)
         npix_func = npix_pill_ann_exact if method == "exact" else npix_pill_ann_center
         return _shape_apsum_result(

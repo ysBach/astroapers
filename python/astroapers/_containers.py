@@ -165,8 +165,7 @@ class BoundingBox:
             Two-dimensional image to sample.
         mask : array_like of bool, optional
             Boolean image mask with the same shape as ``image``. ``True``
-            pixels are excluded by setting their aperture weights to zero
-            before multiplication.
+            pixels are set to ``fill_value`` in the returned cutout.
         fill_value : float, optional
             Value used in returned cutout pixels that do not overlap ``image``.
         validate : bool, optional
@@ -176,9 +175,9 @@ class BoundingBox:
         Returns
         -------
         ndarray
-            Floating cutout with shape ``self.shape``. Overlapping pixels
-            contain ``image * weight``; non-overlapping pixels contain
-            ``fill_value``.
+            Floating cutout with shape ``self.shape``. Unmasked overlapping
+            pixels contain ``image * weight``; masked and non-overlapping
+            pixels contain ``fill_value``.
         """
         w_full = _validate_weights(weights, self) if validate else np.asarray(weights)
         arr = np.asarray(image)
@@ -191,11 +190,12 @@ class BoundingBox:
             return cutout
         data_slices, mask_slices = overlap
         weights = w_full[mask_slices].astype(dtype, copy=False)
+        weighted = arr[data_slices].astype(dtype, copy=False) * weights
         if mask is not None:
-            weights = weights.copy()
+            weighted = weighted.copy()
             bad = validate_mask(mask, arr.shape) if validate else mask
-            weights[bad[data_slices]] = 0.0
-        cutout[mask_slices] = arr[data_slices].astype(dtype, copy=False) * weights
+            weighted[bad[data_slices]] = fill_value
+        cutout[mask_slices] = weighted
         return cutout
 
     def weighted_values(
