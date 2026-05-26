@@ -30,14 +30,16 @@ website:
             text: Multiple apertures and radial profiles
           - href: tutorials/05-custom-masks.qmd
             text: Custom weights and composition
-          - href: tutorials/06-ellipse-annuli-galaxies.qmd
-            text: Split-geometry elliptical annuli
+          - href: tutorials/06-mixed-annulus-shapes.qmd
+            text: Mixed inner and outer annulus shapes
           - href: tutorials/07-wedge-comet-jet.qmd
             text: Wedge aperture sums for comet jets
           - href: tutorials/08-pathap-custom-shapes.qmd
             text: PathAp custom line and arc apertures
-          - href: tutorials/09-performance-guide.qmd
-            text: Performance guide
+      - href: performance.qmd
+        text: Performance
+      - href: benchmarks.qmd
+        text: Benchmarks
       - href: api/index.qmd
         text: API reference
 
@@ -84,8 +86,8 @@ quartodoc:
       desc: Raw bbox-weight operations.
       contents:
         - BoundingBox
-    - title: Direct Rust-backed kernels
-      desc: Low-overhead catalog functions for fixed geometry workflows.
+    - title: Python convenience functions
+      desc: Reference functions used by the object layer.
       contents:
         - apsum_circ_exact
         - apsum_circ_center

@@ -115,8 +115,9 @@ pub(in crate::pyapi) fn validate_ellip_ann_params(
         || !positive(b_out)
         || !theta_in.is_finite()
         || !theta_out.is_finite()
-        || a_in >= a_out
-        || b_in >= b_out
+        || a_in > a_out
+        || b_in > b_out
+        || (a_in == a_out && b_in == b_out)
     {
         return Err(PyValueError::new_err(message));
     }
@@ -158,8 +159,9 @@ pub(in crate::pyapi) fn validate_rect_ann_params(
         || !positive(h_out)
         || !theta_in.is_finite()
         || !theta_out.is_finite()
-        || w_in >= w_out
-        || h_in >= h_out
+        || w_in > w_out
+        || h_in > h_out
+        || (w_in == w_out && h_in == h_out)
     {
         return Err(PyValueError::new_err(message));
     }
@@ -340,7 +342,9 @@ pub(in crate::pyapi) fn run_parallel_sum_only<F>(
 
 #[cfg(test)]
 mod tests {
-    use super::super::weights::{weights_circ_exact, weights_ellip_exact, weights_rect_exact};
+    use super::super::weights::{
+        weights_circ_exact_one, weights_ellip_exact_one, weights_rect_exact_one,
+    };
     use super::*;
 
     #[test]
@@ -375,25 +379,25 @@ mod tests {
 
     #[test]
     fn weights_circ_fill_tracks_analytic_area() {
-        let weights = weights_circ_exact(5.0, 5.0, 3.0, 0, 0, 11, 11).unwrap();
+        let weights = weights_circ_exact_one(5.0, 5.0, 3.0, 0, 0, 11, 11).unwrap();
         let area: f64 = weights.iter().sum();
         assert!((area - PI * 9.0).abs() < 1.0e-8);
     }
 
     #[test]
     fn weights_circ_fill_accepts_negative_bbox() {
-        let weights = weights_circ_exact(0.0, 0.0, 3.0, -4, -4, 8, 8).unwrap();
+        let weights = weights_circ_exact_one(0.0, 0.0, 3.0, -4, -4, 8, 8).unwrap();
         let area: f64 = weights.iter().sum();
         assert!((area - PI * 9.0).abs() < 1.0e-8);
     }
 
     #[test]
     fn weights_ellip_and_rect_fill_track_analytic_area() {
-        let ellip = weights_ellip_exact(10.0, 10.0, 4.0, 2.0, 0.3, 0, 0, 20, 20).unwrap();
+        let ellip = weights_ellip_exact_one(10.0, 10.0, 4.0, 2.0, 0.3, 0, 0, 20, 20).unwrap();
         let ellip_area: f64 = ellip.iter().sum();
         assert!((ellip_area - PI * 8.0).abs() < 1.0e-8);
 
-        let rect = weights_rect_exact(10.0, 10.0, 6.0, 3.0, 0.3, 0, 0, 20, 20).unwrap();
+        let rect = weights_rect_exact_one(10.0, 10.0, 6.0, 3.0, 0.3, 0, 0, 20, 20).unwrap();
         let rect_area: f64 = rect.iter().sum();
         assert!((rect_area - 18.0).abs() < 1.0e-12);
     }

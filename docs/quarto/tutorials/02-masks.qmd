@@ -111,7 +111,8 @@ choose different thresholds.
 
 Aperture objects expose two 1-D value extractors:
 
-- `sampled_values()` returns raw image samples selected by center weights.
+- `sampled_values(data)` returns raw image values selected by positive
+  `weights_center()` pixels; it does not return the weights.
 - `weighted_values()` returns exact fractional-overlap values, already
   multiplied by their weights.
 
@@ -134,6 +135,10 @@ At the lower `BoundingBox` layer, `weighted_cutout()` preserves the bbox shape.
 Masked cutout pixels and off-image pixels use `fill_value`, which defaults to
 `np.nan`. `weighted_values()` returns the positive-weight values for explicit
 raw weights passed by the caller.
+
+This lower-level `BoundingBox.weighted_values(weights_center, data)` pattern is
+equivalent to object-level `sampled_values(data)` only when the supplied weights
+are center weights, because those weights are binary.
 
 Built-in aperture weights use `float64`. If you pass your own raw weights to
 `BoundingBox` methods, `float32` and `float64` are preserved, but other numeric
@@ -167,37 +172,33 @@ fig.colorbar(im1, ax=axes[1], fraction=0.046)
 plt.show()
 ```
 
-## Low-Level Kernels for Lowest Overhead
+## Maximum Performance
 
-For catalog aperture sums where your coordinates are already arrays, use the direct
-kernel namespace as the lowest-overhead entry point. For supported unmasked
-`apsum_exact()` calls, aperture objects delegate to the same kernels, so the direct
-path mainly saves object construction and validation overhead. That advantage is
-most visible for small aperture counts and can be a near tie for large batches.
-Use `mask=bad_pixels` for direct masked sums, and use `weights_exact()`, `bboxes()`,
-or `BoundingBox` methods when you need reusable bbox-tight weights, full-frame
-masks, or custom mask composition.
+Import the raw Rust extension as `aapr` when the coordinates and image are
+already contiguous arrays. The raw functions return plain lists/tuples, not
+`BoundingBox` objects. For more raw-call examples, inspect `astroapers.kernels`.
 
 ```{python}
-import astroapers.kernels as aapk
+import astroapers._rust as aapr
 
-image = np.ones(shape, dtype=float)
-kernel_apsum, kernel_npix = aapk.apsum_circ_exact(
-    image,
-    np.array([15.0]),
-    np.array([15.0]),
-    r=6.0,
-)
-kernel_npix_only = aapk.npix_circ_exact(
-    np.array([15.0]),
-    np.array([15.0]),
-    r=6.0,
-    shape=shape,
+image = np.ascontiguousarray(np.ones(shape), dtype=np.float64)
+xpos = np.ascontiguousarray([15.0], dtype=np.float64)
+ypos = np.ascontiguousarray([15.0], dtype=np.float64)
+
+raw_apsum, raw_npix = aapr.apsum_circ_exact(image, xpos, ypos, 6.0)
+raw_npix_only = aapr.npix_circ_exact(xpos, ypos, 6.0, *shape)
+raw_weights, ixmins, ixmaxs, iymins, iymaxs = aapr.weights_circ_exact(
+    xpos,
+    ypos,
+    6.0,
 )
 
-assert np.allclose(kernel_apsum[0], bbox.apsum(weights_exact, image)[0])
-assert np.allclose(kernel_npix[0], bbox.npix(weights_exact, shape))
-assert np.allclose(kernel_npix_only[0], kernel_npix[0])
+raw_shape = (iymaxs[0] - iymins[0], ixmaxs[0] - ixmins[0])
+raw_weights0 = np.asarray(raw_weights[0], dtype=np.float64).reshape(raw_shape)
 
-kernel_apsum[0], kernel_npix[0]
+assert np.allclose(raw_apsum[0], bbox.apsum(weights_exact, image)[0])
+assert np.allclose(raw_npix[0], bbox.npix(weights_exact, shape))
+assert np.allclose(raw_npix_only[0], raw_npix[0])
+
+raw_apsum[0], raw_npix[0], raw_weights0.sum()
 ```

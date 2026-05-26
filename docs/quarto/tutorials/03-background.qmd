@@ -26,7 +26,9 @@ data = background + source
 ## Source aperture and sky annulus
 
 Use exact fractional weights for the source sum, and center-selected annulus
-pixels for robust background samples.
+data values for robust background samples. The center weights define which
+pixels are selected; `sampled_values(data)` returns the corresponding raw image
+values.
 
 ```{python}
 ap = aap.CircAp((x0, y0), r=5.0)
@@ -98,76 +100,44 @@ ax.set_title("Bad pixels excluded from aperture and annulus")
 plt.show()
 ```
 
-## Low-Level Kernels for Lowest Overhead
+## Maximum Performance
 
-The direct kernels are the lowest-overhead entry point for source aperture sums,
-and they accept `mask=bad_pixels` when bad pixels must be excluded. The object
-methods for these supported unmasked sums call the same kernels, so direct calls
-mostly save Python object overhead; the relative gain is largest for small
-aperture counts and can shrink to a near tie for large batches. For the annulus
-background, the annulus sum is not the useful quantity: the median needs the
-center-selected annulus sample values. Use the low-level center weights with
-`BoundingBox.weighted_values()` for that part.
+For fixed unmasked work, import the raw Rust extension as `aapr`. Raw Rust
+functions do not accept the `bad_pixels` mask; if masked background subtraction
+is required, keep using the object or Python wrapper layer. For more raw-call
+patterns, inspect `astroapers.kernels`.
 
 ```{python}
-import astroapers.kernels as aapk
+import astroapers._rust as aapr
 
-xpos = np.array([x0])
-ypos = np.array([y0])
+raw_data = np.ascontiguousarray(data, dtype=np.float64)
+xpos = np.ascontiguousarray([x0], dtype=np.float64)
+ypos = np.ascontiguousarray([y0], dtype=np.float64)
 
-kernel_src_apsum, kernel_src_npix = aapk.apsum_circ_exact(
-    data,
+raw_src_apsum, raw_src_npix = aapr.apsum_circ_exact(
+    raw_data,
     xpos,
     ypos,
-    r=5.0,
-    mask=bad_pixels,
+    5.0,
 )
-sky_weights, sky_boxes = aapk.weights_circ_ann_center(
+raw_sky_weights, ixmins, ixmaxs, iymins, iymaxs = aapr.weights_circ_ann_center(
     xpos,
     ypos,
     9.0,
     15.0,
 )
-kernel_sky_values = sky_boxes[0].weighted_values(
-    sky_weights[0],
-    data,
-    mask=bad_pixels,
-)
-kernel_sky_median = np.median(kernel_sky_values)
-kernel_srcsum = kernel_src_apsum[0] - kernel_src_npix[0] * kernel_sky_median
-kernel_sum_only = aapk.apsum_circ_exact(
-    data,
-    xpos,
-    ypos,
-    r=5.0,
-    mask=bad_pixels,
-    return_npix=False,
-)
 
-assert np.allclose(kernel_src_apsum[0], apsum_masked)
-assert np.allclose(kernel_src_npix[0], src_npix_masked)
-assert np.allclose(kernel_sum_only[0], apsum_masked)
-assert np.allclose(kernel_sky_values, sky_values_masked)
-assert np.allclose(kernel_sky_median, sky_median_masked)
-assert np.allclose(kernel_srcsum, srcsum_masked)
+sky_shape = (iymaxs[0] - iymins[0], ixmaxs[0] - ixmins[0])
+sky_weights0 = np.asarray(raw_sky_weights[0], dtype=np.float64).reshape(sky_shape)
+sky_cutout = raw_data[iymins[0]:iymaxs[0], ixmins[0]:ixmaxs[0]]
+raw_sky_values = sky_cutout[sky_weights0 > 0]
+raw_sky_median = np.median(raw_sky_values)
+raw_srcsum = raw_src_apsum[0] - raw_src_npix[0] * raw_sky_median
 
-kernel_sky_median, sky_median_masked, kernel_srcsum
-```
+assert np.allclose(raw_src_apsum[0], apsum)
+assert np.allclose(raw_src_npix[0], src_npix)
+assert np.allclose(raw_sky_values, sky_values)
+assert np.allclose(raw_sky_median, sky_median)
 
-The direct circular-annulus `apsum` function is still useful when you actually
-want the weighted annulus flux or mean. It is not a substitute for robust
-background sampling:
-
-```{python}
-kernel_ann_apsum, kernel_ann_npix = aapk.apsum_circ_ann_exact(
-    data,
-    xpos,
-    ypos,
-    r_in=9.0,
-    r_out=15.0,
-    mask=bad_pixels,
-)
-
-kernel_ann_mean = kernel_ann_apsum[0] / kernel_ann_npix[0]
-kernel_ann_mean, kernel_sky_median
+raw_sky_median, raw_srcsum
 ```

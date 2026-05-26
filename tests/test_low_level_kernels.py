@@ -5,9 +5,150 @@ import pytest
 from numpy.testing import assert_allclose
 
 import astroapers as apers
+import astroapers._rust as aapr
+import astroapers._kernel_dispatch as dispatch
 import astroapers.kernels as aapk
 
 SEP_PARITY_RTOL = 5e-9
+
+
+def test_validate_false_circle_sum_uses_raw_rust_fast_path(monkeypatch):
+    data = np.ones((16, 16), dtype=np.float64)
+    x = np.ascontiguousarray([8.0], dtype=np.float64)
+    y = np.ascontiguousarray([8.0], dtype=np.float64)
+
+    def fail_dispatch(*args, **kwargs):
+        raise AssertionError("fast path should bypass ergonomic dispatch")
+
+    monkeypatch.setattr(aapk, "_apsum_or_masked", fail_dispatch)
+
+    got = aapk.apsum_circ_exact(data, x, y, 3.0, return_npix=False, validate=False)
+    expected = aapr.apsum_circ_exact_sum(data, x, y, 3.0)
+
+    assert_allclose(got, expected)
+
+
+def test_validate_false_circular_annulus_sum_uses_raw_rust_fast_path(monkeypatch):
+    data = np.ones((16, 16), dtype=np.float64)
+    x = np.ascontiguousarray([8.0], dtype=np.float64)
+    y = np.ascontiguousarray([8.0], dtype=np.float64)
+
+    def fail_dispatch(*args, **kwargs):
+        raise AssertionError("fast path should bypass ergonomic dispatch")
+
+    monkeypatch.setattr(aapk, "_apsum_or_masked", fail_dispatch)
+
+    got = aapk.apsum_circ_ann_exact(
+        data, x, y, 1.0, 3.0, return_npix=False, validate=False
+    )
+    expected = aapr.apsum_circ_ann_exact_sum(data, x, y, 1.0, 3.0)
+
+    assert_allclose(got, expected)
+
+
+@pytest.mark.parametrize(
+    ("wrapper", "rust_func", "pars"),
+    [
+        (aapk.apsum_circ_center, aapr.apsum_circ_center, (3.0,)),
+        (aapk.apsum_ellip_exact, aapr.apsum_ellip_exact, (4.0, 2.0, 0.3)),
+        (aapk.apsum_ellip_center, aapr.apsum_ellip_center, (4.0, 2.0, 0.3)),
+        (aapk.apsum_rect_exact, aapr.apsum_rect_exact, (5.0, 3.0, 0.3)),
+        (aapk.apsum_rect_center, aapr.apsum_rect_center, (5.0, 3.0, 0.3)),
+    ],
+)
+def test_validate_false_direct_apsum_bypasses_position_normalization(
+    monkeypatch, wrapper, rust_func, pars
+):
+    data = np.ones((16, 16), dtype=np.float64)
+    x = np.ascontiguousarray([8.0, 9.0], dtype=np.float64)
+    y = np.ascontiguousarray([8.0, 9.0], dtype=np.float64)
+
+    def fail_positions(*args, **kwargs):
+        raise AssertionError("fast path should bypass position normalization")
+
+    monkeypatch.setattr(dispatch, "_positions", fail_positions)
+
+    got = wrapper(data, x, y, *pars, return_npix=False, validate=False)
+    expected = rust_func(data, x, y, *pars)[0]
+
+    assert_allclose(got, expected)
+
+
+@pytest.mark.parametrize(
+    ("wrapper", "rust_func", "pars"),
+    [
+        (aapk.npix_circ_exact, aapr.npix_circ_exact, (3.0,)),
+        (aapk.npix_circ_center, aapr.npix_circ_center, (3.0,)),
+        (aapk.npix_ellip_exact, aapr.npix_ellip_exact, (4.0, 2.0, 0.3)),
+        (aapk.npix_ellip_center, aapr.npix_ellip_center, (4.0, 2.0, 0.3)),
+        (aapk.npix_rect_exact, aapr.npix_rect_exact, (5.0, 3.0, 0.3)),
+        (aapk.npix_rect_center, aapr.npix_rect_center, (5.0, 3.0, 0.3)),
+    ],
+)
+def test_validate_false_direct_npix_bypasses_position_normalization(
+    monkeypatch, wrapper, rust_func, pars
+):
+    shape = (16, 16)
+    x = np.ascontiguousarray([8.0, 9.0], dtype=np.float64)
+    y = np.ascontiguousarray([8.0, 9.0], dtype=np.float64)
+
+    def fail_positions(*args, **kwargs):
+        raise AssertionError("fast path should bypass position normalization")
+
+    monkeypatch.setattr(aapk, "_positions", fail_positions)
+
+    got = wrapper(x, y, *pars, shape=shape, validate=False)
+    expected = rust_func(x, y, *pars, *shape)
+
+    assert_allclose(got, expected)
+
+
+@pytest.mark.parametrize(
+    ("wrapper", "pars"),
+    [
+        (aapk.weights_circ_exact, (3.0,)),
+        (aapk.weights_ellip_exact, (4.0, 2.0, 0.3)),
+        (aapk.weights_rect_exact, (5.0, 3.0, 0.3)),
+    ],
+)
+def test_validate_false_weights_bypass_position_normalization(
+    monkeypatch, wrapper, pars
+):
+    x = np.ascontiguousarray([8.0, 9.0], dtype=np.float64)
+    y = np.ascontiguousarray([8.0, 9.0], dtype=np.float64)
+
+    def fail_positions(*args, **kwargs):
+        raise AssertionError("fast path should bypass position normalization")
+
+    monkeypatch.setattr(aapk, "_positions", fail_positions)
+
+    weights, boxes = wrapper(x, y, *pars, validate=False)
+
+    assert len(weights) == len(boxes) == 2
+
+
+@pytest.mark.parametrize(
+    ("wrapper", "pars"),
+    [
+        (aapk.bboxes_circ, (3.0,)),
+        (aapk.bboxes_ellip, (4.0, 2.0, 0.3)),
+        (aapk.bboxes_rect, (5.0, 3.0, 0.3)),
+    ],
+)
+def test_validate_false_bboxes_bypass_position_normalization(
+    monkeypatch, wrapper, pars
+):
+    x = np.ascontiguousarray([8.0, 9.0], dtype=np.float64)
+    y = np.ascontiguousarray([8.0, 9.0], dtype=np.float64)
+
+    def fail_positions(*args, **kwargs):
+        raise AssertionError("fast path should bypass position normalization")
+
+    monkeypatch.setattr(aapk, "_positions", fail_positions)
+
+    boxes = wrapper(x, y, *pars, validate=False)
+
+    assert len(boxes) == 2
 
 
 def test_uniform_circle_area():

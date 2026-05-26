@@ -19,7 +19,6 @@ original curve.
 import numpy as np
 import matplotlib.pyplot as plt
 import astroapers as aap
-import astroapers.kernels as aapk
 ```
 
 ## Make a small image
@@ -191,36 +190,6 @@ ax.set_title("One path, multiple centers")
 plt.show()
 ```
 
-## Direct kernels
-
-For low-overhead catalog work, use `astroapers.kernels`. The public functions
-accept the same tuple command language as `PathAp`.
-
-```{python}
-xpos = positions[:, 0]
-ypos = positions[:, 1]
-
-kernel_sums, kernel_npix = aapk.apsum_path_exact(data, xpos, ypos, diamond)
-
-assert np.allclose(kernel_sums, multi_sums)
-assert np.allclose(kernel_npix, multi_npix)
-kernel_sums
-```
-
-You can request only the sums when effective pixel counts are not needed.
-
-```{python}
-fast_sums = aapk.apsum_path_center(
-    data,
-    xpos,
-    ypos,
-    diamond,
-    return_npix=False,
-)
-
-fast_sums
-```
-
 ## Validation rules
 
 `PathAp` rejects malformed paths when `validate=True`, the default. Version 1
@@ -244,3 +213,48 @@ except ValueError as exc:
 Use bbox-tight weight composition when the shape already exists as sampled weights.
 Use `PathAp` when the boundary is truly geometric and can be written with
 straight lines and circular arcs.
+
+## Maximum Performance
+
+Raw path functions use encoded path arrays, not the tuple command language.
+`PathAp` stores those arrays after construction. Import the raw Rust extension
+as `aapr`. For more raw-call patterns, inspect `astroapers.kernels`.
+
+```{python}
+import astroapers._rust as aapr
+
+raw_data = np.ascontiguousarray(data, dtype=np.float64)
+xpos = np.ascontiguousarray(positions[:, 0], dtype=np.float64)
+ypos = np.ascontiguousarray(positions[:, 1], dtype=np.float64)
+
+raw_weights, ixmins, ixmaxs, iymins, iymaxs = aapr.weights_path_exact(
+    xpos,
+    ypos,
+    multi_ap._kinds,
+    multi_ap._data,
+)
+
+raw_sums = []
+raw_npix = []
+for flat, ixmin, ixmax, iymin, iymax in zip(
+    raw_weights,
+    ixmins,
+    ixmaxs,
+    iymins,
+    iymaxs,
+    strict=True,
+):
+    shape = (iymax - iymin, ixmax - ixmin)
+    weights = np.asarray(flat, dtype=np.float64).reshape(shape)
+    cutout = raw_data[iymin:iymax, ixmin:ixmax]
+    raw_sums.append(np.sum(weights * cutout, dtype=np.float64))
+    raw_npix.append(np.sum(weights, dtype=np.float64))
+
+raw_sums = np.asarray(raw_sums)
+raw_npix = np.asarray(raw_npix)
+
+assert np.allclose(raw_sums, multi_sums)
+assert np.allclose(raw_npix, multi_npix)
+
+raw_sums
+```

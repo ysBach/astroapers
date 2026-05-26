@@ -1,24 +1,17 @@
-"""Public direct aperture-sum kernels and Rust wrappers.
+"""Python layer that calls the raw Rust aperture kernels.
 
-This module is the public namespace for direct catalog aperture-sum functions
-such as ``astroapers.kernels.apsum_circ_exact``. The same functions are also
-exported at top level as ``astroapers.apsum_*``. Functions with fused Rust
-aperture-sum kernels use that fastest path for unmasked calls; the complete
-surface for pill and split-angle annuli uses Rust-generated bbox-tight weights
-plus the same ``BoundingBox`` reduction used by object methods. Calls with a
-boolean mask route through bbox-tight aperture weights so bad pixels are
-excluded from both ``apsum`` and ``npix``.
+Use ``import astroapers._rust as aapr`` for maximum performance. This module is
+also useful as source-code reference for raw-call patterns.
 """
 
 from __future__ import annotations
 
 import numpy as np
 
-from . import _rust
+from . import _rust as aapr
 from ._containers import BoundingBox, validate_mask  # noqa: F401
 from ._kernel_dispatch import (
-    _apsum,
-    _masked_apsum,
+    _apsum_or_masked,
     _npix_from_weights,
     _subtract_apsum,
     _weight_apsum,
@@ -26,6 +19,7 @@ from ._kernel_dispatch import (
 from ._kernel_docs import apply_kernel_docstrings
 from ._kernel_validation import (
     _boxes_from_tuple,
+    _floatify,
     _positions,
     _shape2,
     _theta_pair,
@@ -35,6 +29,7 @@ from ._kernel_validation import (
     _validate_wedge,
     _wedge_outer_pair,
 )
+from ._path_encoding import _encode_path_commands
 
 __all__ = [
     "apsum_circ_ann_exact",
@@ -113,6 +108,20 @@ __all__ = [
 ]
 
 
+def _raw_xy(x, y) -> bool:
+    return (
+        isinstance(x, np.ndarray)
+        and isinstance(y, np.ndarray)
+        and x.ndim == y.ndim == 1
+        and x.flags.c_contiguous
+        and y.flags.c_contiguous
+    )
+
+
+def _raw_apsum_args(data, x, y) -> bool:
+    return isinstance(data, np.ndarray) and data.flags.c_contiguous and _raw_xy(x, y)
+
+
 def farthest_mask_pixel(mask, center, *, return_pos: bool = False):
     """Return the farthest `True` mask pixel distance from ``center``.
 
@@ -140,7 +149,7 @@ def farthest_mask_pixel(mask, center, *, return_pos: bool = False):
     if center_arr.ndim != 1:
         raise ValueError("center must be one-dimensional")
 
-    radius, ndim, flat_positions = _rust._farthest_mask_pixel(
+    radius, ndim, flat_positions = aapr._farthest_mask_pixel(
         mask_arr,
         center_arr,
         return_pos,
@@ -155,23 +164,24 @@ def farthest_mask_pixel(mask, center, *, return_pos: bool = False):
 def apsum_circ_exact(
     data, x, y, r: float, *, mask=None, return_npix: bool = True, validate=True
 ):
-    if mask is not None:
-        return _masked_apsum(
-            weights_circ_exact,
-            data,
-            mask,
-            x,
-            y,
-            float(r),
-            return_npix=return_npix,
-            validate=validate,
-        )
-    return _apsum(
-        "apsum_circ_exact",
+    if (
+        mask is None
+        and not return_npix
+        and not validate
+        and _raw_apsum_args(data, x, y)
+    ):
+        try:
+            return aapr.apsum_circ_exact_sum(data, x, y, float(r))
+        except TypeError:
+            pass
+    return _apsum_or_masked(
+        aapr.apsum_circ_exact,
+        weights_circ_exact,
         data,
         x,
         y,
         float(r),
+        mask=mask,
         return_npix=return_npix,
         validate=validate,
     )
@@ -188,25 +198,24 @@ def apsum_circ_ann_exact(
     return_npix: bool = True,
     validate=True,
 ):
-    if mask is not None:
-        return _masked_apsum(
-            weights_circ_ann_exact,
-            data,
-            mask,
-            x,
-            y,
-            float(r_in),
-            float(r_out),
-            return_npix=return_npix,
-            validate=validate,
-        )
-    return _apsum(
-        "apsum_circ_ann_exact",
+    if (
+        mask is None
+        and not return_npix
+        and not validate
+        and _raw_apsum_args(data, x, y)
+    ):
+        try:
+            return aapr.apsum_circ_ann_exact_sum(data, x, y, *_floatify(r_in, r_out))
+        except TypeError:
+            pass
+    return _apsum_or_masked(
+        aapr.apsum_circ_ann_exact,
+        weights_circ_ann_exact,
         data,
         x,
         y,
-        float(r_in),
-        float(r_out),
+        *_floatify(r_in, r_out),
+        mask=mask,
         return_npix=return_npix,
         validate=validate,
     )
@@ -229,8 +238,7 @@ def apsum_circ_ann_center(
         mask,
         x,
         y,
-        float(r_in),
-        float(r_out),
+        *_floatify(r_in, r_out),
         return_npix=return_npix,
         validate=validate,
     )
@@ -239,23 +247,24 @@ def apsum_circ_ann_center(
 def apsum_circ_center(
     data, x, y, r: float, *, mask=None, return_npix: bool = True, validate=True
 ):
-    if mask is not None:
-        return _masked_apsum(
-            weights_circ_center,
-            data,
-            mask,
-            x,
-            y,
-            float(r),
-            return_npix=return_npix,
-            validate=validate,
-        )
-    return _apsum(
-        "apsum_circ_center",
+    if (
+        mask is None
+        and not return_npix
+        and not validate
+        and _raw_apsum_args(data, x, y)
+    ):
+        try:
+            return aapr.apsum_circ_center(data, x, y, float(r))[0]
+        except TypeError:
+            pass
+    return _apsum_or_masked(
+        aapr.apsum_circ_center,
+        weights_circ_center,
         data,
         x,
         y,
         float(r),
+        mask=mask,
         return_npix=return_npix,
         validate=validate,
     )
@@ -273,27 +282,24 @@ def apsum_ellip_exact(
     return_npix: bool = True,
     validate=True,
 ):
-    if mask is not None:
-        return _masked_apsum(
-            weights_ellip_exact,
-            data,
-            mask,
-            x,
-            y,
-            float(a),
-            float(b),
-            float(theta),
-            return_npix=return_npix,
-            validate=validate,
-        )
-    return _apsum(
-        "apsum_ellip_exact",
+    if (
+        mask is None
+        and not return_npix
+        and not validate
+        and _raw_apsum_args(data, x, y)
+    ):
+        try:
+            return aapr.apsum_ellip_exact(data, x, y, *_floatify(a, b, theta))[0]
+        except TypeError:
+            pass
+    return _apsum_or_masked(
+        aapr.apsum_ellip_exact,
+        weights_ellip_exact,
         data,
         x,
         y,
-        float(a),
-        float(b),
-        float(theta),
+        *_floatify(a, b, theta),
+        mask=mask,
         return_npix=return_npix,
         validate=validate,
     )
@@ -311,27 +317,24 @@ def apsum_ellip_center(
     return_npix: bool = True,
     validate=True,
 ):
-    if mask is not None:
-        return _masked_apsum(
-            weights_ellip_center,
-            data,
-            mask,
-            x,
-            y,
-            float(a),
-            float(b),
-            float(theta),
-            return_npix=return_npix,
-            validate=validate,
-        )
-    return _apsum(
-        "apsum_ellip_center",
+    if (
+        mask is None
+        and not return_npix
+        and not validate
+        and _raw_apsum_args(data, x, y)
+    ):
+        try:
+            return aapr.apsum_ellip_center(data, x, y, *_floatify(a, b, theta))[0]
+        except TypeError:
+            pass
+    return _apsum_or_masked(
+        aapr.apsum_ellip_center,
+        weights_ellip_center,
         data,
         x,
         y,
-        float(a),
-        float(b),
-        float(theta),
+        *_floatify(a, b, theta),
+        mask=mask,
         return_npix=return_npix,
         validate=validate,
     )
@@ -385,10 +388,7 @@ def apsum_ellip_ann_exact(
         mask,
         x,
         y,
-        float(a_in),
-        float(b_in),
-        float(a_out),
-        float(b_out),
+        *_floatify(a_in, b_in, a_out, b_out),
         theta_in,
         theta_out,
         return_npix=return_npix,
@@ -444,10 +444,7 @@ def apsum_ellip_ann_center(
         mask,
         x,
         y,
-        float(a_in),
-        float(b_in),
-        float(a_out),
-        float(b_out),
+        *_floatify(a_in, b_in, a_out, b_out),
         theta_in,
         theta_out,
         return_npix=return_npix,
@@ -467,27 +464,24 @@ def apsum_rect_exact(
     return_npix: bool = True,
     validate=True,
 ):
-    if mask is not None:
-        return _masked_apsum(
-            weights_rect_exact,
-            data,
-            mask,
-            x,
-            y,
-            float(w),
-            float(h),
-            float(theta),
-            return_npix=return_npix,
-            validate=validate,
-        )
-    return _apsum(
-        "apsum_rect_exact",
+    if (
+        mask is None
+        and not return_npix
+        and not validate
+        and _raw_apsum_args(data, x, y)
+    ):
+        try:
+            return aapr.apsum_rect_exact(data, x, y, *_floatify(w, h, theta))[0]
+        except TypeError:
+            pass
+    return _apsum_or_masked(
+        aapr.apsum_rect_exact,
+        weights_rect_exact,
         data,
         x,
         y,
-        float(w),
-        float(h),
-        float(theta),
+        *_floatify(w, h, theta),
+        mask=mask,
         return_npix=return_npix,
         validate=validate,
     )
@@ -541,10 +535,7 @@ def apsum_rect_ann_exact(
         mask,
         x,
         y,
-        float(w_in),
-        float(h_in),
-        float(w_out),
-        float(h_out),
+        *_floatify(w_in, h_in, w_out, h_out),
         theta_in,
         theta_out,
         return_npix=return_npix,
@@ -600,10 +591,7 @@ def apsum_rect_ann_center(
         mask,
         x,
         y,
-        float(w_in),
-        float(h_in),
-        float(w_out),
-        float(h_out),
+        *_floatify(w_in, h_in, w_out, h_out),
         theta_in,
         theta_out,
         return_npix=return_npix,
@@ -623,27 +611,24 @@ def apsum_rect_center(
     return_npix: bool = True,
     validate=True,
 ):
-    if mask is not None:
-        return _masked_apsum(
-            weights_rect_center,
-            data,
-            mask,
-            x,
-            y,
-            float(w),
-            float(h),
-            float(theta),
-            return_npix=return_npix,
-            validate=validate,
-        )
-    return _apsum(
-        "apsum_rect_center",
+    if (
+        mask is None
+        and not return_npix
+        and not validate
+        and _raw_apsum_args(data, x, y)
+    ):
+        try:
+            return aapr.apsum_rect_center(data, x, y, *_floatify(w, h, theta))[0]
+        except TypeError:
+            pass
+    return _apsum_or_masked(
+        aapr.apsum_rect_center,
+        weights_rect_center,
         data,
         x,
         y,
-        float(w),
-        float(h),
-        float(theta),
+        *_floatify(w, h, theta),
+        mask=mask,
         return_npix=return_npix,
         validate=validate,
     )
@@ -668,10 +653,7 @@ def apsum_pill_exact(
         mask,
         x,
         y,
-        float(w),
-        float(a),
-        float(b),
-        float(theta),
+        *_floatify(w, a, b, theta),
         return_npix=return_npix,
         validate=validate,
     )
@@ -696,10 +678,7 @@ def apsum_pill_center(
         mask,
         x,
         y,
-        float(w),
-        float(a),
-        float(b),
-        float(theta),
+        *_floatify(w, a, b, theta),
         return_npix=return_npix,
         validate=validate,
     )
@@ -722,7 +701,6 @@ def apsum_pill_ann_exact(
     return_npix: bool = True,
     validate=True,
 ):
-    theta_in, theta_out = _theta_pair(theta_in, theta_out, validate=validate)
     if validate:
         _validate_pill_ann(w_in, a_in, b_in, w_out, a_out, b_out)
     return _weight_apsum(
@@ -731,14 +709,8 @@ def apsum_pill_ann_exact(
         mask,
         x,
         y,
-        float(w_in),
-        float(a_in),
-        float(b_in),
-        float(w_out),
-        float(a_out),
-        float(b_out),
-        theta_in,
-        theta_out,
+        *_floatify(w_in, a_in, b_in, w_out, a_out, b_out),
+        *_theta_pair(theta_in, theta_out, validate=validate),
         return_npix=return_npix,
         validate=validate,
     )
@@ -761,7 +733,6 @@ def apsum_pill_ann_center(
     return_npix: bool = True,
     validate=True,
 ):
-    theta_in, theta_out = _theta_pair(theta_in, theta_out, validate=validate)
     if validate:
         _validate_pill_ann(w_in, a_in, b_in, w_out, a_out, b_out)
     return _weight_apsum(
@@ -770,14 +741,8 @@ def apsum_pill_ann_center(
         mask,
         x,
         y,
-        float(w_in),
-        float(a_in),
-        float(b_in),
-        float(w_out),
-        float(a_out),
-        float(b_out),
-        theta_in,
-        theta_out,
+        *_floatify(w_in, a_in, b_in, w_out, a_out, b_out),
+        *_theta_pair(theta_in, theta_out, validate=validate),
         return_npix=return_npix,
         validate=validate,
     )
@@ -798,23 +763,17 @@ def apsum_wedge_exact(
     return_npix: bool = True,
     validate=True,
 ):
-    theta_out, dtheta_out = _wedge_outer_pair(
-        theta_in, dtheta_in, theta_out, dtheta_out
-    )
+    outer_angles = _wedge_outer_pair(theta_in, dtheta_in, theta_out, dtheta_out)
     if validate:
-        _validate_wedge(r_in, r_out, theta_in, dtheta_in, theta_out, dtheta_out)
+        _validate_wedge(r_in, r_out, theta_in, dtheta_in, *outer_angles)
     return _weight_apsum(
         weights_wedge_exact,
         data,
         mask,
         x,
         y,
-        float(r_in),
-        float(r_out),
-        float(theta_in),
-        float(dtheta_in),
-        theta_out,
-        dtheta_out,
+        *_floatify(r_in, r_out, theta_in, dtheta_in),
+        *outer_angles,
         return_npix=return_npix,
         validate=validate,
     )
@@ -835,23 +794,17 @@ def apsum_wedge_center(
     return_npix: bool = True,
     validate=True,
 ):
-    theta_out, dtheta_out = _wedge_outer_pair(
-        theta_in, dtheta_in, theta_out, dtheta_out
-    )
+    outer_angles = _wedge_outer_pair(theta_in, dtheta_in, theta_out, dtheta_out)
     if validate:
-        _validate_wedge(r_in, r_out, theta_in, dtheta_in, theta_out, dtheta_out)
+        _validate_wedge(r_in, r_out, theta_in, dtheta_in, *outer_angles)
     return _weight_apsum(
         weights_wedge_center,
         data,
         mask,
         x,
         y,
-        float(r_in),
-        float(r_out),
-        float(theta_in),
-        float(dtheta_in),
-        theta_out,
-        dtheta_out,
+        *_floatify(r_in, r_out, theta_in, dtheta_in),
+        *outer_angles,
         return_npix=return_npix,
         validate=validate,
     )
@@ -860,6 +813,11 @@ def apsum_wedge_center(
 def npix_circ_exact(
     x, y, r: float, *, shape: tuple[int, int], mask=None, validate=True
 ):
+    if mask is None and not validate and _raw_xy(x, y):
+        try:
+            return aapr.npix_circ_exact(x, y, float(r), shape[0], shape[1])
+        except TypeError:
+            pass
     if mask is not None:
         return _npix_from_weights(
             weights_circ_exact,
@@ -872,7 +830,7 @@ def npix_circ_exact(
         )
     xs, ys = _positions(x, y, validate=validate)
     ny, nx = _shape2(shape, validate=validate)
-    npix = _rust.npix_circ_exact(xs.reshape(-1), ys.reshape(-1), float(r), ny, nx)
+    npix = aapr.npix_circ_exact(xs.reshape(-1), ys.reshape(-1), float(r), ny, nx)
     return np.asarray(npix, dtype=np.float64).reshape(xs.shape)
 
 
@@ -898,6 +856,11 @@ def npix_circ_ann_exact(
 def npix_circ_center(
     x, y, r: float, *, shape: tuple[int, int], mask=None, validate=True
 ):
+    if mask is None and not validate and _raw_xy(x, y):
+        try:
+            return aapr.npix_circ_center(x, y, float(r), shape[0], shape[1])
+        except TypeError:
+            pass
     if mask is not None:
         return _npix_from_weights(
             weights_circ_center,
@@ -910,7 +873,7 @@ def npix_circ_center(
         )
     xs, ys = _positions(x, y, validate=validate)
     ny, nx = _shape2(shape, validate=validate)
-    npix = _rust.npix_circ_center(xs.reshape(-1), ys.reshape(-1), float(r), ny, nx)
+    npix = aapr.npix_circ_center(xs.reshape(-1), ys.reshape(-1), float(r), ny, nx)
     return np.asarray(npix, dtype=np.float64).reshape(xs.shape)
 
 
@@ -944,22 +907,27 @@ def npix_ellip_exact(
     mask=None,
     validate=True,
 ):
+    if mask is None and not validate and _raw_xy(x, y):
+        try:
+            return aapr.npix_ellip_exact(
+                x, y, *_floatify(a, b, theta), shape[0], shape[1]
+            )
+        except TypeError:
+            pass
     if mask is not None:
         return _npix_from_weights(
             weights_ellip_exact,
             x,
             y,
-            float(a),
-            float(b),
-            float(theta),
+            *_floatify(a, b, theta),
             shape=shape,
             mask=mask,
             validate=validate,
         )
     xs, ys = _positions(x, y, validate=validate)
     ny, nx = _shape2(shape, validate=validate)
-    npix = _rust.npix_ellip_exact(
-        xs.reshape(-1), ys.reshape(-1), float(a), float(b), float(theta), ny, nx
+    npix = aapr.npix_ellip_exact(
+        xs.reshape(-1), ys.reshape(-1), *_floatify(a, b, theta), ny, nx
     )
     return np.asarray(npix, dtype=np.float64).reshape(xs.shape)
 
@@ -975,22 +943,27 @@ def npix_ellip_center(
     mask=None,
     validate=True,
 ):
+    if mask is None and not validate and _raw_xy(x, y):
+        try:
+            return aapr.npix_ellip_center(
+                x, y, *_floatify(a, b, theta), shape[0], shape[1]
+            )
+        except TypeError:
+            pass
     if mask is not None:
         return _npix_from_weights(
             weights_ellip_center,
             x,
             y,
-            float(a),
-            float(b),
-            float(theta),
+            *_floatify(a, b, theta),
             shape=shape,
             mask=mask,
             validate=validate,
         )
     xs, ys = _positions(x, y, validate=validate)
     ny, nx = _shape2(shape, validate=validate)
-    npix = _rust.npix_ellip_center(
-        xs.reshape(-1), ys.reshape(-1), float(a), float(b), float(theta), ny, nx
+    npix = aapr.npix_ellip_center(
+        xs.reshape(-1), ys.reshape(-1), *_floatify(a, b, theta), ny, nx
     )
     return np.asarray(npix, dtype=np.float64).reshape(xs.shape)
 
@@ -1024,10 +997,7 @@ def npix_ellip_ann_exact(
         weights_ellip_ann_exact,
         x,
         y,
-        float(a_in),
-        float(b_in),
-        float(a_out),
-        float(b_out),
+        *_floatify(a_in, b_in, a_out, b_out),
         theta_in,
         theta_out,
         shape=shape,
@@ -1065,10 +1035,7 @@ def npix_ellip_ann_center(
         weights_ellip_ann_center,
         x,
         y,
-        float(a_in),
-        float(b_in),
-        float(a_out),
-        float(b_out),
+        *_floatify(a_in, b_in, a_out, b_out),
         theta_in,
         theta_out,
         shape=shape,
@@ -1088,22 +1055,27 @@ def npix_rect_exact(
     mask=None,
     validate=True,
 ):
+    if mask is None and not validate and _raw_xy(x, y):
+        try:
+            return aapr.npix_rect_exact(
+                x, y, *_floatify(w, h, theta), shape[0], shape[1]
+            )
+        except TypeError:
+            pass
     if mask is not None:
         return _npix_from_weights(
             weights_rect_exact,
             x,
             y,
-            float(w),
-            float(h),
-            float(theta),
+            *_floatify(w, h, theta),
             shape=shape,
             mask=mask,
             validate=validate,
         )
     xs, ys = _positions(x, y, validate=validate)
     ny, nx = _shape2(shape, validate=validate)
-    npix = _rust.npix_rect_exact(
-        xs.reshape(-1), ys.reshape(-1), float(w), float(h), float(theta), ny, nx
+    npix = aapr.npix_rect_exact(
+        xs.reshape(-1), ys.reshape(-1), *_floatify(w, h, theta), ny, nx
     )
     return np.asarray(npix, dtype=np.float64).reshape(xs.shape)
 
@@ -1119,22 +1091,27 @@ def npix_rect_center(
     mask=None,
     validate=True,
 ):
+    if mask is None and not validate and _raw_xy(x, y):
+        try:
+            return aapr.npix_rect_center(
+                x, y, *_floatify(w, h, theta), shape[0], shape[1]
+            )
+        except TypeError:
+            pass
     if mask is not None:
         return _npix_from_weights(
             weights_rect_center,
             x,
             y,
-            float(w),
-            float(h),
-            float(theta),
+            *_floatify(w, h, theta),
             shape=shape,
             mask=mask,
             validate=validate,
         )
     xs, ys = _positions(x, y, validate=validate)
     ny, nx = _shape2(shape, validate=validate)
-    npix = _rust.npix_rect_center(
-        xs.reshape(-1), ys.reshape(-1), float(w), float(h), float(theta), ny, nx
+    npix = aapr.npix_rect_center(
+        xs.reshape(-1), ys.reshape(-1), *_floatify(w, h, theta), ny, nx
     )
     return np.asarray(npix, dtype=np.float64).reshape(xs.shape)
 
@@ -1168,10 +1145,7 @@ def npix_rect_ann_exact(
         weights_rect_ann_exact,
         x,
         y,
-        float(w_in),
-        float(h_in),
-        float(w_out),
-        float(h_out),
+        *_floatify(w_in, h_in, w_out, h_out),
         theta_in,
         theta_out,
         shape=shape,
@@ -1209,10 +1183,7 @@ def npix_rect_ann_center(
         weights_rect_ann_center,
         x,
         y,
-        float(w_in),
-        float(h_in),
-        float(w_out),
-        float(h_out),
+        *_floatify(w_in, h_in, w_out, h_out),
         theta_in,
         theta_out,
         shape=shape,
@@ -1237,10 +1208,7 @@ def npix_pill_exact(
         weights_pill_exact,
         x,
         y,
-        float(w),
-        float(a),
-        float(b),
-        float(theta),
+        *_floatify(w, a, b, theta),
         shape=shape,
         mask=mask,
         validate=validate,
@@ -1263,10 +1231,7 @@ def npix_pill_center(
         weights_pill_center,
         x,
         y,
-        float(w),
-        float(a),
-        float(b),
-        float(theta),
+        *_floatify(w, a, b, theta),
         shape=shape,
         mask=mask,
         validate=validate,
@@ -1289,21 +1254,14 @@ def npix_pill_ann_exact(
     mask=None,
     validate=True,
 ):
-    theta_in, theta_out = _theta_pair(theta_in, theta_out, validate=validate)
     if validate:
         _validate_pill_ann(w_in, a_in, b_in, w_out, a_out, b_out)
     return _npix_from_weights(
         weights_pill_ann_exact,
         x,
         y,
-        float(w_in),
-        float(a_in),
-        float(b_in),
-        float(w_out),
-        float(a_out),
-        float(b_out),
-        theta_in,
-        theta_out,
+        *_floatify(w_in, a_in, b_in, w_out, a_out, b_out),
+        *_theta_pair(theta_in, theta_out, validate=validate),
         shape=shape,
         mask=mask,
         validate=validate,
@@ -1326,21 +1284,14 @@ def npix_pill_ann_center(
     mask=None,
     validate=True,
 ):
-    theta_in, theta_out = _theta_pair(theta_in, theta_out, validate=validate)
     if validate:
         _validate_pill_ann(w_in, a_in, b_in, w_out, a_out, b_out)
     return _npix_from_weights(
         weights_pill_ann_center,
         x,
         y,
-        float(w_in),
-        float(a_in),
-        float(b_in),
-        float(w_out),
-        float(a_out),
-        float(b_out),
-        theta_in,
-        theta_out,
+        *_floatify(w_in, a_in, b_in, w_out, a_out, b_out),
+        *_theta_pair(theta_in, theta_out, validate=validate),
         shape=shape,
         mask=mask,
         validate=validate,
@@ -1361,21 +1312,15 @@ def npix_wedge_exact(
     mask=None,
     validate=True,
 ):
-    theta_out, dtheta_out = _wedge_outer_pair(
-        theta_in, dtheta_in, theta_out, dtheta_out
-    )
+    outer_angles = _wedge_outer_pair(theta_in, dtheta_in, theta_out, dtheta_out)
     if validate:
-        _validate_wedge(r_in, r_out, theta_in, dtheta_in, theta_out, dtheta_out)
+        _validate_wedge(r_in, r_out, theta_in, dtheta_in, *outer_angles)
     return _npix_from_weights(
         weights_wedge_exact,
         x,
         y,
-        float(r_in),
-        float(r_out),
-        float(theta_in),
-        float(dtheta_in),
-        theta_out,
-        dtheta_out,
+        *_floatify(r_in, r_out, theta_in, dtheta_in),
+        *outer_angles,
         shape=shape,
         mask=mask,
         validate=validate,
@@ -1396,32 +1341,23 @@ def npix_wedge_center(
     mask=None,
     validate=True,
 ):
-    theta_out, dtheta_out = _wedge_outer_pair(
-        theta_in, dtheta_in, theta_out, dtheta_out
-    )
+    outer_angles = _wedge_outer_pair(theta_in, dtheta_in, theta_out, dtheta_out)
     if validate:
-        _validate_wedge(r_in, r_out, theta_in, dtheta_in, theta_out, dtheta_out)
+        _validate_wedge(r_in, r_out, theta_in, dtheta_in, *outer_angles)
     return _npix_from_weights(
         weights_wedge_center,
         x,
         y,
-        float(r_in),
-        float(r_out),
-        float(theta_in),
-        float(dtheta_in),
-        theta_out,
-        dtheta_out,
+        *_floatify(r_in, r_out, theta_in, dtheta_in),
+        *outer_angles,
         shape=shape,
         mask=mask,
         validate=validate,
     )
 
 
-def weights_exact(
-    symbol: str, bbox: BoundingBox, params: tuple[float, ...]
-) -> np.ndarray:
-    """Return exact aperture weights for one bbox-tight bounding box."""
-    func = getattr(_rust, symbol)
+def _weights_one(func, bbox: BoundingBox, params: tuple[float, ...]) -> np.ndarray:
+    """Return aperture weights for one bbox-tight bounding box."""
     data = func(
         *params,
         bbox.ixmin,
@@ -1432,28 +1368,23 @@ def weights_exact(
     return np.asarray(data, dtype=np.float64).reshape(bbox.shape)
 
 
-def weights_center(
-    symbol: str, bbox: BoundingBox, params: tuple[float, ...]
-) -> np.ndarray:
-    """Return center-selected aperture weights for one bbox-tight bounding box."""
-    func = getattr(_rust, symbol)
-    data = func(
-        *params,
-        bbox.ixmin,
-        bbox.iymin,
-        bbox.shape[0],
-        bbox.shape[1],
-    )
-    return np.asarray(data, dtype=np.float64).reshape(bbox.shape)
+def _rust_positions(x, y, *, validate: bool):
+    if (
+        not validate
+        and isinstance(x, np.ndarray)
+        and isinstance(y, np.ndarray)
+        and x.ndim == y.ndim == 1
+    ):
+        return x, y
+    xs, ys = _positions(x, y, validate=validate)
+    return xs.reshape(-1), ys.reshape(-1)
 
 
 def _weights_many(
-    symbol: str, x, y, *params, validate: bool = True
+    func, x, y, *params, validate: bool = True
 ) -> tuple[list[np.ndarray], list[BoundingBox]]:
-    xs, ys = _positions(x, y, validate=validate)
-    weights, ixmins, ixmaxs, iymins, iymaxs = getattr(_rust, symbol)(
-        xs.reshape(-1), ys.reshape(-1), *params
-    )
+    xs, ys = _rust_positions(x, y, validate=validate)
+    weights, ixmins, ixmaxs, iymins, iymaxs = func(xs, ys, *params)
     boxes = _boxes_from_tuple((ixmins, ixmaxs, iymins, iymaxs))
     arrays = [
         np.asarray(weight, dtype=np.float64).reshape(box.shape)
@@ -1465,24 +1396,23 @@ def _weights_many(
 def weights_circ_exact(
     x, y, r: float, *, validate: bool = True
 ) -> tuple[list[np.ndarray], list[BoundingBox]]:
-    return _weights_many("weights_circ_exact_many", x, y, float(r), validate=validate)
+    return _weights_many(aapr.weights_circ_exact, x, y, float(r), validate=validate)
 
 
 def weights_circ_center(
     x, y, r: float, *, validate: bool = True
 ) -> tuple[list[np.ndarray], list[BoundingBox]]:
-    return _weights_many("weights_circ_center_many", x, y, float(r), validate=validate)
+    return _weights_many(aapr.weights_circ_center, x, y, float(r), validate=validate)
 
 
 def weights_circ_ann_exact(
     x, y, r_in: float, r_out: float, *, validate: bool = True
 ) -> tuple[list[np.ndarray], list[BoundingBox]]:
     return _weights_many(
-        "weights_circ_ann_exact_many",
+        aapr.weights_circ_ann_exact,
         x,
         y,
-        float(r_in),
-        float(r_out),
+        *_floatify(r_in, r_out),
         validate=validate,
     )
 
@@ -1491,11 +1421,10 @@ def weights_circ_ann_center(
     x, y, r_in: float, r_out: float, *, validate: bool = True
 ) -> tuple[list[np.ndarray], list[BoundingBox]]:
     return _weights_many(
-        "weights_circ_ann_center_many",
+        aapr.weights_circ_ann_center,
         x,
         y,
-        float(r_in),
-        float(r_out),
+        *_floatify(r_in, r_out),
         validate=validate,
     )
 
@@ -1504,12 +1433,10 @@ def weights_ellip_exact(
     x, y, a: float, b: float, theta: float, *, validate: bool = True
 ) -> tuple[list[np.ndarray], list[BoundingBox]]:
     return _weights_many(
-        "weights_ellip_exact_many",
+        aapr.weights_ellip_exact,
         x,
         y,
-        float(a),
-        float(b),
-        float(theta),
+        *_floatify(a, b, theta),
         validate=validate,
     )
 
@@ -1518,12 +1445,10 @@ def weights_ellip_center(
     x, y, a: float, b: float, theta: float, *, validate: bool = True
 ) -> tuple[list[np.ndarray], list[BoundingBox]]:
     return _weights_many(
-        "weights_ellip_center_many",
+        aapr.weights_ellip_center,
         x,
         y,
-        float(a),
-        float(b),
-        float(theta),
+        *_floatify(a, b, theta),
         validate=validate,
     )
 
@@ -1541,15 +1466,10 @@ def weights_ellip_ann_exact(
     validate: bool = True,
 ) -> tuple[list[np.ndarray], list[BoundingBox]]:
     return _weights_many(
-        "weights_ellip_ann_exact_many",
+        aapr.weights_ellip_ann_exact,
         x,
         y,
-        float(a_in),
-        float(b_in),
-        float(a_out),
-        float(b_out),
-        float(theta_in),
-        float(theta_out),
+        *_floatify(a_in, b_in, a_out, b_out, theta_in, theta_out),
         validate=validate,
     )
 
@@ -1567,15 +1487,10 @@ def weights_ellip_ann_center(
     validate: bool = True,
 ) -> tuple[list[np.ndarray], list[BoundingBox]]:
     return _weights_many(
-        "weights_ellip_ann_center_many",
+        aapr.weights_ellip_ann_center,
         x,
         y,
-        float(a_in),
-        float(b_in),
-        float(a_out),
-        float(b_out),
-        float(theta_in),
-        float(theta_out),
+        *_floatify(a_in, b_in, a_out, b_out, theta_in, theta_out),
         validate=validate,
     )
 
@@ -1584,12 +1499,10 @@ def weights_rect_exact(
     x, y, w: float, h: float, theta: float, *, validate: bool = True
 ) -> tuple[list[np.ndarray], list[BoundingBox]]:
     return _weights_many(
-        "weights_rect_exact_many",
+        aapr.weights_rect_exact,
         x,
         y,
-        float(w),
-        float(h),
-        float(theta),
+        *_floatify(w, h, theta),
         validate=validate,
     )
 
@@ -1598,12 +1511,10 @@ def weights_rect_center(
     x, y, w: float, h: float, theta: float, *, validate: bool = True
 ) -> tuple[list[np.ndarray], list[BoundingBox]]:
     return _weights_many(
-        "weights_rect_center_many",
+        aapr.weights_rect_center,
         x,
         y,
-        float(w),
-        float(h),
-        float(theta),
+        *_floatify(w, h, theta),
         validate=validate,
     )
 
@@ -1621,15 +1532,10 @@ def weights_rect_ann_exact(
     validate: bool = True,
 ) -> tuple[list[np.ndarray], list[BoundingBox]]:
     return _weights_many(
-        "weights_rect_ann_exact_many",
+        aapr.weights_rect_ann_exact,
         x,
         y,
-        float(w_in),
-        float(h_in),
-        float(w_out),
-        float(h_out),
-        float(theta_in),
-        float(theta_out),
+        *_floatify(w_in, h_in, w_out, h_out, theta_in, theta_out),
         validate=validate,
     )
 
@@ -1647,15 +1553,10 @@ def weights_rect_ann_center(
     validate: bool = True,
 ) -> tuple[list[np.ndarray], list[BoundingBox]]:
     return _weights_many(
-        "weights_rect_ann_center_many",
+        aapr.weights_rect_ann_center,
         x,
         y,
-        float(w_in),
-        float(h_in),
-        float(w_out),
-        float(h_out),
-        float(theta_in),
-        float(theta_out),
+        *_floatify(w_in, h_in, w_out, h_out, theta_in, theta_out),
         validate=validate,
     )
 
@@ -1664,13 +1565,10 @@ def weights_pill_exact(
     x, y, w: float, a: float, b: float, theta: float, *, validate: bool = True
 ) -> tuple[list[np.ndarray], list[BoundingBox]]:
     return _weights_many(
-        "weights_pill_exact_many",
+        aapr.weights_pill_exact,
         x,
         y,
-        float(w),
-        float(a),
-        float(b),
-        float(theta),
+        *_floatify(w, a, b, theta),
         validate=validate,
     )
 
@@ -1679,13 +1577,10 @@ def weights_pill_center(
     x, y, w: float, a: float, b: float, theta: float, *, validate: bool = True
 ) -> tuple[list[np.ndarray], list[BoundingBox]]:
     return _weights_many(
-        "weights_pill_center_many",
+        aapr.weights_pill_center,
         x,
         y,
-        float(w),
-        float(a),
-        float(b),
-        float(theta),
+        *_floatify(w, a, b, theta),
         validate=validate,
     )
 
@@ -1705,17 +1600,10 @@ def weights_pill_ann_exact(
     validate: bool = True,
 ) -> tuple[list[np.ndarray], list[BoundingBox]]:
     return _weights_many(
-        "weights_pill_ann_exact_many",
+        aapr.weights_pill_ann_exact,
         x,
         y,
-        float(w_in),
-        float(a_in),
-        float(b_in),
-        float(w_out),
-        float(a_out),
-        float(b_out),
-        float(theta_in),
-        float(theta_out),
+        *_floatify(w_in, a_in, b_in, w_out, a_out, b_out, theta_in, theta_out),
         validate=validate,
     )
 
@@ -1735,17 +1623,10 @@ def weights_pill_ann_center(
     validate: bool = True,
 ) -> tuple[list[np.ndarray], list[BoundingBox]]:
     return _weights_many(
-        "weights_pill_ann_center_many",
+        aapr.weights_pill_ann_center,
         x,
         y,
-        float(w_in),
-        float(a_in),
-        float(b_in),
-        float(w_out),
-        float(a_out),
-        float(b_out),
-        float(theta_in),
-        float(theta_out),
+        *_floatify(w_in, a_in, b_in, w_out, a_out, b_out, theta_in, theta_out),
         validate=validate,
     )
 
@@ -1763,15 +1644,10 @@ def weights_wedge_exact(
     validate: bool = True,
 ) -> tuple[list[np.ndarray], list[BoundingBox]]:
     return _weights_many(
-        "weights_wedge_exact_many",
+        aapr.weights_wedge_exact,
         x,
         y,
-        float(r_in),
-        float(r_out),
-        float(theta_in),
-        float(dtheta_in),
-        float(theta_out),
-        float(dtheta_out),
+        *_floatify(r_in, r_out, theta_in, dtheta_in, theta_out, dtheta_out),
         validate=validate,
     )
 
@@ -1789,25 +1665,18 @@ def weights_wedge_center(
     validate: bool = True,
 ) -> tuple[list[np.ndarray], list[BoundingBox]]:
     return _weights_many(
-        "weights_wedge_center_many",
+        aapr.weights_wedge_center,
         x,
         y,
-        float(r_in),
-        float(r_out),
-        float(theta_in),
-        float(dtheta_in),
-        float(theta_out),
-        float(dtheta_out),
+        *_floatify(r_in, r_out, theta_in, dtheta_in, theta_out, dtheta_out),
         validate=validate,
     )
 
 
 def bboxes_circ(x, y, r: float, *, validate: bool = True):
     """Return exact circular aperture bounding boxes for one or many centers."""
-    xs, ys = _positions(x, y, validate=validate)
-    return _boxes_from_tuple(
-        _rust.bboxes_circ_many(xs.reshape(-1), ys.reshape(-1), float(r))
-    )
+    xs, ys = _rust_positions(x, y, validate=validate)
+    return _boxes_from_tuple(aapr.bboxes_circ(xs, ys, float(r)))
 
 
 def bboxes_circ_ann(x, y, r_in: float, r_out: float, *, validate: bool = True):
@@ -1819,12 +1688,8 @@ def bboxes_circ_ann(x, y, r_in: float, r_out: float, *, validate: bool = True):
 
 def bboxes_ellip(x, y, a: float, b: float, theta: float, *, validate: bool = True):
     """Return exact elliptical aperture bounding boxes for one or many centers."""
-    xs, ys = _positions(x, y, validate=validate)
-    return _boxes_from_tuple(
-        _rust.bboxes_ellip_many(
-            xs.reshape(-1), ys.reshape(-1), float(a), float(b), float(theta)
-        )
-    )
+    xs, ys = _rust_positions(x, y, validate=validate)
+    return _boxes_from_tuple(aapr.bboxes_ellip(xs, ys, *_floatify(a, b, theta)))
 
 
 def bboxes_ellip_ann(
@@ -1840,20 +1705,21 @@ def bboxes_ellip_ann(
     validate: bool = True,
 ):
     """Return elliptical-annulus bounding boxes for one or many centers."""
-    _, theta_out = _theta_pair(theta_in, theta_out, validate=validate)
     if validate:
         _validate_inner_outer_axes(a_in, b_in, a_out, b_out, "ellipse")
-    return bboxes_ellip(x, y, float(a_out), float(b_out), theta_out, validate=validate)
+    return bboxes_ellip(
+        x,
+        y,
+        *_floatify(a_out, b_out),
+        _theta_pair(theta_in, theta_out, validate=validate)[1],
+        validate=validate,
+    )
 
 
 def bboxes_rect(x, y, w: float, h: float, theta: float, *, validate: bool = True):
     """Return exact rotated-rectangle aperture bounding boxes for one or many centers."""
-    xs, ys = _positions(x, y, validate=validate)
-    return _boxes_from_tuple(
-        _rust.bboxes_rect_many(
-            xs.reshape(-1), ys.reshape(-1), float(w), float(h), float(theta)
-        )
-    )
+    xs, ys = _rust_positions(x, y, validate=validate)
+    return _boxes_from_tuple(aapr.bboxes_rect(xs, ys, *_floatify(w, h, theta)))
 
 
 def bboxes_rect_ann(
@@ -1869,22 +1735,23 @@ def bboxes_rect_ann(
     validate: bool = True,
 ):
     """Return rotated-rectangle-annulus bounding boxes for one or many centers."""
-    _, theta_out = _theta_pair(theta_in, theta_out, validate=validate)
     if validate:
         _validate_inner_outer_axes(w_in, h_in, w_out, h_out, "rectangle")
-    return bboxes_rect(x, y, float(w_out), float(h_out), theta_out, validate=validate)
+    return bboxes_rect(
+        x,
+        y,
+        *_floatify(w_out, h_out),
+        _theta_pair(theta_in, theta_out, validate=validate)[1],
+        validate=validate,
+    )
 
 
 def bboxes_pill(
     x, y, w: float, a: float, b: float, theta: float = 0.0, *, validate: bool = True
 ):
     """Return pill aperture bounding boxes for one or many centers."""
-    xs, ys = _positions(x, y, validate=validate)
-    return _boxes_from_tuple(
-        _rust.bboxes_pill_many(
-            xs.reshape(-1), ys.reshape(-1), float(w), float(a), float(b), float(theta)
-        )
-    )
+    xs, ys = _rust_positions(x, y, validate=validate)
+    return _boxes_from_tuple(aapr.bboxes_pill(xs, ys, *_floatify(w, a, b, theta)))
 
 
 def bboxes_pill_ann(
@@ -1902,30 +1769,17 @@ def bboxes_pill_ann(
     validate: bool = True,
 ):
     """Return pill-annulus bounding boxes for one or many centers."""
-    theta_in, theta_out = _theta_pair(theta_in, theta_out, validate=validate)
     if validate:
         _validate_pill_ann(w_in, a_in, b_in, w_out, a_out, b_out)
-    xs, ys = _positions(x, y, validate=validate)
+    xs, ys = _rust_positions(x, y, validate=validate)
     return _boxes_from_tuple(
-        _rust.bboxes_pill_ann_many(
-            xs.reshape(-1),
-            ys.reshape(-1),
-            float(w_in),
-            float(a_in),
-            float(b_in),
-            float(w_out),
-            float(a_out),
-            float(b_out),
-            theta_in,
-            theta_out,
+        aapr.bboxes_pill_ann(
+            xs,
+            ys,
+            *_floatify(w_in, a_in, b_in, w_out, a_out, b_out),
+            *_theta_pair(theta_in, theta_out, validate=validate),
         )
     )
-
-
-def _encode_path(segments, holes):
-    from ._path import _encode_path_commands
-
-    return _encode_path_commands(segments, holes)
 
 
 def _path_kernel_result(x, y, result, *, return_npix: bool):
@@ -1940,6 +1794,12 @@ def _path_kernel_result(x, y, result, *, return_npix: bool):
     ).reshape(())
 
 
+def _path_arrays(segments_or_kinds, holes_or_data=None):
+    if isinstance(segments_or_kinds, np.ndarray) and segments_or_kinds.dtype == np.int8:
+        return segments_or_kinds, holes_or_data
+    return _encode_path_commands(segments_or_kinds, holes_or_data)
+
+
 def weights_path_exact(
     x, y, segments_or_kinds, holes_or_data=None, *, validate: bool = True
 ):
@@ -1952,12 +1812,9 @@ def weights_path_exact(
     Accepts either ``(x, y, segments, holes=None)`` with Python command lists,
     or ``(x, y, kinds_array, data_array)`` with pre-encoded compact arrays.
     """
-    if isinstance(segments_or_kinds, np.ndarray) and segments_or_kinds.dtype == np.int8:
-        kinds, data_arr = segments_or_kinds, holes_or_data
-    else:
-        kinds, data_arr = _encode_path(segments_or_kinds, holes_or_data)
+    kinds, data_arr = _path_arrays(segments_or_kinds, holes_or_data)
     return _weights_many(
-        "weights_path_exact_many", x, y, kinds, data_arr, validate=validate
+        aapr.weights_path_exact, x, y, kinds, data_arr, validate=validate
     )
 
 
@@ -1969,12 +1826,9 @@ def weights_path_center(
     Path geometry is limited to closed contours made from ``"line"`` and
     circular ``"arc"`` commands.
     """
-    if isinstance(segments_or_kinds, np.ndarray) and segments_or_kinds.dtype == np.int8:
-        kinds, data_arr = segments_or_kinds, holes_or_data
-    else:
-        kinds, data_arr = _encode_path(segments_or_kinds, holes_or_data)
+    kinds, data_arr = _path_arrays(segments_or_kinds, holes_or_data)
     return _weights_many(
-        "weights_path_center_many", x, y, kinds, data_arr, validate=validate
+        aapr.weights_path_center, x, y, kinds, data_arr, validate=validate
     )
 
 
@@ -1995,7 +1849,7 @@ def apsum_path_exact(
     path. Other curve types are unsupported unless approximated before calling
     this function.
     """
-    kinds, data_arr = _encode_path(segments, holes)
+    kinds, data_arr = _path_arrays(segments, holes)
     result = _weight_apsum(
         weights_path_exact,
         data,
@@ -2026,7 +1880,7 @@ def apsum_path_center(
     Path geometry is limited to closed contours made from ``"line"`` and
     circular ``"arc"`` commands.
     """
-    kinds, data_arr = _encode_path(segments, holes)
+    kinds, data_arr = _path_arrays(segments, holes)
     result = _weight_apsum(
         weights_path_center,
         data,
@@ -2055,7 +1909,7 @@ def npix_path_exact(
 
     Exact mode is analytic for straight-line and circular-arc paths only.
     """
-    kinds, data_arr = _encode_path(segments, holes)
+    kinds, data_arr = _path_arrays(segments, holes)
     result = _npix_from_weights(
         weights_path_exact,
         x,
@@ -2085,7 +1939,7 @@ def npix_path_center(
 
     Path geometry is limited to straight line segments and circular arcs.
     """
-    kinds, data_arr = _encode_path(segments, holes)
+    kinds, data_arr = _path_arrays(segments, holes)
     result = _npix_from_weights(
         weights_path_center,
         x,
@@ -2106,11 +1960,9 @@ def bboxes_path(x, y, segments, holes=None, *, validate: bool = True):
 
     Path geometry is limited to straight line segments and circular arcs.
     """
-    kinds, data_arr = _encode_path(segments, holes)
-    xs, ys = _positions(x, y, validate=validate)
-    return _boxes_from_tuple(
-        _rust.bboxes_path_many(xs.reshape(-1), ys.reshape(-1), kinds, data_arr)
-    )
+    kinds, data_arr = _path_arrays(segments, holes)
+    xs, ys = _rust_positions(x, y, validate=validate)
+    return _boxes_from_tuple(aapr.bboxes_path(xs, ys, kinds, data_arr))
 
 
 def bboxes_wedge(
@@ -2126,34 +1978,28 @@ def bboxes_wedge(
     validate: bool = True,
 ):
     """Return wedge aperture bounding boxes for one or many centers."""
-    theta_out, dtheta_out = _wedge_outer_pair(
-        theta_in, dtheta_in, theta_out, dtheta_out
-    )
+    outer_angles = _wedge_outer_pair(theta_in, dtheta_in, theta_out, dtheta_out)
     if validate:
-        _validate_wedge(r_in, r_out, theta_in, dtheta_in, theta_out, dtheta_out)
-    xs, ys = _positions(x, y, validate=validate)
+        _validate_wedge(r_in, r_out, theta_in, dtheta_in, *outer_angles)
+    xs, ys = _rust_positions(x, y, validate=validate)
     return _boxes_from_tuple(
-        _rust.bboxes_wedge_many(
-            xs.reshape(-1),
-            ys.reshape(-1),
-            float(r_in),
-            float(r_out),
-            float(theta_in),
-            float(dtheta_in),
-            theta_out,
-            dtheta_out,
+        aapr.bboxes_wedge(
+            xs,
+            ys,
+            *_floatify(r_in, r_out, theta_in, dtheta_in),
+            *outer_angles,
         )
     )
 
 
 def get_parallel_threshold() -> int:
     """Return the aperture count where Rust kernels switch to Rayon."""
-    return int(_rust.get_parallel_threshold())
+    return int(aapr.get_parallel_threshold())
 
 
 def set_parallel_threshold(threshold: int) -> None:
     """Set the aperture count where Rust kernels switch to Rayon."""
-    _rust.set_parallel_threshold(int(threshold))
+    aapr.set_parallel_threshold(int(threshold))
 
 
 apply_kernel_docstrings(globals())

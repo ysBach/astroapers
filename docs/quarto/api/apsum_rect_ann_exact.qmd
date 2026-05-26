@@ -24,7 +24,7 @@ Return exact rotated-rectangle-annulus aperture sums for one or many aperture ce
 
 <code>[**data**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like]{.parameter-annotation}</code>
 
-:   Two-dimensional image. For ``mask=None``, ``float64``, ``float32``, ``int32``, and ``int16`` arrays dispatch to dtype-specialized Rust kernels when available; other dtypes are converted to contiguous ``float64`` before summation. Returned aperture sums and effective pixel counts are always ``float64`` arrays.
+:   Two-dimensional image. For maximum performance with raw contiguous arrays, use ``import astroapers._rust as aapr`` and call the raw functions directly.
 
 <code>[**x, y**]{.parameter-name} [:]{.parameter-annotation-sep} [scalar or array_like]{.parameter-annotation}</code>
 
@@ -48,11 +48,11 @@ Return exact rotated-rectangle-annulus aperture sums for one or many aperture ce
 
 <code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like of bool, optional]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
 
-:   Boolean image mask with the same shape as ``data``. ``True`` pixels are excluded from both the aperture sum and effective pixel count. Values are converted to boolean. When this is omitted, the unmasked Rust summation path is used.
+:   Boolean image mask with the same shape as ``data``. ``True`` pixels are excluded from both the aperture sum and effective pixel count. Values are converted to boolean.
 
 <code>[**return_npix**]{.parameter-name} [:]{.parameter-annotation-sep} [bool, optional]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
 
-:   If `True`, return ``(apsum, npix)``. If `False`, return only ``apsum`` and use the sum-only Rust kernel for supported unmasked calls.
+:   If `True`, return ``(apsum, npix)``. If `False`, return only ``apsum``.
 
 ## Returns {.doc-section .doc-section-returns}
 

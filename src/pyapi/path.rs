@@ -6,11 +6,11 @@ use super::*;
 use crate::geometry::{build_validated_path, path_bbox, path_center_weight, path_pixel_area};
 
 pub(super) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(weights_path_exact_many, m)?)?;
-    m.add_function(wrap_pyfunction!(weights_path_center_many, m)?)?;
     m.add_function(wrap_pyfunction!(weights_path_exact, m)?)?;
     m.add_function(wrap_pyfunction!(weights_path_center, m)?)?;
-    m.add_function(wrap_pyfunction!(bboxes_path_many, m)?)?;
+    m.add_function(wrap_pyfunction!(weights_path_exact_one, m)?)?;
+    m.add_function(wrap_pyfunction!(weights_path_center_one, m)?)?;
+    m.add_function(wrap_pyfunction!(bboxes_path, m)?)?;
     Ok(())
 }
 
@@ -47,7 +47,7 @@ fn parse_path_inputs<'a>(
 }
 
 #[pyfunction]
-fn weights_path_exact_many(
+fn weights_path_exact(
     py: Python<'_>,
     xs: PyReadonlyArray1<'_, f64>,
     ys: PyReadonlyArray1<'_, f64>,
@@ -79,7 +79,7 @@ fn weights_path_exact_many(
 }
 
 #[pyfunction]
-fn weights_path_center_many(
+fn weights_path_center(
     py: Python<'_>,
     xs: PyReadonlyArray1<'_, f64>,
     ys: PyReadonlyArray1<'_, f64>,
@@ -111,7 +111,7 @@ fn weights_path_center_many(
 }
 
 #[pyfunction]
-fn weights_path_exact(
+fn weights_path_exact_one(
     x: f64,
     y: f64,
     kinds: PyReadonlyArray1<'_, i8>,
@@ -135,7 +135,7 @@ fn weights_path_exact(
 }
 
 #[pyfunction]
-fn weights_path_center(
+fn weights_path_center_one(
     x: f64,
     y: f64,
     kinds: PyReadonlyArray1<'_, i8>,
@@ -159,7 +159,7 @@ fn weights_path_center(
 }
 
 #[pyfunction]
-fn bboxes_path_many(
+fn bboxes_path(
     xs: PyReadonlyArray1<'_, f64>,
     ys: PyReadonlyArray1<'_, f64>,
     kinds: PyReadonlyArray1<'_, i8>,

@@ -7,6 +7,10 @@ import numpy as np
 from ._containers import BoundingBox
 
 
+def _floatify(*args) -> tuple[float, ...]:
+    return tuple(float(arg) for arg in args)
+
+
 def _positions(x, y, *, validate: bool = True) -> tuple[np.ndarray, np.ndarray]:
     if not validate:
         return x, y
@@ -18,8 +22,7 @@ def _positions(x, y, *, validate: bool = True) -> tuple[np.ndarray, np.ndarray]:
 
 
 def _validate_circ_ann_radii(r_in: float, r_out: float) -> tuple[float, float]:
-    r_in = float(r_in)
-    r_out = float(r_out)
+    r_in, r_out = _floatify(r_in, r_out)
     if not np.isfinite(r_in) or r_in < 0.0:
         raise ValueError("r_in must be a nonnegative finite scalar")
     if not np.isfinite(r_out) or r_out <= 0.0:
@@ -45,8 +48,10 @@ def _wedge_outer_pair(
     theta_out: float | None,
     dtheta_out: float | None,
 ) -> tuple[float, float]:
-    theta_out = float(theta_in) if theta_out is None else float(theta_out)
-    dtheta_out = float(dtheta_in) if dtheta_out is None else float(dtheta_out)
+    theta_out, dtheta_out = _floatify(
+        theta_in if theta_out is None else theta_out,
+        dtheta_in if dtheta_out is None else dtheta_out,
+    )
     return theta_out, dtheta_out
 
 
@@ -58,12 +63,9 @@ def _validate_wedge(
     theta_out: float,
     dtheta_out: float,
 ) -> tuple[float, float, float, float, float, float]:
-    r_in = float(r_in)
-    r_out = float(r_out)
-    theta_in = float(theta_in)
-    dtheta_in = float(dtheta_in)
-    theta_out = float(theta_out)
-    dtheta_out = float(dtheta_out)
+    r_in, r_out, theta_in, dtheta_in, theta_out, dtheta_out = _floatify(
+        r_in, r_out, theta_in, dtheta_in, theta_out, dtheta_out
+    )
     if not np.isfinite(r_in) or r_in <= 0.0:
         raise ValueError("r_in must be a positive finite scalar")
     if not np.isfinite(r_out) or r_out <= 0.0:
@@ -87,16 +89,14 @@ def _validate_wedge(
 def _validate_inner_outer_axes(
     in0: float, in1: float, out0: float, out1: float, shape_name: str
 ) -> tuple[float, float, float, float]:
-    in0 = float(in0)
-    in1 = float(in1)
-    out0 = float(out0)
-    out1 = float(out1)
+    in0, in1, out0, out1 = _floatify(in0, in1, out0, out1)
     values = (in0, in1, out0, out1)
     if any((not np.isfinite(value) or value <= 0.0) for value in values):
         raise ValueError(f"{shape_name} dimensions must be positive finite scalars")
-    if in0 >= out0 or in1 >= out1:
+    if in0 > out0 or in1 > out1 or (in0 == out0 and in1 == out1):
         raise ValueError(
-            f"inner {shape_name} dimensions must be smaller than outer dimensions"
+            f"inner {shape_name} dimensions must fit inside outer dimensions "
+            "with at least one larger outer dimension"
         )
     return in0, in1, out0, out1
 
@@ -109,12 +109,9 @@ def _validate_pill_ann(
     a_out: float,
     b_out: float,
 ) -> tuple[float, float, float, float, float, float]:
-    w_in = float(w_in)
-    a_in = float(a_in)
-    b_in = float(b_in)
-    w_out = float(w_out)
-    a_out = float(a_out)
-    b_out = float(b_out)
+    w_in, a_in, b_in, w_out, a_out, b_out = _floatify(
+        w_in, a_in, b_in, w_out, a_out, b_out
+    )
     values = (w_in, a_in, b_in, w_out, a_out, b_out)
     if any((not np.isfinite(value) or value <= 0.0) for value in values):
         raise ValueError("pill dimensions must be positive finite scalars")

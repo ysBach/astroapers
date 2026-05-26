@@ -182,53 +182,62 @@ tapered_exact_sum, tapered_npix_exact = tapered.apsum_exact(data)
 np.array([tapered_center_sum, tapered_exact_sum, tapered_center_npix, tapered_npix_exact])
 ```
 
-## Low-Level Kernels for Lowest Overhead
+## Maximum Performance
 
-When source positions already live in arrays, call the direct kernel functions.
-This avoids object construction and is the lowest-overhead entry point for
-production work. Geometry parameters are scalar for one kernel call, so a
-position-angle scan still loops over angle, but each call can process a catalog
-of centers.
+Wedges currently expose raw bbox-tight weights rather than a fused raw
+`apsum_wedge_*` function. For maximum performance, import the raw Rust extension
+as `aapr`, call `aapr.weights_*`, and reduce the returned bbox-tight arrays
+yourself. For more raw-call patterns, inspect `astroapers.kernels`.
 
 ```{python}
-import astroapers.kernels as aapk
+import astroapers._rust as aapr
 
-xpos = np.array([x0], dtype=np.float64)
-ypos = np.array([y0], dtype=np.float64)
+raw_data = np.ascontiguousarray(data, dtype=np.float64)
+xpos = np.ascontiguousarray([x0], dtype=np.float64)
+ypos = np.ascontiguousarray([y0], dtype=np.float64)
 
-kernel_sums = np.array(
+
+def raw_weighted_sum(result):
+    raw_weights, ixmins, ixmaxs, iymins, iymaxs = result
+    shape = (iymaxs[0] - iymins[0], ixmaxs[0] - ixmins[0])
+    weights = np.asarray(raw_weights[0], dtype=np.float64).reshape(shape)
+    cutout = raw_data[iymins[0]:iymaxs[0], ixmins[0]:ixmaxs[0]]
+    return np.sum(weights * cutout, dtype=np.float64), np.sum(weights, dtype=np.float64)
+
+
+raw_center_sums = np.array(
     [
-        aapk.apsum_wedge_center(
-            data,
-            xpos,
-            ypos,
-            r_in,
-            r_out,
-            angle,
-            dtheta,
-            return_npix=False,
+        raw_weighted_sum(
+            aapr.weights_wedge_center(
+                xpos,
+                ypos,
+                r_in,
+                r_out,
+                angle,
+                dtheta,
+                angle,
+                dtheta,
+            )
         )[0]
         for angle in angles_rad
     ]
 )
 
-np.rad2deg(angles_rad[np.argmax(kernel_sums - np.median(kernel_sums))])
-```
-
-Use `apsum_wedge_exact()` for analytic fractional overlap, including
-straight-sided generalized wedges.
-
-```{python}
-exact_sums = aapk.apsum_wedge_exact(
-    data,
-    xpos,
-    ypos,
-    r_in,
-    r_out,
-    theta_jet,
-    dtheta,
-    return_npix=False,
+raw_exact_sum, raw_exact_npix = raw_weighted_sum(
+    aapr.weights_wedge_exact(
+        xpos,
+        ypos,
+        r_in,
+        r_out,
+        theta_jet,
+        dtheta,
+        theta_jet,
+        dtheta,
+    )
 )
 
-exact_sums
+assert np.allclose(raw_exact_sum, jet_apsum)
+assert np.allclose(raw_exact_npix, jet_npix)
+
+np.rad2deg(angles_rad[np.argmax(raw_center_sums - np.median(raw_center_sums))])
 ```

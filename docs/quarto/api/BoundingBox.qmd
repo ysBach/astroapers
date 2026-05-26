@@ -149,7 +149,7 @@ Return this box as a FITS image section string.
 
 #### Parameters {.doc-section .doc-section-parameters}
 
-<code>[**shape**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple\[int, int\], optional]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
+<code>[**shape**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple\[int, int\]]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
 
 :   Full image shape as ``(ny, nx)``. If supplied, the returned section is clipped to the image overlap. If omitted, the raw bounding box must already be valid in FITS coordinates.
 
@@ -161,7 +161,7 @@ Return this box as a FITS image section string.
 
 #### Raises {.doc-section .doc-section-raises}
 
-<code>[**ValueError**]{.parameter-name}</code>
+<code>[:]{.parameter-annotation-sep} [ValueError]{.parameter-annotation}</code>
 
 :   If the raw bounding box has nonpositive extent, if an unclipped box would start before FITS pixel 1, or if the box does not overlap ``shape``.
 
@@ -224,7 +224,7 @@ Return a bbox-tight weighted cutout for raw aperture weights.
 
 <code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like of bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
 
-:   Boolean image mask with the same shape as ``image``. ``True`` pixels are excluded by setting their aperture weights to zero before multiplication.
+:   Boolean image mask with the same shape as ``image``. ``True`` pixels are set to ``fill_value`` in the returned cutout.
 
 <code>[**fill_value**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation} [ = ]{.parameter-default-sep} [np.nan]{.parameter-default}</code>
 
@@ -238,7 +238,7 @@ Return a bbox-tight weighted cutout for raw aperture weights.
 
 <code>[]{.parameter-name} [:]{.parameter-annotation-sep} [ndarray]{.parameter-annotation}</code>
 
-:   Floating cutout with shape ``self.shape``. Overlapping pixels contain ``image * weight``; non-overlapping pixels contain ``fill_value``.
+:   Floating cutout with shape ``self.shape``. Unmasked overlapping pixels contain ``image * weight``; masked and non-overlapping pixels contain ``fill_value``.
 
 ### weighted_values { #astroapers.BoundingBox.weighted_values }
 

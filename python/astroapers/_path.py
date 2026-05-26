@@ -11,96 +11,14 @@ from typing import Sequence
 
 import numpy as np
 
+from . import _rust as aapr
+from ._aperture_kernel_ops import PATH_OPS
 from ._apertures import PixelAp, _shape_apsum_result
 from ._containers import BoundingBox
+from ._kernel_dispatch import _masked_apsum
+from ._path_encoding import _encode_path_commands
 from ._utils import require_even_int_at_least
-from .kernels import (
-    _masked_apsum,
-    _weights_many,
-    weights_center,
-    weights_exact,
-)
-
-# Segment kind constants matching Rust SEG_* values
-_SEG_MOVE = np.int8(0)
-_SEG_LINE = np.int8(1)
-_SEG_ARC = np.int8(2)
-_SEG_CLOSE = np.int8(3)
-
-
-def _encode_path_commands(
-    segments: Sequence,
-    holes: Sequence[Sequence] | None,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Encode path command tuples into compact kinds/data arrays.
-
-    Parameters
-    ----------
-    segments : sequence of tuples
-        Outer contour commands.
-    holes : sequence of sequences of tuples, optional
-        Zero or more hole contours.
-
-    Returns
-    -------
-    kinds : ndarray of int8, shape (N,)
-    data : ndarray of float64, shape (N, 6)
-    """
-    all_contours = [segments]
-    if holes:
-        all_contours.extend(holes)
-
-    kinds_list: list[int] = []
-    data_list: list[list[float]] = []
-
-    for contour in all_contours:
-        has_move = False
-        has_close = False
-        for cmd in contour:
-            if not cmd:
-                raise ValueError("path commands must be non-empty tuples")
-            tag = cmd[0]
-            if tag == "move":
-                if len(cmd) != 3:
-                    raise ValueError("'move' command must be ('move', x, y)")
-                kinds_list.append(int(_SEG_MOVE))
-                data_list.append([float(cmd[1]), float(cmd[2]), 0.0, 0.0, 0.0, 0.0])
-                has_move = True
-            elif tag == "line":
-                if len(cmd) != 3:
-                    raise ValueError("'line' command must be ('line', x, y)")
-                kinds_list.append(int(_SEG_LINE))
-                data_list.append([float(cmd[1]), float(cmd[2]), 0.0, 0.0, 0.0, 0.0])
-            elif tag == "arc":
-                if len(cmd) != 6:
-                    raise ValueError(
-                        "'arc' command must be ('arc', cx, cy, r, theta0, dtheta)"
-                    )
-                kinds_list.append(int(_SEG_ARC))
-                data_list.append(
-                    [
-                        float(cmd[1]),  # cx
-                        float(cmd[2]),  # cy
-                        float(cmd[3]),  # r
-                        float(cmd[4]),  # theta0
-                        float(cmd[5]),  # dtheta
-                        0.0,
-                    ]
-                )
-            elif tag == "close":
-                kinds_list.append(int(_SEG_CLOSE))
-                data_list.append([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-                has_close = True
-            else:
-                raise ValueError(f"unknown path command: {tag!r}")
-        if not has_move:
-            raise ValueError("contour must start with a ('move', x, y) command")
-        if not has_close:
-            raise ValueError("contour must end with a ('close',) command")
-
-    kinds = np.array(kinds_list, dtype=np.int8)
-    data = np.array(data_list, dtype=np.float64)
-    return kinds, data
+from .kernels import _weights_many
 
 
 def _validate_segments(segments: Sequence) -> None:
@@ -176,9 +94,7 @@ def _validate_segments(segments: Sequence) -> None:
 
 
 def _validate_with_rust(kinds: np.ndarray, data: np.ndarray) -> None:
-    from . import _rust
-
-    _rust.bboxes_path_many(
+    aapr.bboxes_path(
         np.array([0.0], dtype=np.float64),
         np.array([0.0], dtype=np.float64),
         kinds,
@@ -189,17 +105,13 @@ def _validate_with_rust(kinds: np.ndarray, data: np.ndarray) -> None:
 def weights_path_exact(
     x, y, kinds: np.ndarray, data: np.ndarray, *, validate: bool = True
 ) -> tuple[list[np.ndarray], list[BoundingBox]]:
-    return _weights_many(
-        "weights_path_exact_many", x, y, kinds, data, validate=validate
-    )
+    return _weights_many(aapr.weights_path_exact, x, y, kinds, data, validate=validate)
 
 
 def weights_path_center(
     x, y, kinds: np.ndarray, data: np.ndarray, *, validate: bool = True
 ) -> tuple[list[np.ndarray], list[BoundingBox]]:
-    return _weights_many(
-        "weights_path_center_many", x, y, kinds, data, validate=validate
-    )
+    return _weights_many(aapr.weights_path_center, x, y, kinds, data, validate=validate)
 
 
 class PathAp(PixelAp):
@@ -233,6 +145,8 @@ class PathAp(PixelAp):
         If `False`, skip Python-side validation.
     """
 
+    _kernels = PATH_OPS
+
     def __init__(
         self,
         positions,
@@ -260,71 +174,39 @@ class PathAp(PixelAp):
         if validate:
             _validate_with_rust(self._kinds, self._data)
 
-    def _bbox_one(self, x: float, y: float) -> BoundingBox:
-        from . import _rust
+    @property
+    def _pars(self) -> tuple[np.ndarray, np.ndarray]:
+        return self._kinds, self._data
 
-        ixmins, ixmaxs, iymins, iymaxs = _rust.bboxes_path_many(
+    def _bbox_one(self, x: float, y: float) -> BoundingBox:
+        ixmins, ixmaxs, iymins, iymaxs = aapr.bboxes_path(
             np.array([x], dtype=np.float64),
             np.array([y], dtype=np.float64),
-            self._kinds,
-            self._data,
+            *self._pars,
         )
         return BoundingBox(
             int(ixmins[0]), int(ixmaxs[0]), int(iymins[0]), int(iymaxs[0])
         )
 
     def bboxes(self) -> list[BoundingBox]:
-        from . import _rust
         from .kernels import _boxes_from_tuple
 
         return _boxes_from_tuple(
-            _rust.bboxes_path_many(
+            aapr.bboxes_path(
                 self._x,
                 self._y,
-                self._kinds,
-                self._data,
+                *self._pars,
             )
         )
 
-    def _weights_exact_one(self, x: float, y: float, bbox: BoundingBox) -> np.ndarray:
-        return weights_exact(
-            "weights_path_exact",
-            bbox,
-            (x, y, self._kinds, self._data),
-        )
-
-    def _weights_center_one(self, x: float, y: float, bbox: BoundingBox) -> np.ndarray:
-        return weights_center(
-            "weights_path_center",
-            bbox,
-            (x, y, self._kinds, self._data),
-        )
-
-    def _weights_with_method(self, method: str) -> list[np.ndarray]:
-        method = self._weight_method(method)
-        weights_func = weights_path_exact if method == "exact" else weights_path_center
-        weights, _ = weights_func(
-            self._x,
-            self._y,
-            self._kinds,
-            self._data,
-            validate=self._validate,
-        )
-        return weights
-
-    def _apsum_with_method(
-        self, data, mask=None, *, method: str, return_npix: bool = True
-    ):
-        method = self._weight_method(method)
-        weights_func = weights_path_exact if method == "exact" else weights_path_center
+    def _apsum_path_many(self, func, data, mask=None, *, return_npix: bool = True):
         result = _masked_apsum(
-            weights_func,
+            func,
             data,
             mask,
             self._x,
             self._y,
-            self._kinds,
-            self._data,
+            *self._pars,
             return_npix=return_npix,
             validate=self._validate,
         )
@@ -333,10 +215,15 @@ class PathAp(PixelAp):
         apsum_arr, npix = result
         return _shape_apsum_result(self, apsum_arr, npix)
 
-    def _weight_method(self, method: str) -> str:
-        if method not in {"exact", "center"}:
-            raise ValueError("method must be 'exact' or 'center'")
-        return method
+    def _apsum_exact(self, data, mask=None, *, return_npix: bool = True):
+        return self._apsum_path_many(
+            weights_path_exact, data, mask=mask, return_npix=return_npix
+        )
+
+    def _apsum_center(self, data, mask=None, *, return_npix: bool = True):
+        return self._apsum_path_many(
+            weights_path_center, data, mask=mask, return_npix=return_npix
+        )
 
     def _patch_one(self, x: float, y: float, origin, **kwargs):
         import matplotlib.patches as mpatches

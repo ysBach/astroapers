@@ -5,6 +5,7 @@ type FarthestMaskResult = (f64, usize, Vec<usize>);
 
 pub(super) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(_farthest_mask_pixel, m)?)?;
+    m.add_function(wrap_pyfunction!(_selected_pixel_distances, m)?)?;
     Ok(())
 }
 
@@ -80,4 +81,42 @@ fn squared_distance(coords: &[usize], center: &[f64]) -> f64 {
             delta * delta
         })
         .sum()
+}
+
+#[pyfunction]
+fn _selected_pixel_distances(
+    selected: PyReadonlyArray2<'_, bool>,
+    x0: f64,
+    y0: f64,
+    x_min: isize,
+    y_min: isize,
+) -> PyResult<Vec<f64>> {
+    if !x0.is_finite() || !y0.is_finite() {
+        return Err(PyValueError::new_err("center values must be finite"));
+    }
+    let shape = selected.shape();
+    let ny = shape[0];
+    let nx = shape[1];
+    let selected = selected
+        .as_slice()
+        .map_err(|_| PyValueError::new_err("selected must be a contiguous bool array"))?;
+
+    let mut distances = Vec::new();
+    for yy in 0..ny {
+        let py = y_min
+            .checked_add(yy as isize)
+            .ok_or_else(|| PyValueError::new_err("invalid selected extent"))?;
+        for xx in 0..nx {
+            if !selected[yy * nx + xx] {
+                continue;
+            }
+            let px = x_min
+                .checked_add(xx as isize)
+                .ok_or_else(|| PyValueError::new_err("invalid selected extent"))?;
+            let dx = px as f64 - x0;
+            let dy = py as f64 - y0;
+            distances.push((dx * dx + dy * dy).sqrt());
+        }
+    }
+    Ok(distances)
 }

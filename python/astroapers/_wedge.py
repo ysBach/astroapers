@@ -6,19 +6,10 @@ import math
 
 import numpy as np
 
-from ._apertures import PixelAp, _shape_apsum_result
+from ._aperture_kernel_ops import WEDGE_OPS
+from ._apertures import PixelAp
 from ._containers import BoundingBox
-from .kernels import (
-    apsum_wedge_center,
-    apsum_wedge_exact,
-    bboxes_wedge,
-    npix_wedge_center,
-    npix_wedge_exact,
-    weights_center,
-    weights_exact,
-    weights_wedge_center,
-    weights_wedge_exact,
-)
+from .kernels import bboxes_wedge
 from ._utils import require_even_int_at_least, require_finite_float
 
 
@@ -54,6 +45,8 @@ class WedgeAp(PixelAp):
         and normalized positions.
     """
 
+    _kernels = WEDGE_OPS
+
     def __init__(
         self,
         positions,
@@ -81,6 +74,17 @@ class WedgeAp(PixelAp):
         )
         if validate:
             self._validate_geometry()
+
+    @property
+    def _pars(self) -> tuple[float, float, float, float, float, float]:
+        return (
+            self.r_in,
+            self.r_out,
+            self.theta_in,
+            self.dtheta_in,
+            self.theta_out,
+            self.dtheta_out,
+        )
 
     def _validate_geometry(self) -> None:
         if not math.isfinite(self.r_in) or self.r_in <= 0.0:
@@ -124,12 +128,7 @@ class WedgeAp(PixelAp):
         return bboxes_wedge(
             np.array([x]),
             np.array([y]),
-            self.r_in,
-            self.r_out,
-            self.theta_in,
-            self.dtheta_in,
-            self.theta_out,
-            self.dtheta_out,
+            *self._pars,
             validate=self._validate,
         )[0]
 
@@ -137,113 +136,9 @@ class WedgeAp(PixelAp):
         return bboxes_wedge(
             self._x,
             self._y,
-            self.r_in,
-            self.r_out,
-            self.theta_in,
-            self.dtheta_in,
-            self.theta_out,
-            self.dtheta_out,
+            *self._pars,
             validate=self._validate,
         )
-
-    def _weights_exact_one(self, x: float, y: float, bbox: BoundingBox) -> np.ndarray:
-        return weights_exact(
-            "weights_wedge_exact",
-            bbox,
-            (
-                x,
-                y,
-                self.r_in,
-                self.r_out,
-                self.theta_in,
-                self.dtheta_in,
-                self.theta_out,
-                self.dtheta_out,
-            ),
-        )
-
-    def _weights_center_one(self, x: float, y: float, bbox: BoundingBox) -> np.ndarray:
-        return weights_center(
-            "weights_wedge_center",
-            bbox,
-            (
-                x,
-                y,
-                self.r_in,
-                self.r_out,
-                self.theta_in,
-                self.dtheta_in,
-                self.theta_out,
-                self.dtheta_out,
-            ),
-        )
-
-    def _weights_with_method(self, method: str) -> list[np.ndarray]:
-        method = self._weight_method(method)
-        weights_func = (
-            weights_wedge_exact if method == "exact" else weights_wedge_center
-        )
-        weights, _ = weights_func(
-            self._x,
-            self._y,
-            self.r_in,
-            self.r_out,
-            self.theta_in,
-            self.dtheta_in,
-            self.theta_out,
-            self.dtheta_out,
-            validate=self._validate,
-        )
-        return weights
-
-    def _apsum_with_method(
-        self, data, mask=None, *, method: str, return_npix: bool = True
-    ):
-        method = self._weight_method(method)
-        apsum_func = apsum_wedge_exact if method == "exact" else apsum_wedge_center
-        result = apsum_func(
-            data,
-            self._x,
-            self._y,
-            self.r_in,
-            self.r_out,
-            self.theta_in,
-            self.dtheta_in,
-            self.theta_out,
-            self.dtheta_out,
-            mask=mask,
-            return_npix=return_npix,
-            validate=self._validate,
-        )
-        if not return_npix:
-            return _shape_apsum_result(self, result)
-        apsum, npix = result
-        return _shape_apsum_result(self, apsum, npix)
-
-    def _npix_with_method(self, shape: tuple[int, int], *, method: str, mask=None):
-        method = self._weight_method(method)
-        npix_func = npix_wedge_exact if method == "exact" else npix_wedge_center
-        return _shape_apsum_result(
-            self,
-            npix_func(
-                self._x,
-                self._y,
-                self.r_in,
-                self.r_out,
-                self.theta_in,
-                self.dtheta_in,
-                self.theta_out,
-                self.dtheta_out,
-                shape=shape,
-                mask=mask,
-                validate=self._validate,
-            ),
-        )
-
-    def _weight_method(self, method: str) -> str:
-        if method not in {"exact", "center"}:
-            raise ValueError("method must be 'exact' or 'center'")
-        return method
 
     def _patch_one(self, x: float, y: float, origin, **kwargs):
         import matplotlib.patches as mpatches

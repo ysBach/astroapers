@@ -140,3 +140,71 @@ on platforms where NumPy exposes them. Array-producing helpers such as
 `.to_image()`, `.weighted_cutout()`, and `.weighted_values()` preserve `float32`
 when both data and weights are `float32`, but `BoundingBox.apsum()` and
 `BoundingBox.npix()` always accumulate in `float64`.
+
+## Maximum Performance
+
+For custom composed masks, the raw Rust extension can generate the component
+bbox-tight weights without constructing aperture objects. Import it as `aapr`.
+The composition itself is still your Python logic; there is no raw fused Rust
+function for an arbitrary user-composed shape. For more raw-call patterns,
+inspect `astroapers.kernels`.
+
+```{python}
+import astroapers._rust as aapr
+
+raw_data = np.ascontiguousarray(data, dtype=np.float64)
+x_outer = np.ascontiguousarray([x0], dtype=np.float64)
+y_outer = np.ascontiguousarray([y0], dtype=np.float64)
+x_hole = np.ascontiguousarray([x0 + 2.0], dtype=np.float64)
+y_hole = np.ascontiguousarray([y0], dtype=np.float64)
+
+cw, c_xmin, c_xmax, c_ymin, c_ymax = aapr.weights_circ_exact(
+    x_outer,
+    y_outer,
+    8.0,
+)
+ew, e_xmin, e_xmax, e_ymin, e_ymax = aapr.weights_ellip_exact(
+    x_hole,
+    y_hole,
+    3.0,
+    1.4,
+    0.5,
+)
+
+c_bounds = (c_xmin[0], c_xmax[0], c_ymin[0], c_ymax[0])
+e_bounds = (e_xmin[0], e_xmax[0], e_ymin[0], e_ymax[0])
+u_bounds = (
+    min(c_bounds[0], e_bounds[0]),
+    max(c_bounds[1], e_bounds[1]),
+    min(c_bounds[2], e_bounds[2]),
+    max(c_bounds[3], e_bounds[3]),
+)
+
+
+def reshape_raw(flat, bounds):
+    ixmin, ixmax, iymin, iymax = bounds
+    return np.asarray(flat, dtype=np.float64).reshape(iymax - iymin, ixmax - ixmin)
+
+
+def place_raw(weight, bounds, out_bounds):
+    ixmin, ixmax, iymin, iymax = bounds
+    uxmin, _, uymin, _ = out_bounds
+    out = np.zeros((out_bounds[3] - out_bounds[2], out_bounds[1] - out_bounds[0]))
+    out[iymin - uymin:iymax - uymin, ixmin - uxmin:ixmax - uxmin] = weight
+    return out
+
+
+raw_outer = place_raw(reshape_raw(cw[0], c_bounds), c_bounds, u_bounds)
+raw_hole = place_raw(reshape_raw(ew[0], e_bounds), e_bounds, u_bounds)
+raw_composed = np.clip(raw_outer - raw_hole, 0.0, 1.0)
+uxmin, uxmax, uymin, uymax = u_bounds
+raw_cutout = raw_data[uymin:uymax, uxmin:uxmax]
+raw_apsum = np.sum(raw_composed * raw_cutout, dtype=np.float64)
+raw_npix = np.sum(raw_composed, dtype=np.float64)
+
+expected_apsum, expected_npix = bbox.apsum(weights, data)
+assert np.allclose(raw_apsum, expected_apsum)
+assert np.allclose(raw_npix, expected_npix)
+
+raw_apsum, raw_npix
+```

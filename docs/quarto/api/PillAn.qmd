@@ -76,31 +76,3 @@ If ``theta_out`` is `None`, it defaults to ``theta_in``.
 <code>[**area**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
 
 :   Analytic geometric annulus area. Image clipping and bad-pixel masks are accounted for by ``npix`` results, not by this property.
-
-## Methods
-
-| Name | Description |
-| --- | --- |
-| [apsum_exact](#astroapers.PillAn.apsum_exact) | Return exact pill-annulus sums, and npix by default. |
-
-### apsum_exact { #astroapers.PillAn.apsum_exact }
-
-```python
-PillAn.apsum_exact(data, mask=None, *, return_npix=True)
-```
-
-Return exact pill-annulus sums, and npix by default.
-
-#### Parameters {.doc-section .doc-section-parameters}
-
-<code>[**data**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like]{.parameter-annotation}</code>
-
-:   Two-dimensional image.
-
-<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like of bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
-
-:   Boolean image mask with the same shape as ``data``. ``True`` pixels are excluded from both ``apsum`` and ``npix``.
-
-<code>[**return_npix**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
-
-:   If `True`, return ``(apsum, npix)``. If `False`, return only ``apsum``.

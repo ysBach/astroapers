@@ -1,0 +1,295 @@
+---
+title: "Different inner and outer annulus shapes"
+---
+
+Annuli in `astroapers` are apertures with two boundaries. The inner and outer
+boundaries do not need to be scaled copies of the same region. That is useful
+when the source aperture is set by the measurement geometry, but the background
+region is set by a different practical constraint.
+
+This tutorial shows two examples:
+
+- a tilted longslit-style rectangular aperture with same-width sky boxes farther
+  from the aperture center;
+- an ellipse-to-circle annulus for sampling and subtracting a radial coma model.
+
+```{python}
+import numpy as np
+import matplotlib.pyplot as plt
+import astroapers as aap
+```
+
+## Tilted rectangular sky boxes
+
+For a longslit-like extraction, use a narrow rectangular source aperture and a
+larger rectangular annulus aligned to the same trace. Here the source aperture
+has width 1 pixel and height 5 pixels. The sky annulus keeps the same width but
+uses inner and outer heights of 10 and 20 pixels.
+
+`sampled_values(..., return_dist=True)` returns center-selected image values and
+the matching Euclidean pixel-center distances from the aperture center. That is
+enough for a simple radial-distance sky fit. If you need a signed coordinate
+along the slit, compute that signed coordinate explicitly from the selected
+pixel positions.
+
+```{python}
+ny, nx = 70, 80
+yy, xx = np.mgrid[:ny, :nx]
+x0, y0 = 39.5, 34.0
+theta = np.deg2rad(10.0)
+
+dx = xx - x0
+dy = yy - y0
+local_x = dx * np.cos(theta) + dy * np.sin(theta)
+local_y = -dx * np.sin(theta) + dy * np.cos(theta)
+distance_from_center = np.hypot(dx, dy)
+
+rng = np.random.default_rng(2026)
+sky_true = 12.0 + 0.08 * distance_from_center
+trace_signal = 45.0 * np.exp(-0.5 * (local_x / 0.35) ** 2)
+trace_signal *= np.exp(-0.5 * (local_y / 1.0) ** 2)
+longslit_image = sky_true + trace_signal
+longslit_image += rng.normal(0.0, 0.08, size=longslit_image.shape)
+```
+
+```{python}
+source_ap = aap.RectAp((x0, y0), w=1.0, h=5.0, theta=theta)
+sky_an = aap.RectAn(
+    (x0, y0),
+    w_in=1.0,
+    h_in=10.0,
+    w_out=1.0,
+    h_out=20.0,
+    theta_in=theta,
+    theta_out=theta,
+)
+
+sky_values_list, sky_distances_list = sky_an.sampled_values(
+    longslit_image,
+    return_dist=True,
+)
+source_values_list, source_distances_list = source_ap.sampled_values(
+    longslit_image,
+    return_dist=True,
+)
+
+sky_values = sky_values_list[0]
+sky_distances = sky_distances_list[0]
+source_values = source_values_list[0]
+source_distances = source_distances_list[0]
+
+sky_line = np.polyfit(sky_distances, sky_values, deg=1)
+sky_fit_center = np.polyval(sky_line, 0.0)
+source_sky_model = np.polyval(sky_line, source_distances)
+source_sky_removed = source_values - source_sky_model
+
+assert sky_values.size == sky_distances.size
+assert source_values.size == source_distances.size
+assert sky_fit_center > 11.5
+```
+
+```{python}
+fig, axes = plt.subplots(1, 2, figsize=(9.5, 3.8), constrained_layout=True)
+
+axes[0].imshow(longslit_image, origin="lower", cmap="viridis")
+source_ap.plot(ax=axes[0], color="tab:red", lw=1.4)
+sky_an.plot(ax=axes[0], color="white", lw=1.1)
+axes[0].set_title("Tilted source aperture and sky annulus")
+
+order = np.argsort(sky_distances)
+axes[1].scatter(sky_distances, sky_values, s=20, alpha=0.75, label="sky pixels")
+axes[1].plot(
+    sky_distances[order],
+    np.polyval(sky_line, sky_distances[order]),
+    color="tab:red",
+    lw=2,
+    label="linear sky fit",
+)
+axes[1].scatter(
+    source_distances,
+    source_sky_removed,
+    s=28,
+    marker="x",
+    color="black",
+    label="source pixels after sky",
+)
+axes[1].set_xlabel("distance from aperture center (pixels)")
+axes[1].set_ylabel("pixel value")
+axes[1].legend()
+
+plt.show()
+```
+
+The annulus only selects pixels. The background model is your choice: a median,
+a clipped statistic, a polynomial, or a model tied to the observing setup.
+
+## Elliptical inner boundary and circular outer boundary
+
+The next image has an elliptical inner component and a circular coma:
+
+- elliptical Gaussian: amplitude 20, `sigma_x=5` pixels, `sigma_y=8` pixels,
+  rotated by 45 degrees;
+- circular Gaussian coma: amplitude 12, `sigma=10` pixels.
+
+The annulus excludes the inner ellipse but samples out to a circular radius of
+30 pixels.
+
+```{python}
+ny, nx = 90, 90
+yy, xx = np.mgrid[:ny, :nx]
+x0, y0 = 45.0, 44.0
+theta_inner = np.deg2rad(45.0)
+
+dx = xx - x0
+dy = yy - y0
+x_rot = dx * np.cos(theta_inner) + dy * np.sin(theta_inner)
+y_rot = -dx * np.sin(theta_inner) + dy * np.cos(theta_inner)
+radius = np.hypot(dx, dy)
+
+elliptical_inner = 20.0 * np.exp(
+    -0.5 * ((x_rot / 5.0) ** 2 + (y_rot / 8.0) ** 2)
+)
+circular_coma = 12.0 * np.exp(-0.5 * (radius / 10.0) ** 2)
+coma_image = elliptical_inner + circular_coma
+```
+
+```{python}
+coma_annulus = aap.EllipAn(
+    (x0, y0),
+    a_in=10.0,
+    b_in=16.0,
+    a_out=30.0,
+    b_out=30.0,
+    theta_in=theta_inner,
+    theta_out=0.0,
+)
+
+coma_values_list, coma_distances_list = coma_annulus.sampled_values(
+    coma_image,
+    return_dist=True,
+)
+coma_values = coma_values_list[0]
+coma_distances = coma_distances_list[0]
+
+assert coma_values.size == coma_distances.size
+assert coma_values.size > 0
+```
+
+```{python}
+radial_bins = np.arange(10.0, 31.0, 2.0)
+bin_center = 0.5 * (radial_bins[:-1] + radial_bins[1:])
+bin_median = np.array(
+    [
+        np.median(
+            coma_values[
+                (coma_distances >= r0) & (coma_distances < r1)
+            ]
+        )
+        for r0, r1 in zip(radial_bins[:-1], radial_bins[1:])
+    ]
+)
+
+valid = np.isfinite(bin_median) & (bin_median > 0.0)
+log_coma_fit = np.polyfit(bin_center[valid] ** 2, np.log(bin_median[valid]), deg=1)
+
+
+def radial_coma_model(distance):
+    return np.exp(np.polyval(log_coma_fit, distance**2))
+
+
+coma_model = radial_coma_model(radius)
+residual = coma_image - coma_model
+annulus_model_values = radial_coma_model(coma_distances)
+annulus_residual_mad = np.median(np.abs(coma_values - annulus_model_values))
+image_rms = np.sqrt(np.mean(coma_image**2))
+residual_rms = np.sqrt(np.mean(residual**2))
+
+assert annulus_residual_mad < 0.35
+assert residual_rms < image_rms
+```
+
+```{python}
+fig, axes = plt.subplots(1, 2, figsize=(9.5, 3.8), constrained_layout=True)
+
+axes[0].scatter(coma_distances, coma_values, s=14, alpha=0.55)
+axes[0].plot(
+    bin_center[valid],
+    bin_median[valid],
+    marker="o",
+    color="black",
+    lw=0,
+    label="binned median",
+)
+r_plot = np.linspace(0.0, 30.0, 200)
+axes[0].plot(r_plot, radial_coma_model(r_plot), color="tab:red", lw=2, label="fit")
+axes[0].set_xlabel("distance from center (pixels)")
+axes[0].set_ylabel("pixel value")
+axes[0].legend()
+
+axes[1].imshow(coma_image, origin="lower", cmap="magma")
+coma_annulus.plot(ax=axes[1], color="white", lw=1.2)
+axes[1].set_title("Ellipse-to-circle annulus")
+
+plt.show()
+```
+
+```{python}
+vmax = np.percentile(coma_image, 99.0)
+residual_limit = np.percentile(np.abs(residual), 99.0)
+
+fig, axes = plt.subplots(1, 3, figsize=(10.5, 3.5), constrained_layout=True)
+
+panels = [
+    (coma_image, "image", "magma", 0.0, vmax),
+    (coma_model, "radial coma model", "magma", 0.0, vmax),
+    (residual, "residual", "coolwarm", -residual_limit, residual_limit),
+]
+
+for ax, (image, title, cmap, vmin, vmax_panel) in zip(axes, panels):
+    im = ax.imshow(image, origin="lower", cmap=cmap, vmin=vmin, vmax=vmax_panel)
+    ax.set_title(title)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+
+plt.show()
+```
+
+The model is intentionally simple. The radial fit removes most of the circular
+coma and leaves the non-circular inner component in the residual. For real
+data, replace the toy fit with a robust binned profile, spline, or physical
+coma model.
+
+## Maximum Performance
+
+For mixed-shape annuli, the raw performance entry point is usually
+`aapr.weights_*`, because not every composite shape has a fused raw `apsum_*`
+function. The raw function returns flattened weights and integer bbox bounds.
+For more examples of raw call patterns, inspect `astroapers.kernels`.
+
+```{python}
+import astroapers._rust as aapr
+
+raw_coma = np.ascontiguousarray(coma_image, dtype=np.float64)
+xpos = np.ascontiguousarray([x0], dtype=np.float64)
+ypos = np.ascontiguousarray([y0], dtype=np.float64)
+
+raw_weights, ixmins, ixmaxs, iymins, iymaxs = aapr.weights_ellip_ann_center(
+    xpos,
+    ypos,
+    10.0,
+    16.0,
+    30.0,
+    30.0,
+    theta_inner,
+    0.0,
+)
+
+raw_shape = (iymaxs[0] - iymins[0], ixmaxs[0] - ixmins[0])
+raw_weights0 = np.asarray(raw_weights[0], dtype=np.float64).reshape(raw_shape)
+raw_cutout = raw_coma[iymins[0]:iymaxs[0], ixmins[0]:ixmaxs[0]]
+raw_values = raw_cutout[raw_weights0 > 0]
+
+assert np.allclose(raw_values, coma_values)
+raw_values.size, np.median(raw_values)
+```

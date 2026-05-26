@@ -1,4 +1,4 @@
-"""Private generated docstrings for :mod:`astroapers.kernels`."""
+"""Private generated docstrings for Python kernel-wrapper functions."""
 
 from __future__ import annotations
 
@@ -9,11 +9,8 @@ def _apsum_doc(summary: str, geometry_params: str, notes: str) -> str:
 Parameters
 ----------
 data : array_like
-    Two-dimensional image. For ``mask=None``, ``float64``, ``float32``,
-    ``int32``, and ``int16`` arrays dispatch to dtype-specialized Rust
-    kernels when available; other dtypes are converted to contiguous
-    ``float64`` before summation. Returned aperture sums and effective pixel
-    counts are always ``float64`` arrays.
+    Two-dimensional image. For maximum performance with raw contiguous arrays,
+    use ``import astroapers._rust as aapr`` and call the raw functions directly.
 x, y : scalar or array_like
     Aperture center coordinates in pixel units. Inputs are converted to
     contiguous ``float64`` arrays. Shapes must match after ``numpy.atleast_1d``.
@@ -23,11 +20,9 @@ x, y : scalar or array_like
 mask : array_like of bool, optional
     Boolean image mask with the same shape as ``data``. ``True`` pixels are
     excluded from both the aperture sum and effective pixel count. Values are
-    converted to boolean. When this is omitted, the unmasked Rust summation path
-    is used.
+    converted to boolean.
 return_npix : bool, optional
-    If `True`, return ``(apsum, npix)``. If `False`, return only ``apsum`` and
-    use the sum-only Rust kernel for supported unmasked calls.
+    If `True`, return ``(apsum, npix)``. If `False`, return only ``apsum``.
 
 Returns
 -------
@@ -40,6 +35,9 @@ npix : ndarray
 
 Notes
 -----
+For more raw-call patterns, inspect ``astroapers.kernels``; it is the Python
+layer that calls ``_rust`` internally.
+
 {notes}
 """
 
@@ -131,8 +129,9 @@ theta : float, optional
     x axis."""
 
 _ELLIP_ANN_PARAMS = """a_in, b_in, a_out, b_out : float
-    Inner and outer ellipse semiaxes in pixels. Inner axes must be smaller
-    than the corresponding outer axes.
+    Inner and outer ellipse semiaxes in pixels. Inner axes must be no larger
+    than the corresponding outer axes, and at least one outer axis must be
+    larger.
 theta_in : float, optional
     Inner ellipse rotation angle in radians.
 theta_out : float or None, optional
@@ -153,9 +152,10 @@ _RECT_ANN_PARAMS = """w_in, h_in : float
 w_out, h_out : float
     Outer rectangle full width and height in pixels. ``w_out`` is measured
     along the outer rectangle's local x axis, and ``h_out`` along its local
-    y axis. Each outer dimension must be larger than the corresponding inner
-    dimension. At ``theta_out=0``, the outer width axis is aligned with the
-    image x axis and the outer height axis with the image y axis.
+    y axis. Each outer dimension must be no smaller than the corresponding
+    inner dimension, and at least one outer dimension must be larger. At
+    ``theta_out=0``, the outer width axis is aligned with the image x axis and
+    the outer height axis with the image y axis.
 theta_in : float, optional
     Inner rectangle rotation angle in radians, measured counterclockwise from
     the positive image x axis to the inner rectangle's local width axis.

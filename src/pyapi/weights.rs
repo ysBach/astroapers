@@ -6,26 +6,10 @@ use super::*;
 use crate::geometry::{wedge_bbox, Wedge};
 
 pub(super) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(weights_circ_exact_one, m)?)?;
+    m.add_function(wrap_pyfunction!(weights_circ_ann_exact_one, m)?)?;
     m.add_function(wrap_pyfunction!(weights_circ_exact, m)?)?;
     m.add_function(wrap_pyfunction!(weights_circ_ann_exact, m)?)?;
-    m.add_function(wrap_pyfunction!(weights_circ_exact_many, m)?)?;
-    m.add_function(wrap_pyfunction!(weights_circ_ann_exact_many, m)?)?;
-    m.add_function(wrap_pyfunction!(weights_ellip_exact_many, m)?)?;
-    m.add_function(wrap_pyfunction!(weights_ellip_ann_exact_many, m)?)?;
-    m.add_function(wrap_pyfunction!(weights_rect_exact_many, m)?)?;
-    m.add_function(wrap_pyfunction!(weights_rect_ann_exact_many, m)?)?;
-    m.add_function(wrap_pyfunction!(weights_wedge_exact_many, m)?)?;
-    m.add_function(wrap_pyfunction!(weights_pill_exact_many, m)?)?;
-    m.add_function(wrap_pyfunction!(weights_pill_ann_exact_many, m)?)?;
-    m.add_function(wrap_pyfunction!(weights_circ_center_many, m)?)?;
-    m.add_function(wrap_pyfunction!(weights_circ_ann_center_many, m)?)?;
-    m.add_function(wrap_pyfunction!(weights_ellip_center_many, m)?)?;
-    m.add_function(wrap_pyfunction!(weights_ellip_ann_center_many, m)?)?;
-    m.add_function(wrap_pyfunction!(weights_rect_center_many, m)?)?;
-    m.add_function(wrap_pyfunction!(weights_rect_ann_center_many, m)?)?;
-    m.add_function(wrap_pyfunction!(weights_wedge_center_many, m)?)?;
-    m.add_function(wrap_pyfunction!(weights_pill_center_many, m)?)?;
-    m.add_function(wrap_pyfunction!(weights_pill_ann_center_many, m)?)?;
     m.add_function(wrap_pyfunction!(weights_ellip_exact, m)?)?;
     m.add_function(wrap_pyfunction!(weights_ellip_ann_exact, m)?)?;
     m.add_function(wrap_pyfunction!(weights_rect_exact, m)?)?;
@@ -42,11 +26,27 @@ pub(super) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(weights_wedge_center, m)?)?;
     m.add_function(wrap_pyfunction!(weights_pill_center, m)?)?;
     m.add_function(wrap_pyfunction!(weights_pill_ann_center, m)?)?;
+    m.add_function(wrap_pyfunction!(weights_ellip_exact_one, m)?)?;
+    m.add_function(wrap_pyfunction!(weights_ellip_ann_exact_one, m)?)?;
+    m.add_function(wrap_pyfunction!(weights_rect_exact_one, m)?)?;
+    m.add_function(wrap_pyfunction!(weights_rect_ann_exact_one, m)?)?;
+    m.add_function(wrap_pyfunction!(weights_wedge_exact_one, m)?)?;
+    m.add_function(wrap_pyfunction!(weights_pill_exact_one, m)?)?;
+    m.add_function(wrap_pyfunction!(weights_pill_ann_exact_one, m)?)?;
+    m.add_function(wrap_pyfunction!(weights_circ_center_one, m)?)?;
+    m.add_function(wrap_pyfunction!(weights_circ_ann_center_one, m)?)?;
+    m.add_function(wrap_pyfunction!(weights_ellip_center_one, m)?)?;
+    m.add_function(wrap_pyfunction!(weights_ellip_ann_center_one, m)?)?;
+    m.add_function(wrap_pyfunction!(weights_rect_center_one, m)?)?;
+    m.add_function(wrap_pyfunction!(weights_rect_ann_center_one, m)?)?;
+    m.add_function(wrap_pyfunction!(weights_wedge_center_one, m)?)?;
+    m.add_function(wrap_pyfunction!(weights_pill_center_one, m)?)?;
+    m.add_function(wrap_pyfunction!(weights_pill_ann_center_one, m)?)?;
     Ok(())
 }
 
 #[pyfunction]
-pub(in crate::pyapi) fn weights_circ_exact(
+pub(in crate::pyapi) fn weights_circ_exact_one(
     x: f64,
     y: f64,
     r: f64,
@@ -61,7 +61,7 @@ pub(in crate::pyapi) fn weights_circ_exact(
 }
 
 #[pyfunction]
-fn weights_circ_ann_exact(
+fn weights_circ_ann_exact_one(
     x: f64,
     y: f64,
     r_in: f64,
@@ -83,7 +83,7 @@ fn weights_circ_ann_exact(
 }
 
 #[pyfunction]
-fn weights_circ_exact_many(
+fn weights_circ_exact(
     py: Python<'_>,
     xs: PyReadonlyArray1<'_, f64>,
     ys: PyReadonlyArray1<'_, f64>,
@@ -111,7 +111,7 @@ fn weights_circ_exact_many(
 }
 
 #[pyfunction]
-fn weights_circ_ann_exact_many(
+fn weights_circ_ann_exact(
     py: Python<'_>,
     xs: PyReadonlyArray1<'_, f64>,
     ys: PyReadonlyArray1<'_, f64>,
@@ -146,7 +146,7 @@ fn weights_circ_ann_exact_many(
 }
 
 #[pyfunction]
-fn weights_ellip_exact_many(
+fn weights_ellip_exact(
     py: Python<'_>,
     xs: PyReadonlyArray1<'_, f64>,
     ys: PyReadonlyArray1<'_, f64>,
@@ -184,7 +184,7 @@ fn weights_ellip_exact_many(
 }
 
 #[pyfunction]
-fn weights_ellip_ann_exact_many(
+fn weights_ellip_ann_exact(
     py: Python<'_>,
     xs: PyReadonlyArray1<'_, f64>,
     ys: PyReadonlyArray1<'_, f64>,
@@ -245,7 +245,7 @@ fn weights_ellip_ann_exact_many(
 }
 
 #[pyfunction]
-fn weights_rect_exact_many(
+fn weights_rect_exact(
     py: Python<'_>,
     xs: PyReadonlyArray1<'_, f64>,
     ys: PyReadonlyArray1<'_, f64>,
@@ -281,7 +281,7 @@ fn weights_rect_exact_many(
 }
 
 #[pyfunction]
-fn weights_rect_ann_exact_many(
+fn weights_rect_ann_exact(
     py: Python<'_>,
     xs: PyReadonlyArray1<'_, f64>,
     ys: PyReadonlyArray1<'_, f64>,
@@ -338,7 +338,7 @@ fn weights_rect_ann_exact_many(
 
 #[allow(clippy::too_many_arguments)]
 #[pyfunction]
-fn weights_wedge_exact_many(
+fn weights_wedge_exact(
     py: Python<'_>,
     xs: PyReadonlyArray1<'_, f64>,
     ys: PyReadonlyArray1<'_, f64>,
@@ -389,7 +389,7 @@ fn weights_wedge_exact_many(
 }
 
 #[pyfunction]
-fn weights_pill_exact_many(
+fn weights_pill_exact(
     py: Python<'_>,
     xs: PyReadonlyArray1<'_, f64>,
     ys: PyReadonlyArray1<'_, f64>,
@@ -422,7 +422,7 @@ fn weights_pill_exact_many(
 }
 
 #[pyfunction]
-fn weights_pill_ann_exact_many(
+fn weights_pill_ann_exact(
     py: Python<'_>,
     xs: PyReadonlyArray1<'_, f64>,
     ys: PyReadonlyArray1<'_, f64>,
@@ -476,7 +476,7 @@ fn weights_pill_ann_exact_many(
 }
 
 #[pyfunction]
-fn weights_circ_center_many(
+fn weights_circ_center(
     py: Python<'_>,
     xs: PyReadonlyArray1<'_, f64>,
     ys: PyReadonlyArray1<'_, f64>,
@@ -504,7 +504,7 @@ fn weights_circ_center_many(
 }
 
 #[pyfunction]
-fn weights_circ_ann_center_many(
+fn weights_circ_ann_center(
     py: Python<'_>,
     xs: PyReadonlyArray1<'_, f64>,
     ys: PyReadonlyArray1<'_, f64>,
@@ -539,7 +539,7 @@ fn weights_circ_ann_center_many(
 }
 
 #[pyfunction]
-fn weights_ellip_center_many(
+fn weights_ellip_center(
     py: Python<'_>,
     xs: PyReadonlyArray1<'_, f64>,
     ys: PyReadonlyArray1<'_, f64>,
@@ -584,7 +584,7 @@ fn weights_ellip_center_many(
 }
 
 #[pyfunction]
-fn weights_ellip_ann_center_many(
+fn weights_ellip_ann_center(
     py: Python<'_>,
     xs: PyReadonlyArray1<'_, f64>,
     ys: PyReadonlyArray1<'_, f64>,
@@ -645,7 +645,7 @@ fn weights_ellip_ann_center_many(
 }
 
 #[pyfunction]
-fn weights_rect_center_many(
+fn weights_rect_center(
     py: Python<'_>,
     xs: PyReadonlyArray1<'_, f64>,
     ys: PyReadonlyArray1<'_, f64>,
@@ -688,7 +688,7 @@ fn weights_rect_center_many(
 }
 
 #[pyfunction]
-fn weights_rect_ann_center_many(
+fn weights_rect_ann_center(
     py: Python<'_>,
     xs: PyReadonlyArray1<'_, f64>,
     ys: PyReadonlyArray1<'_, f64>,
@@ -745,7 +745,7 @@ fn weights_rect_ann_center_many(
 
 #[allow(clippy::too_many_arguments)]
 #[pyfunction]
-fn weights_wedge_center_many(
+fn weights_wedge_center(
     py: Python<'_>,
     xs: PyReadonlyArray1<'_, f64>,
     ys: PyReadonlyArray1<'_, f64>,
@@ -796,7 +796,7 @@ fn weights_wedge_center_many(
 }
 
 #[pyfunction]
-fn weights_pill_center_many(
+fn weights_pill_center(
     py: Python<'_>,
     xs: PyReadonlyArray1<'_, f64>,
     ys: PyReadonlyArray1<'_, f64>,
@@ -837,7 +837,7 @@ fn weights_pill_center_many(
 }
 
 #[pyfunction]
-fn weights_pill_ann_center_many(
+fn weights_pill_ann_center(
     py: Python<'_>,
     xs: PyReadonlyArray1<'_, f64>,
     ys: PyReadonlyArray1<'_, f64>,
@@ -891,7 +891,7 @@ fn weights_pill_ann_center_many(
 }
 
 #[pyfunction]
-pub(in crate::pyapi) fn weights_ellip_exact(
+pub(in crate::pyapi) fn weights_ellip_exact_one(
     x: f64,
     y: f64,
     a: f64,
@@ -918,7 +918,7 @@ pub(in crate::pyapi) fn weights_ellip_exact(
 }
 
 #[pyfunction]
-fn weights_ellip_ann_exact(
+fn weights_ellip_ann_exact_one(
     x: f64,
     y: f64,
     a_in: f64,
@@ -964,7 +964,7 @@ fn weights_ellip_ann_exact(
 }
 
 #[pyfunction]
-pub(in crate::pyapi) fn weights_rect_exact(
+pub(in crate::pyapi) fn weights_rect_exact_one(
     x: f64,
     y: f64,
     w: f64,
@@ -985,7 +985,7 @@ pub(in crate::pyapi) fn weights_rect_exact(
 }
 
 #[pyfunction]
-fn weights_rect_ann_exact(
+fn weights_rect_ann_exact_one(
     x: f64,
     y: f64,
     w_in: f64,
@@ -1031,7 +1031,7 @@ fn weights_rect_ann_exact(
 
 #[allow(clippy::too_many_arguments)]
 #[pyfunction]
-fn weights_wedge_exact(
+fn weights_wedge_exact_one(
     x: f64,
     y: f64,
     r_in: f64,
@@ -1076,7 +1076,7 @@ fn weights_wedge_exact(
 }
 
 #[pyfunction]
-fn weights_pill_exact(
+fn weights_pill_exact_one(
     x: f64,
     y: f64,
     w: f64,
@@ -1106,7 +1106,7 @@ fn weights_pill_exact(
 }
 
 #[pyfunction]
-fn weights_pill_ann_exact(
+fn weights_pill_ann_exact_one(
     x: f64,
     y: f64,
     w_in: f64,
@@ -1157,7 +1157,7 @@ fn weights_pill_ann_exact(
 }
 
 #[pyfunction]
-fn weights_circ_center(
+fn weights_circ_center_one(
     x: f64,
     y: f64,
     r: f64,
@@ -1172,7 +1172,7 @@ fn weights_circ_center(
 }
 
 #[pyfunction]
-fn weights_circ_ann_center(
+fn weights_circ_ann_center_one(
     x: f64,
     y: f64,
     r_in: f64,
@@ -1200,7 +1200,7 @@ fn weights_circ_ann_center(
 }
 
 #[pyfunction]
-fn weights_ellip_center(
+fn weights_ellip_center_one(
     x: f64,
     y: f64,
     a: f64,
@@ -1239,7 +1239,7 @@ fn weights_ellip_center(
 }
 
 #[pyfunction]
-fn weights_ellip_ann_center(
+fn weights_ellip_ann_center_one(
     x: f64,
     y: f64,
     a_in: f64,
@@ -1296,7 +1296,7 @@ fn weights_ellip_ann_center(
 }
 
 #[pyfunction]
-fn weights_rect_center(
+fn weights_rect_center_one(
     x: f64,
     y: f64,
     w: f64,
@@ -1324,7 +1324,7 @@ fn weights_rect_center(
 }
 
 #[pyfunction]
-fn weights_rect_ann_center(
+fn weights_rect_ann_center_one(
     x: f64,
     y: f64,
     w_in: f64,
@@ -1376,7 +1376,7 @@ fn weights_rect_ann_center(
 
 #[allow(clippy::too_many_arguments)]
 #[pyfunction]
-fn weights_wedge_center(
+fn weights_wedge_center_one(
     x: f64,
     y: f64,
     r_in: f64,
@@ -1421,7 +1421,7 @@ fn weights_wedge_center(
 }
 
 #[pyfunction]
-fn weights_pill_center(
+fn weights_pill_center_one(
     x: f64,
     y: f64,
     w: f64,
@@ -1459,7 +1459,7 @@ fn weights_pill_center(
 }
 
 #[pyfunction]
-fn weights_pill_ann_center(
+fn weights_pill_ann_center_one(
     x: f64,
     y: f64,
     w_in: f64,

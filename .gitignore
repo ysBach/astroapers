@@ -1,12 +1,15 @@
 **/*.DS_Store
 .DS_Store
 .ruff_cache/
+.uv-cache/
 
 
 # Quarto generated/cache output
 docs/quarto/.quarto/
 docs/quarto/_site/
+docs/quarto/**/*.quarto_ipynb
 docs/quarto/_freeze/
+docs/quarto/objects.json
 docs/quarto/**/*.html
 docs/quarto/**/*_files/
 docs/quarto/site_libs/

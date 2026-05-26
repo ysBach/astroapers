@@ -71,30 +71,27 @@ ax.set(title="CircAp.plot()")
 plt.show()
 ```
 
-## Low-Level Kernels for Lowest Overhead
+## Maximum Performance
 
-The object API above is the clearest way to learn the workflow. In production (e.g., when making large-scale pipelines after all algorithms are fixed), use the direct, that is, the lowest-overhead entry point. These are the same Rust-backed functions that `CircAp.apsum_exact()` uses internally for this unmasked case, so the speed difference is mostly Python object construction and result-shaping overhead. That margin is most visible for small aperture counts. When you have large batches of apertures, the difference is smaller and may not be noticeable.
+For fixed production code, import the raw Rust extension as `aapr`. The raw
+functions expect contiguous arrays and positional geometry arguments. They do
+not provide masks, validation, keyword arguments, or Python result shaping. For
+more usage patterns, inspect `astroapers.kernels`, which is the Python layer
+that calls `_rust` internally.
 
 ```{python}
-import astroapers.kernels as aapk
+import astroapers._rust as aapr
 
-kernel_apsum, kernel_npix = aapk.apsum_circ_exact(
-    data,
-    np.array([x0]),
-    np.array([y0]),
-    r=5.0,
-)
-kernel_sum_only = aapk.apsum_circ_exact(
-    data,
-    np.array([x0]),
-    np.array([y0]),
-    r=5.0,
-    return_npix=False,
-)
+raw_data = np.ascontiguousarray(data, dtype=np.float64)
+xpos = np.ascontiguousarray([x0], dtype=np.float64)
+ypos = np.ascontiguousarray([y0], dtype=np.float64)
 
-assert np.allclose(kernel_apsum[0], apsum)
-assert np.allclose(kernel_npix[0], npix)
-assert np.allclose(kernel_sum_only[0], apsum)
+raw_apsum, raw_npix = aapr.apsum_circ_exact(raw_data, xpos, ypos, 5.0)
+raw_sum_only = aapr.apsum_circ_exact_sum(raw_data, xpos, ypos, 5.0)
 
-kernel_apsum[0], kernel_npix[0], kernel_sum_only[0]
+assert np.allclose(raw_apsum[0], apsum)
+assert np.allclose(raw_npix[0], npix)
+assert np.allclose(raw_sum_only[0], apsum)
+
+raw_apsum[0], raw_npix[0], raw_sum_only[0]
 ```

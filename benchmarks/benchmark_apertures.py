@@ -19,12 +19,14 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 import astroapers as apers
+import astroapers._rust as aapr
 import astroapers.kernels as aapk
 import numpy as np
 from numpy.testing import assert_allclose
 
 AAP = "aap"
-AAP_OPT = "aap_opt"
+AAPR = "aapr"
+RUST = "_rust"
 
 REQUIRED_ASTROAPERS_API = (
     "PillAp",
@@ -296,8 +298,10 @@ def mask_benchmarks(
         radius = 5.0
         positions = np.column_stack((case.x, case.y))
         return {
-            AAP_OPT: lambda: apers.CircAp(positions, radius, validate=False).weights(),
-            AAP: lambda: apers.CircAp(positions, radius).weights(),
+            AAPR: lambda: apers.CircAp(
+                positions, radius, validate=False
+            ).weights_exact(),
+            AAP: lambda: apers.CircAp(positions, radius).weights_exact(),
             "photutils.geometry": lambda: circular_grid_mask_npix(
                 case.x, case.y, radius
             ),
@@ -309,10 +313,10 @@ def mask_benchmarks(
         a, b, theta = 7.0, 3.0, 0.4
         positions = np.column_stack((case.x, case.y))
         return {
-            AAP_OPT: lambda: apers.EllipAp(
+            AAPR: lambda: apers.EllipAp(
                 positions, a, b, theta, validate=False
-            ).weights(),
-            AAP: lambda: apers.EllipAp(positions, a, b, theta).weights(),
+            ).weights_exact(),
+            AAP: lambda: apers.EllipAp(positions, a, b, theta).weights_exact(),
             "photutils.geometry": lambda: elliptical_grid_mask_npix(
                 case.x, case.y, a, b, theta
             ),
@@ -326,10 +330,10 @@ def mask_benchmarks(
         w, h, theta = 9.0, 5.0, 0.4
         positions = np.column_stack((case.x, case.y))
         return {
-            AAP_OPT: lambda: apers.RectAp(
+            AAPR: lambda: apers.RectAp(
                 positions, w, h, theta, validate=False
-            ).weights(),
-            AAP: lambda: apers.RectAp(positions, w, h, theta).weights(),
+            ).weights_exact(),
+            AAP: lambda: apers.RectAp(positions, w, h, theta).weights_exact(),
             "photutils.Aperture": lambda: as_mask_list(
                 RectangularAperture(positions, w=w, h=h, theta=theta).to_mask(
                     method="subpixel", subpixels=args.photutils_rectangle_subpixels
@@ -340,19 +344,19 @@ def mask_benchmarks(
         w, a, b, theta = 8.0, 3.0, 2.0, 0.4
         positions = np.column_stack((case.x, case.y))
         return {
-            AAP_OPT: lambda: apers.PillAp(
+            AAPR: lambda: apers.PillAp(
                 positions, w, a, b, theta, validate=False
-            ).weights(),
-            AAP: lambda: apers.PillAp(positions, w, a, b, theta).weights(),
+            ).weights_exact(),
+            AAP: lambda: apers.PillAp(positions, w, a, b, theta).weights_exact(),
         }
     if shape == "circle_annulus":
         r_in, r_out = 2.0, 5.0
         positions = np.column_stack((case.x, case.y))
         return {
-            AAP_OPT: lambda: apers.CircAn(
+            AAPR: lambda: apers.CircAn(
                 positions, r_in, r_out, validate=False
-            ).weights(),
-            AAP: lambda: apers.CircAn(positions, r_in, r_out).weights(),
+            ).weights_exact(),
+            AAP: lambda: apers.CircAn(positions, r_in, r_out).weights_exact(),
             "photutils.geometry": lambda: circular_annulus_grid_mask_npix(
                 case.x, case.y, r_in, r_out
             ),
@@ -368,12 +372,12 @@ def mask_benchmarks(
         a_out, b_out = a * r_out, b * r_out
         positions = np.column_stack((case.x, case.y))
         return {
-            AAP_OPT: lambda: apers.EllipAn(
+            AAPR: lambda: apers.EllipAn(
                 positions, a_in, b_in, a_out, b_out, theta_in=theta, validate=False
-            ).weights(),
+            ).weights_exact(),
             AAP: lambda: apers.EllipAn(
                 positions, a_in, b_in, a_out, b_out, theta_in=theta
-            ).weights(),
+            ).weights_exact(),
             "photutils.geometry": lambda: elliptical_annulus_grid_mask_npix(
                 case.x, case.y, a, b, r_in, r_out, theta
             ),
@@ -392,12 +396,12 @@ def mask_benchmarks(
         w_in, h_in, w_out, h_out, theta = 3.0, 2.0, 9.0, 5.0, 0.4
         positions = np.column_stack((case.x, case.y))
         return {
-            AAP_OPT: lambda: apers.RectAn(
+            AAPR: lambda: apers.RectAn(
                 positions, w_in, h_in, w_out, h_out, theta_in=theta, validate=False
-            ).weights(),
+            ).weights_exact(),
             AAP: lambda: apers.RectAn(
                 positions, w_in, h_in, w_out, h_out, theta_in=theta
-            ).weights(),
+            ).weights_exact(),
             "photutils.Aperture": lambda: as_mask_list(
                 RectangularAnnulus(
                     positions,
@@ -415,7 +419,7 @@ def mask_benchmarks(
         w_in, a_in, b_in, w_out, a_out, b_out, theta = 5.0, 1.5, 1.0, 8.0, 3.0, 2.0, 0.4
         positions = np.column_stack((case.x, case.y))
         return {
-            AAP_OPT: lambda: apers.PillAn(
+            AAPR: lambda: apers.PillAn(
                 positions,
                 w_in,
                 a_in,
@@ -425,12 +429,29 @@ def mask_benchmarks(
                 b_out,
                 theta_in=theta,
                 validate=False,
-            ).weights(),
+            ).weights_exact(),
             AAP: lambda: apers.PillAn(
                 positions, w_in, a_in, b_in, w_out, a_out, b_out, theta_in=theta
-            ).weights(),
+            ).weights_exact(),
         }
     raise ValueError(f"unsupported shape: {shape}")
+
+
+def rust_apsum(name: str, data: np.ndarray, x: np.ndarray, y: np.ndarray, *pars):
+    suffix = {
+        np.dtype(np.float64): "",
+        np.dtype(np.float32): "_f32",
+        np.dtype(np.int32): "_i32",
+        np.dtype(np.int16): "_i16",
+    }.get(np.dtype(data.dtype), "")
+    sum_func = getattr(aapr, f"{name}_sum{suffix}", None)
+    if sum_func is not None:
+        return sum_func(data, x, y, *pars)
+    func = getattr(aapr, f"{name}{suffix}", None)
+    if func is None:
+        func = getattr(aapr, name)
+        data = np.ascontiguousarray(data, dtype=np.float64)
+    return func(data, x, y, *pars)[0]
 
 
 def apsum_benchmarks(
@@ -440,10 +461,18 @@ def apsum_benchmarks(
         radius = 5.0
         positions = np.column_stack((case.x, case.y))
         functions = {
-            AAP_OPT: lambda: aapk.apsum_circ_exact(
-                case.image, case.x, case.y, radius, return_npix=False
+            RUST: lambda: rust_apsum(
+                "apsum_circ_exact", case.image, case.x, case.y, radius
             ),
-            AAP: lambda: apers.CircAp(positions, radius).apsum(
+            AAPR: lambda: aapk.apsum_circ_exact(
+                case.image,
+                case.x,
+                case.y,
+                radius,
+                return_npix=False,
+                validate=False,
+            ),
+            AAP: lambda: apers.CircAp(positions, radius).apsum_exact(
                 case.image, return_npix=False
             ),
             "photutils.geometry": lambda: grid_photometry(
@@ -465,10 +494,20 @@ def apsum_benchmarks(
         a, b, theta = 7.0, 3.0, 0.4
         positions = np.column_stack((case.x, case.y))
         functions = {
-            AAP_OPT: lambda: aapk.apsum_ellip_exact(
-                case.image, case.x, case.y, a, b, theta, return_npix=False
+            RUST: lambda: rust_apsum(
+                "apsum_ellip_exact", case.image, case.x, case.y, a, b, theta
             ),
-            AAP: lambda: apers.EllipAp(positions, a, b, theta).apsum(
+            AAPR: lambda: aapk.apsum_ellip_exact(
+                case.image,
+                case.x,
+                case.y,
+                a,
+                b,
+                theta,
+                return_npix=False,
+                validate=False,
+            ),
+            AAP: lambda: apers.EllipAp(positions, a, b, theta).apsum_exact(
                 case.image, return_npix=False
             ),
             "photutils.geometry": lambda: grid_photometry(
@@ -491,10 +530,20 @@ def apsum_benchmarks(
         w, h, theta = 9.0, 5.0, 0.4
         positions = np.column_stack((case.x, case.y))
         return {
-            AAP_OPT: lambda: aapk.apsum_rect_exact(
-                case.image, case.x, case.y, w, h, theta, return_npix=False
+            RUST: lambda: rust_apsum(
+                "apsum_rect_exact", case.image, case.x, case.y, w, h, theta
             ),
-            AAP: lambda: apers.RectAp(positions, w, h, theta).apsum(
+            AAPR: lambda: aapk.apsum_rect_exact(
+                case.image,
+                case.x,
+                case.y,
+                w,
+                h,
+                theta,
+                return_npix=False,
+                validate=False,
+            ),
+            AAP: lambda: apers.RectAp(positions, w, h, theta).apsum_exact(
                 case.image, return_npix=False
             ),
             "photutils.Aperture": lambda: photutils_photometry(
@@ -508,10 +557,18 @@ def apsum_benchmarks(
         w, a, b, theta = 8.0, 3.0, 2.0, 0.4
         positions = np.column_stack((case.x, case.y))
         return {
-            AAP_OPT: lambda: aapk.apsum_pill_exact(
-                case.image, case.x, case.y, w, a, b, theta, return_npix=False
+            AAPR: lambda: aapk.apsum_pill_exact(
+                case.image,
+                case.x,
+                case.y,
+                w,
+                a,
+                b,
+                theta,
+                return_npix=False,
+                validate=False,
             ),
-            AAP: lambda: apers.PillAp(positions, w, a, b, theta).apsum(
+            AAP: lambda: apers.PillAp(positions, w, a, b, theta).apsum_exact(
                 case.image, return_npix=False
             ),
         }
@@ -519,10 +576,19 @@ def apsum_benchmarks(
         r_in, r_out = 2.0, 5.0
         positions = np.column_stack((case.x, case.y))
         functions = {
-            AAP_OPT: lambda: aapk.apsum_circ_ann_exact(
-                case.image, case.x, case.y, r_in, r_out, return_npix=False
+            RUST: lambda: rust_apsum(
+                "apsum_circ_ann_exact", case.image, case.x, case.y, r_in, r_out
             ),
-            AAP: lambda: apers.CircAn(positions, r_in, r_out).apsum(
+            AAPR: lambda: aapk.apsum_circ_ann_exact(
+                case.image,
+                case.x,
+                case.y,
+                r_in,
+                r_out,
+                return_npix=False,
+                validate=False,
+            ),
+            AAP: lambda: apers.CircAn(positions, r_in, r_out).apsum_exact(
                 case.image, return_npix=False
             ),
             "photutils.geometry": lambda: grid_photometry(
@@ -546,7 +612,7 @@ def apsum_benchmarks(
         a_out, b_out = a * r_out, b * r_out
         positions = np.column_stack((case.x, case.y))
         functions = {
-            AAP_OPT: lambda: aapk.apsum_ellip_ann_exact(
+            AAPR: lambda: aapk.apsum_ellip_ann_exact(
                 case.image,
                 case.x,
                 case.y,
@@ -556,10 +622,11 @@ def apsum_benchmarks(
                 b_out,
                 theta,
                 return_npix=False,
+                validate=False,
             ),
             AAP: lambda: apers.EllipAn(
                 positions, a_in, b_in, a_out, b_out, theta_in=theta
-            ).apsum(case.image, return_npix=False),
+            ).apsum_exact(case.image, return_npix=False),
             "photutils.geometry": lambda: grid_photometry(
                 case.image,
                 case.x,
@@ -589,7 +656,7 @@ def apsum_benchmarks(
         w_in, h_in, w_out, h_out, theta = 3.0, 2.0, 9.0, 5.0, 0.4
         positions = np.column_stack((case.x, case.y))
         return {
-            AAP_OPT: lambda: aapk.apsum_rect_ann_exact(
+            AAPR: lambda: aapk.apsum_rect_ann_exact(
                 case.image,
                 case.x,
                 case.y,
@@ -599,10 +666,11 @@ def apsum_benchmarks(
                 h_out,
                 theta,
                 return_npix=False,
+                validate=False,
             ),
             AAP: lambda: apers.RectAn(
                 positions, w_in, h_in, w_out, h_out, theta_in=theta
-            ).apsum(case.image, return_npix=False),
+            ).apsum_exact(case.image, return_npix=False),
             "photutils.Aperture": lambda: photutils_photometry(
                 RectangularAnnulus(
                     positions,
@@ -621,7 +689,7 @@ def apsum_benchmarks(
         w_in, a_in, b_in, w_out, a_out, b_out, theta = 5.0, 1.5, 1.0, 8.0, 3.0, 2.0, 0.4
         positions = np.column_stack((case.x, case.y))
         return {
-            AAP_OPT: lambda: aapk.apsum_pill_ann_exact(
+            AAPR: lambda: aapk.apsum_pill_ann_exact(
                 case.image,
                 case.x,
                 case.y,
@@ -633,10 +701,11 @@ def apsum_benchmarks(
                 b_out,
                 theta,
                 return_npix=False,
+                validate=False,
             ),
             AAP: lambda: apers.PillAn(
                 positions, w_in, a_in, b_in, w_out, a_out, b_out, theta_in=theta
-            ).apsum(case.image, return_npix=False),
+            ).apsum_exact(case.image, return_npix=False),
         }
     raise ValueError(f"unsupported shape: {shape}")
 
@@ -865,7 +934,7 @@ def validate_results(
     functions: dict[str, Callable[[], np.ndarray]],
     args: argparse.Namespace,
 ) -> None:
-    reference_name = AAP_OPT
+    reference_name = AAPR
     reference = np.asarray(functions[reference_name](), dtype=np.float64)
     for name, function in functions.items():
         if name == reference_name:
@@ -891,7 +960,7 @@ def validate_mask_results(
     functions: dict[str, Callable[[], object]],
     args: argparse.Namespace,
 ) -> None:
-    reference_name = AAP_OPT
+    reference_name = AAPR
     reference_masks = functions[reference_name]()
     reference = mask_npix(reference_masks)
     for name, function in functions.items():
@@ -974,10 +1043,10 @@ def time_benchmark_groups(
             )
             for name, seconds in raw.items()
         )
-        aap_opt_time = raw.get(AAP_OPT)
-        if aap_opt_time is not None:
+        aapr_time = raw.get(AAPR)
+        if aapr_time is not None:
             for name, seconds in raw.items():
-                if name == AAP_OPT:
+                if name == AAPR:
                     continue
                 timings.append(
                     Timing(
@@ -985,10 +1054,10 @@ def time_benchmark_groups(
                         shape=group.shape,
                         dtype=group.dtype,
                         n_apertures=group.n_apertures,
-                        library=AAP_OPT,
-                        seconds=aap_opt_time,
+                        library=AAPR,
+                        seconds=aapr_time,
                         speedup_vs_library=name,
-                        speedup=seconds / aap_opt_time,
+                        speedup=seconds / aapr_time,
                     )
                 )
     return timings
@@ -1068,7 +1137,7 @@ def repeat_count_for_backend(
 
 
 def adaptive_repeats(library: str, n_apertures: int, repeats: int) -> int:
-    if repeats <= 1 or library in {AAP, AAP_OPT}:
+    if repeats <= 1 or library in {AAP, AAPR}:
         return repeats
     if library.startswith("photutils"):
         if n_apertures >= 10_000:
@@ -1132,15 +1201,17 @@ def print_notes(args: argparse.Namespace) -> None:
         f"subpixels={args.photutils_rectangle_subpixels}; Photutils maps "
         "method='exact' to subpixels=32 for rectangles"
     )
+    print("# _rust: raw extension calls where fused Rust aperture-sum kernels exist")
     print(
-        "# aap_opt: astroapers speed path; direct kernels where available and "
-        "validate=False object paths otherwise"
+        "# aapr: public astroapers speed path; direct kernels where available "
+        "and validate=False object paths otherwise. This includes Python API "
+        "normalization and result shaping, so it is not identical to _rust."
     )
     print(
         "# aap: normal object API; supported unmasked apsum rows delegate to "
         "the same kernels, so ratios near 1 are ties"
     )
-    print("# ratios are backend_time / aap_opt_time")
+    print("# ratios are backend_time / aapr_time")
 
 
 def print_timings_csv(timings: list[Timing], args: argparse.Namespace) -> None:
@@ -1159,13 +1230,14 @@ def print_timings_table(timings: list[Timing], args: argparse.Namespace) -> None
     raw = [timing for timing in timings if timing.speedup_vs_library is None]
     print(
         f"{'dtype':<7} {'task':<6} {'shape':<{SHAPE_COLUMN_WIDTH}} {'n':>7} "
-        f"{'aap_opt_us':>14} {'aap_us':>9} {'aap/aap_opt':>11} "
-        f"{'photu_opt/aap_opt':>17} "
-        f"{'photu_Ap./aap_opt':>23} {'sep/aap_opt':>11}"
+        f"{'rust_us':>9} {'aapr_us':>14} {'aapr/rust':>13} "
+        f"{'aap_us':>9} {'aap/aapr':>11} "
+        f"{'photu_opt/aapr':>17} "
+        f"{'photu_Ap./aapr':>23} {'sep/aapr':>11}"
     )
     print(
         f"{'-' * 7} {'-' * 6} {'-' * SHAPE_COLUMN_WIDTH} {'-' * 7} "
-        f"{'-' * 14} {'-' * 9} {'-' * 11} "
+        f"{'-' * 9} {'-' * 14} {'-' * 13} {'-' * 9} {'-' * 11} "
         f"{'-' * 17} {'-' * 23} {'-' * 11}"
     )
     keys = sorted(
@@ -1182,22 +1254,26 @@ def print_timings_table(timings: list[Timing], args: argparse.Namespace) -> None
             == (dtype, task, shape, n_apertures)
         ]
         seconds_by_library = {timing.library: timing.seconds for timing in group}
-        aap_opt_seconds = seconds_by_library.get(AAP_OPT)
-        aap_ratio = format_ratio(seconds_by_library.get(AAP), aap_opt_seconds)
+        aapr_seconds = seconds_by_library.get(AAPR)
+        rust_seconds = seconds_by_library.get(RUST)
+        aapr_rust_ratio = format_ratio(aapr_seconds, rust_seconds)
+        aap_ratio = format_ratio(seconds_by_library.get(AAP), aapr_seconds)
         photu_opt_ratio = format_ratio(
-            seconds_by_library.get("photutils.geometry"), aap_opt_seconds
+            seconds_by_library.get("photutils.geometry"), aapr_seconds
         )
         photu_ap_ratio = format_ratio(
-            seconds_by_library.get("photutils.Aperture"), aap_opt_seconds
+            seconds_by_library.get("photutils.Aperture"), aapr_seconds
         )
         print(
             f"{dtype:<7} {task:<6} {shape:<{SHAPE_COLUMN_WIDTH}} {n_apertures:7d} "
-            f"{format_us(aap_opt_seconds):>14} "
+            f"{format_us(rust_seconds):>9} "
+            f"{format_us(aapr_seconds):>14} "
+            f"{aapr_rust_ratio:>13} "
             f"{format_us(seconds_by_library.get(AAP)):>9} "
             f"{aap_ratio:>11} "
             f"{photu_opt_ratio:>17} "
             f"{photu_ap_ratio:>23} "
-            f"{format_ratio(seconds_by_library.get('sep'), aap_opt_seconds):>11}"
+            f"{format_ratio(seconds_by_library.get('sep'), aapr_seconds):>11}"
         )
     print_notes(args)
 
@@ -1212,10 +1288,10 @@ def print_fastest_backends_csv(timings: list[Timing]) -> None:
     )
     print()
     print("# fastest backend summary")
-    print("# fastest_speedup_vs_aap_opt > 1 means another backend was faster")
+    print("# fastest_speedup_vs_aapr > 1 means another backend was faster")
     print(
         "task,shape,dtype,n_apertures,fastest_library,fastest_seconds,"
-        "aap_opt_seconds,fastest_speedup_vs_aap_opt"
+        "aapr_seconds,fastest_speedup_vs_aapr"
     )
     for task, shape, dtype, n_apertures in keys:
         group = [
@@ -1225,11 +1301,11 @@ def print_fastest_backends_csv(timings: list[Timing]) -> None:
             == (task, shape, dtype, n_apertures)
         ]
         fastest = min(group, key=lambda timing: timing.seconds)
-        aap_opt = next(timing for timing in group if timing.library == AAP_OPT)
-        speedup = aap_opt.seconds / fastest.seconds
+        aapr_timing = next(timing for timing in group if timing.library == AAPR)
+        speedup = aapr_timing.seconds / fastest.seconds
         print(
             f"{task},{shape},{dtype},{n_apertures},{fastest.library},"
-            f"{fastest.seconds:.9f},{aap_opt.seconds:.9f},{speedup:.3f}"
+            f"{fastest.seconds:.9f},{aapr_timing.seconds:.9f},{speedup:.3f}"
         )
 
 

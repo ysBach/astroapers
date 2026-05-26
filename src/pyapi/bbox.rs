@@ -4,17 +4,17 @@ use super::*;
 use crate::geometry::{wedge_bbox, Wedge};
 
 pub(super) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(bboxes_circ_many, m)?)?;
-    m.add_function(wrap_pyfunction!(bboxes_ellip_many, m)?)?;
-    m.add_function(wrap_pyfunction!(bboxes_rect_many, m)?)?;
-    m.add_function(wrap_pyfunction!(bboxes_wedge_many, m)?)?;
-    m.add_function(wrap_pyfunction!(bboxes_pill_many, m)?)?;
-    m.add_function(wrap_pyfunction!(bboxes_pill_ann_many, m)?)?;
+    m.add_function(wrap_pyfunction!(bboxes_circ, m)?)?;
+    m.add_function(wrap_pyfunction!(bboxes_ellip, m)?)?;
+    m.add_function(wrap_pyfunction!(bboxes_rect, m)?)?;
+    m.add_function(wrap_pyfunction!(bboxes_wedge, m)?)?;
+    m.add_function(wrap_pyfunction!(bboxes_pill, m)?)?;
+    m.add_function(wrap_pyfunction!(bboxes_pill_ann, m)?)?;
     Ok(())
 }
 
 #[pyfunction]
-fn bboxes_circ_many(
+fn bboxes_circ(
     xs: PyReadonlyArray1<'_, f64>,
     ys: PyReadonlyArray1<'_, f64>,
     r: f64,
@@ -45,7 +45,7 @@ fn bboxes_circ_many(
 }
 
 #[pyfunction]
-fn bboxes_ellip_many(
+fn bboxes_ellip(
     xs: PyReadonlyArray1<'_, f64>,
     ys: PyReadonlyArray1<'_, f64>,
     a: f64,
@@ -87,7 +87,7 @@ fn bboxes_ellip_many(
 }
 
 #[pyfunction]
-fn bboxes_rect_many(
+fn bboxes_rect(
     xs: PyReadonlyArray1<'_, f64>,
     ys: PyReadonlyArray1<'_, f64>,
     w: f64,
@@ -127,7 +127,7 @@ fn bboxes_rect_many(
 
 #[allow(clippy::too_many_arguments)]
 #[pyfunction]
-fn bboxes_wedge_many(
+fn bboxes_wedge(
     xs: PyReadonlyArray1<'_, f64>,
     ys: PyReadonlyArray1<'_, f64>,
     r_in: f64,
@@ -182,7 +182,7 @@ fn bboxes_wedge_many(
 }
 
 #[pyfunction]
-fn bboxes_pill_many(
+fn bboxes_pill(
     xs: PyReadonlyArray1<'_, f64>,
     ys: PyReadonlyArray1<'_, f64>,
     w: f64,
@@ -219,7 +219,7 @@ fn bboxes_pill_many(
 
 #[allow(clippy::too_many_arguments)]
 #[pyfunction]
-fn bboxes_pill_ann_many(
+fn bboxes_pill_ann(
     xs: PyReadonlyArray1<'_, f64>,
     ys: PyReadonlyArray1<'_, f64>,
     w_in: f64,

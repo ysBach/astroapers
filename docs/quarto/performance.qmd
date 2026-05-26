@@ -1,0 +1,190 @@
+---
+title: "Performance"
+---
+
+The fastest user-facing interface is `astroapers._rust`, conventionally imported
+as `aapr`. It skips the Python wrapper layer: no scalar/list normalization, no
+dtype conversion, no bad-pixel masks, no `BoundingBox` objects, and no result
+shaping. Use it when your pipeline already has contiguous arrays and fixed
+geometry.
+
+For more examples of raw `_rust` usage, inspect `astroapers.kernels`; it is the
+Python layer that calls `_rust` internally.
+
+For representative local timing runs and benchmark-label definitions, see
+[Benchmarks](benchmarks.qmd).
+
+```{python}
+import numpy as np
+import pandas as pd
+import astroapers as aap
+import astroapers._rust as aapr
+```
+
+## Build one image and many positions
+
+```{python}
+ny, nx = 80, 96
+y, x = np.mgrid[:ny, :nx]
+data = 10.0 + 0.03 * x + 0.02 * y
+
+positions = np.array(
+    [
+        [16.2, 18.5],
+        [40.0, 22.0],
+        [72.5, 44.2],
+        [88.0, 76.0],
+    ],
+    dtype=np.float64,
+)
+
+for x0, y0 in positions:
+    data += 100.0 * np.exp(-0.5 * ((x - x0) ** 2 + (y - y0) ** 2) / 2.2**2)
+
+data = np.ascontiguousarray(data, dtype=np.float64)
+xpos = np.ascontiguousarray(positions[:, 0], dtype=np.float64)
+ypos = np.ascontiguousarray(positions[:, 1], dtype=np.float64)
+```
+
+## Object API for readable work
+
+This is how general `aap` users should write the measurement:
+
+```{python}
+ap = aap.CircAp(positions, r=4.0)
+obj_apsum, obj_npix = ap.apsum_exact(data)
+obj_coverage = obj_npix / ap.area
+
+pd.DataFrame({
+    "x": positions[:, 0],
+    "y": positions[:, 1],
+    "apsum": obj_apsum,
+    "npix": obj_npix,
+    "coverage": obj_coverage,
+})
+```
+
+## Raw Rust API for maximum throughput
+
+Raw Rust functions use positional arguments and raw return values. For circular
+exact sums, the sum-only function is the lowest-overhead call:
+
+```{python}
+raw_sum_only = aapr.apsum_circ_exact_sum(data, xpos, ypos, 4.0)
+
+assert np.allclose(raw_sum_only, obj_apsum)
+raw_sum_only
+```
+
+Use the non-`_sum` form when effective pixel counts are also needed:
+
+```{python}
+raw_apsum, raw_npix = aapr.apsum_circ_exact(data, xpos, ypos, 4.0)
+
+assert np.allclose(raw_apsum, obj_apsum)
+assert np.allclose(raw_npix, obj_npix)
+
+pd.DataFrame({
+    "x": xpos,
+    "y": ypos,
+    "apsum": raw_apsum,
+    "npix": raw_npix,
+})
+```
+
+Standalone raw `npix_*` functions are available for simple built-in shapes:
+
+```{python}
+raw_npix_only = aapr.npix_circ_exact(xpos, ypos, 4.0, *data.shape)
+raw_center_npix = aapr.npix_circ_center(xpos, ypos, 4.0, *data.shape)
+
+pd.DataFrame({
+    "x": xpos,
+    "y": ypos,
+    "exact_npix": raw_npix_only,
+    "center_npix": raw_center_npix,
+})
+```
+
+## Masks
+
+Raw fused Rust aperture-sum functions do not accept bad-pixel masks. Use the
+object API when a full-image boolean mask is part of the measurement.
+
+```{python}
+bad = np.zeros_like(data, dtype=bool)
+bad[20:24, 18:22] = True
+
+masked_apsum, masked_npix = aap.apsum_circ_exact(data, xpos, ypos, r=4.0, mask=bad)
+
+assert np.all(masked_npix <= raw_npix)
+pd.DataFrame({
+    "x": xpos,
+    "y": ypos,
+    "raw_unmasked": raw_apsum,
+    "masked_apsum": masked_apsum,
+    "raw_npix": raw_npix,
+    "masked_npix": masked_npix,
+})
+```
+
+## Dtypes
+
+Raw functions require the dtype named by the function. `float64` functions have
+no suffix. Other supported image dtypes use suffixes such as `_f32`, `_i32`, and
+`_i16`.
+
+```{python}
+data_i16 = np.ascontiguousarray(data.astype(np.int16))
+i16_apsum, i16_npix = aapr.apsum_circ_exact_i16(data_i16, xpos, ypos, 4.0)
+
+type(i16_apsum), type(i16_npix), i16_apsum[:2]
+```
+
+Coordinate arrays are still `float64`. If positions are not finite, raw Rust
+returns non-finite results according to the raw kernel behavior; the Python
+wrappers provide friendlier validation and shape handling.
+
+## Raw weights and bounding boxes
+
+For shapes without a fused raw `apsum_*` function, the raw performance entry
+point is usually `weights_*` or `bboxes_*`. These return raw tuples, not
+`BoundingBox` objects.
+
+```{python}
+weights, ixmins, ixmaxs, iymins, iymaxs = aapr.weights_rect_exact(
+    xpos,
+    ypos,
+    9.0,
+    5.0,
+    0.4,
+)
+
+first_shape = (iymaxs[0] - iymins[0], ixmaxs[0] - ixmins[0])
+first_weights = np.asarray(weights[0], dtype=np.float64).reshape(first_shape)
+first_shape, first_weights.sum()
+```
+
+If you want Python `BoundingBox` helpers, construct them explicitly or use the
+object/convenience layer.
+
+## Parallel threshold
+
+For large coordinate batches, Rust kernels can split work across CPU threads.
+The default threshold is conservative. Benchmark the current machine when
+performance matters:
+
+```{python}
+# result = aap.calibrate_parallel_threshold()
+# aap.set_parallel_threshold(result.threshold)
+```
+
+From a shell, the CLI prints copyable commands:
+
+```bash
+astroapers calibrate-threshold
+export ASTROAPERS_PARALLEL_THRESHOLD=<recommended_threshold>
+```
+
+Set the environment variable before starting Python, or call
+`aap.set_parallel_threshold(...)` inside an already-running process.

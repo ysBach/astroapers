@@ -122,6 +122,17 @@ def test_annulus_theta_keyword_is_not_supported():
     )
 
 
+def test_rectangular_annulus_allows_equal_width_when_height_grows():
+    data = np.ones((32, 32), dtype=np.float64)
+    annulus = apers.RectAn((16.0, 16.0), 1.0, 5.0, 1.0, 20.0, theta_in=0.1)
+
+    apsum, npix = annulus.apsum_exact(data)
+
+    assert_allclose(annulus.area, 15.0)
+    assert_allclose(apsum, npix)
+    assert_allclose(npix, annulus.area, atol=1e-12)
+
+
 def test_object_api_excludes_true_mask_pixels_from_apsum_and_npix():
     data = np.ones((9, 9), dtype=np.float64)
     aperture = apers.CircAp((4.0, 4.0), r=2.0)
@@ -162,6 +173,55 @@ def test_sampled_values_applies_bad_pixel_mask():
     expected = bbox.weighted_values(weights, data, mask=bad)
 
     assert_allclose(values[0], expected)
+
+
+def test_sampled_values_return_dist_matches_center_selected_value_order():
+    data = np.arange(25, dtype=np.float64).reshape(5, 5)
+    aperture = apers.CircAp((2.0, 2.0), r=1.1)
+
+    values, distances = aperture.sampled_values(data, return_dist=True)
+    weights = aperture.weights_center()[0]
+    bbox = aperture.bboxes()[0]
+    selected = bbox.to_image(weights, data.shape).astype(bool)
+    yy, xx = np.nonzero(selected)
+    expected_distances = np.hypot(xx - 2.0, yy - 2.0)
+
+    assert isinstance(values, list)
+    assert isinstance(distances, list)
+    assert len(values) == len(distances) == 1
+    assert_allclose(values[0], data[selected].ravel())
+    assert_allclose(distances[0], expected_distances)
+
+
+def test_sampled_values_return_dist_applies_bad_pixel_mask_to_distances():
+    data = np.arange(25, dtype=np.float64).reshape(5, 5)
+    aperture = apers.CircAp((2.0, 2.0), r=1.1)
+    bad = np.zeros_like(data, dtype=bool)
+    bad[2, 2] = True
+
+    values, distances = aperture.sampled_values(data, mask=bad, return_dist=True)
+
+    assert 0.0 not in distances[0]
+    assert values[0].size == distances[0].size
+
+
+def test_sampled_values_return_dist_flat_reconstructs_values_and_distances():
+    data = np.arange(100, dtype=np.float64).reshape(10, 10)
+    aperture = apers.RectAp([(2.0, 2.0), (7.0, 7.0)], w=3.0, h=3.0)
+
+    values, distances = aperture.sampled_values(data, return_dist=True)
+    flat_values, flat_distances, offsets = aperture.sampled_values(
+        data, flat=True, return_dist=True
+    )
+    split_values = np.split(flat_values, offsets[1:-1])
+    split_distances = np.split(flat_distances, offsets[1:-1])
+
+    assert flat_values.shape == flat_distances.shape
+    assert offsets[-1] == flat_values.size
+    for got_values, want_values in zip(split_values, values, strict=True):
+        assert_allclose(got_values, want_values)
+    for got_distances, want_distances in zip(split_distances, distances, strict=True):
+        assert_allclose(got_distances, want_distances)
 
 
 def test_weighted_values_returns_positive_weighted_data():
@@ -456,6 +516,8 @@ def test_pill_annulus_on_uniform_data_tracks_area_and_center_mask():
 
 
 def test_public_top_level_exports_prefer_short_names():
+    import astroapers._rust as aapr
+
     assert not hasattr(apers, "CircularAperture")
     assert not hasattr(apers, "CircularAnnulus")
     assert not hasattr(apers, "ApertureMask")
@@ -469,7 +531,9 @@ def test_public_top_level_exports_prefer_short_names():
     assert "npix_circ_ann_exact" in apers.__all__
     assert "npix_rect_ann_center" in apers.__all__
     assert "npix_circ_ann_center" in apers.__all__
+    assert "_rust" in apers.__all__
     assert "kernels" in apers.__all__
+    assert aapr.apsum_circ_exact_sum is apers._rust.apsum_circ_exact_sum
     assert apers.kernels.apsum_circ_exact is apers.apsum_circ_exact
     removed_names = {
         "apmask_apsum",
@@ -759,7 +823,7 @@ def test_center_object_apsum_uses_kernel_path_without_weights(monkeypatch):
     def fail_weights(*args, **kwargs):
         raise AssertionError("optimized object apsum should not build weight arrays")
 
-    monkeypatch.setattr(aperture, "_weights_with_method", fail_weights)
+    monkeypatch.setattr(aperture, "_weights_center", fail_weights)
 
     got_apsum, got_npix = aperture.apsum_center(data)
     expected_apsum, expected_npix = apers.apsum_circ_center(
@@ -778,7 +842,7 @@ def test_masked_object_npix_uses_weight_sum_without_apsum(monkeypatch):
     def fail_apsum(*args, **kwargs):
         raise AssertionError("masked npix should not allocate image data or call apsum")
 
-    monkeypatch.setattr(aperture, "_apsum_with_method", fail_apsum)
+    monkeypatch.setattr(aperture, "_apsum_center", fail_apsum)
 
     got = aperture.npix_center(bad.shape, mask=bad)
     expected = np.array(

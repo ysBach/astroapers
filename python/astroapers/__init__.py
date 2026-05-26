@@ -1,12 +1,13 @@
 """Fast exact aperture summation for Python.
 
-``astroapers`` exposes aperture classes for readable Python workflows
-and Rust-backed functions for high-throughput catalog aperture sums.
+``astroapers`` exposes aperture classes for readable Python workflows and
+``astroapers._rust`` for expert users who need the raw extension functions.
+Use ``import astroapers._rust as aapr`` for raw calls.
 """
 
 from __future__ import annotations
 
-from . import kernels
+from . import _rust as aapr, kernels
 from ._apertures import (
     CircAn,
     CircAp,
@@ -26,6 +27,8 @@ from .kernels import (
     apsum_ellip_ann_exact,
     apsum_ellip_center,
     apsum_ellip_exact,
+    apsum_path_center,
+    apsum_path_exact,
     apsum_pill_ann_center,
     apsum_pill_ann_exact,
     apsum_pill_center,
@@ -34,8 +37,6 @@ from .kernels import (
     apsum_rect_ann_exact,
     apsum_rect_center,
     apsum_rect_exact,
-    apsum_path_center,
-    apsum_path_exact,
     apsum_wedge_center,
     apsum_wedge_exact,
     bboxes_path,
@@ -71,6 +72,7 @@ __all__ = [
     "CircAp",
     "EllipAn",
     "EllipAp",
+    "_rust",
     "kernels",
     "PillAn",
     "PillAp",
@@ -123,3 +125,6 @@ __all__ = [
     "npix_wedge_exact",
     "set_parallel_threshold",
 ]
+
+_rust = aapr
+del aapr

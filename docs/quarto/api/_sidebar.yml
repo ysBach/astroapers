@@ -18,6 +18,9 @@ website:
       - api/BoundingBox.qmd
       section: Bounding boxes
     - contents:
+      - api/raw-rust.qmd
+      section: Raw Rust extension
+    - contents:
       - api/apsum_circ_exact.qmd
       - api/apsum_circ_center.qmd
       - api/apsum_circ_ann_exact.qmd
@@ -57,7 +60,7 @@ website:
       - api/npix_wedge_exact.qmd
       - api/npix_wedge_center.qmd
       - api/bboxes_path.qmd
-      section: Direct Rust-backed kernels
+      section: Python convenience functions
     - contents:
       - api/ParallelThresholdCalibration.qmd
       - api/calibrate_parallel_threshold.qmd
