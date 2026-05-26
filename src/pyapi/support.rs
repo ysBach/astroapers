@@ -344,7 +344,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn centered_circ_area_tracks_analytic() {
+    fn center_weight_circ_area_tracks_analytic() {
         let ell = Ellip {
             x0: 8.0,
             y0: 8.0,

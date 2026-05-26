@@ -60,7 +60,7 @@ def test_center_apsum_functions_match_center_masks():
         expected_apsum = []
         expected_npix = []
         for weight, bbox in zip(
-            aperture.weights(method="center"), aperture.bboxes(), strict=True
+            aperture.weights_center(), aperture.bboxes(), strict=True
         ):
             expected_apsum.append(bbox.apsum(weight, data)[0])
             expected_npix.append(weight.sum())
@@ -77,19 +77,17 @@ def test_circular_annulus_npix_functions_match_apsum_and_masks():
     r_in = 1.3
     r_out = 4.2
 
-    exact_apsum, exact_npix = apers.apsum_circ_ann_exact(data, x, y, r_in, r_out)
+    apsum_exact, npix_exact = apers.apsum_circ_ann_exact(data, x, y, r_in, r_out)
     assert_allclose(
         apers.npix_circ_ann_exact(x, y, r_in, r_out, shape=data.shape),
-        exact_npix,
+        npix_exact,
     )
-    assert_allclose(exact_apsum, exact_npix)
+    assert_allclose(apsum_exact, npix_exact)
 
     annulus = apers.CircAn(np.column_stack([x, y]), r_in, r_out)
     expected_center = [
         bbox.npix(weight, data.shape)
-        for weight, bbox in zip(
-            annulus.weights(method="center"), annulus.bboxes(), strict=True
-        )
+        for weight, bbox in zip(annulus.weights_center(), annulus.bboxes(), strict=True)
     ]
     assert_allclose(
         apers.npix_circ_ann_center(x, y, r_in, r_out, shape=data.shape),
@@ -116,7 +114,7 @@ def test_circular_annulus_npix_accepts_zero_inner_radius():
 @pytest.mark.parametrize(
     "dtype", [np.float64, np.float32, np.int32, np.int16, np.uint16]
 )
-def test_direct_exact_apsum_accepts_mask(dtype):
+def test_direct_apsum_exact_accepts_mask(dtype):
     data = (np.arange(18 * 20).reshape(18, 20) % 200).astype(dtype)
     positions = np.array([[5.2, 6.1], [13.5, 9.8], [-2.0, 4.0]], dtype=np.float64)
     x = positions[:, 0]
@@ -145,7 +143,7 @@ def test_direct_exact_apsum_accepts_mask(dtype):
     ]
 
     for aperture, func, params in cases:
-        expected_apsum, expected_npix = aperture.apsum(data, mask=bad)
+        expected_apsum, expected_npix = aperture.apsum_exact(data, mask=bad)
         apsum, npix = func(data, x, y, *params, mask=bad)
 
         assert_allclose(apsum, expected_apsum)
@@ -153,7 +151,7 @@ def test_direct_exact_apsum_accepts_mask(dtype):
         assert_allclose(func(data, x, y, *params, mask=bad, return_npix=False), apsum)
 
 
-def test_direct_masked_exact_apsum_accumulates_float32_data_in_float64():
+def test_direct_masked_apsum_exact_accumulates_float32_data_in_float64():
     data = np.array([[1.0e8, 1.0, -1.0e8]], dtype=np.float32)
     x = np.array([1.0])
     y = np.array([0.0])
@@ -203,7 +201,7 @@ def test_direct_center_apsum_accepts_mask():
         expected = [
             bbox.apsum(weight, data, mask=bad)
             for weight, bbox in zip(
-                aperture.weights(method="center"), aperture.bboxes(), strict=True
+                aperture.weights_center(), aperture.bboxes(), strict=True
             )
         ]
         expected_apsum = np.array([item[0] for item in expected])
@@ -281,7 +279,8 @@ def test_circle_apsum_matches_sep_exact():
     assert np.all(sep_flag == 0)
     assert_allclose(apsum, sep_apsum, rtol=SEP_PARITY_RTOL, atol=1e-6)
     expected_npix = [
-        apers.CircAp((xi, yi), r=r).apsum(np.ones_like(data))[1] for xi, yi in zip(x, y)
+        apers.CircAp((xi, yi), r=r).apsum_exact(np.ones_like(data))[1]
+        for xi, yi in zip(x, y)
     ]
     assert_allclose(npix, expected_npix)
 
@@ -340,7 +339,7 @@ def test_circular_annulus_sum_matches_sep_exact():
 
     apsum = np.array(
         [
-            apers.CircAn((xi, yi), r_in=r_in, r_out=r_out).apsum(data)[0]
+            apers.CircAn((xi, yi), r_in=r_in, r_out=r_out).apsum_exact(data)[0]
             for xi, yi in zip(x, y)
         ]
     )
@@ -370,7 +369,7 @@ def test_elliptical_annulus_sum_matches_sep_exact():
                 a_out=a * r_out,
                 b_out=b * r_out,
                 theta_in=theta,
-            ).apsum(data)[0]
+            ).apsum_exact(data)[0]
             for xi, yi in zip(x, y)
         ]
     )
@@ -395,7 +394,7 @@ def test_apsum_outputs_are_float64_for_builtin_kernels():
         data = np.arange(16, dtype=dtype).reshape(4, 4)
 
         direct_apsum, direct_npix = apers.apsum_circ_exact(data, [1.5], [1.5], 1.2)
-        object_apsum, object_npix = apers.CircAp((1.5, 1.5), 1.2).apsum(data)
+        object_apsum, object_npix = apers.CircAp((1.5, 1.5), 1.2).apsum_exact(data)
 
         assert direct_apsum.dtype == np.float64
         assert direct_npix.dtype == np.float64
@@ -460,7 +459,7 @@ def test_object_core_apsum_matches_low_level_exact_kernels():
     ]
 
     for aperture, expected in cases:
-        apsum, npix = aperture.apsum(data)
+        apsum, npix = aperture.apsum_exact(data)
         expected_apsum, expected_npix = expected
         assert_allclose(apsum, expected_apsum)
         assert_allclose(npix, expected_npix)
@@ -496,7 +495,7 @@ def test_object_annulus_apsum_subtracts_low_level_exact_kernels():
         (ellip, ellip_outer, ellip_inner),
         (rect, rect_outer, rect_inner),
     ]:
-        apsum, npix = annulus.apsum(data)
+        apsum, npix = annulus.apsum_exact(data)
         assert_allclose(apsum, outer[0] - inner[0])
         assert_allclose(npix, outer[1] - inner[1])
 

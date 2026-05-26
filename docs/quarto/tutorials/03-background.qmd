@@ -32,8 +32,8 @@ pixels for robust background samples.
 ap = aap.CircAp((x0, y0), r=5.0)
 an = aap.CircAn((x0, y0), r_in=9.0, r_out=15.0)
 
-apsum, src_npix = ap.apsum(data)
-sky_values = an.weighted_values(data, method="center")
+apsum, src_npix = ap.apsum_exact(data)
+sky_values = an.sampled_values(data)[0]
 # you can do complicated math to get best sky value.
 # Here I just use median:
 sky_median = np.median(sky_values)
@@ -68,19 +68,16 @@ plt.show()
 ## A masked-pixel example
 
 Bad-pixel masks are full image-shaped boolean arrays where `True` means
-excluded. For the sky sample, use the annulus' bbox-tight center weights with
-the matching `BoundingBox` so the same bad-pixel mask can be applied before
+excluded. For the sky sample, pass the same mask to `sampled_values()` before
 taking the median.
 
 ```{python}
 bad_pixels = np.zeros(data.shape, dtype=bool)
 bad_pixels[40:45, 45:52] = True
 
-sky_weights = an.weights(method="center")[0]
-sky_bbox = an.bboxes()[0]
-sky_values_masked = sky_bbox.weighted_values(sky_weights, data, mask=bad_pixels)
+sky_values_masked = an.sampled_values(data, mask=bad_pixels)[0]
 sky_median_masked = np.median(sky_values_masked)
-apsum_masked, src_npix_masked = ap.apsum(data, mask=bad_pixels)
+apsum_masked, src_npix_masked = ap.apsum_exact(data, mask=bad_pixels)
 srcsum_masked = apsum_masked - src_npix_masked * sky_median_masked
 
 print(f"Unmasked sky pixels: {sky_values.size}")

@@ -34,7 +34,7 @@ for x0, y0 in positions:
 ap = aap.CircAp(positions, r=5.0)
 
 # all at once:
-apsum, npix = ap.apsum(data)
+apsum, npix = ap.apsum_exact(data)
 coverage = npix / ap.area
 
 assert coverage[-1] < 1.0
@@ -71,7 +71,7 @@ radii = np.arange(1.0, 10.0, 1.0)
 cumulative = []
 for radius in radii:
     ap_r = aap.CircAp(profile_positions, r=radius)
-    ap_r_sum, ap_r_npix = ap_r.apsum(data)
+    ap_r_sum, ap_r_npix = ap_r.apsum_exact(data)
     cumulative.append((ap_r_sum, ap_r_npix))
 
 cumulative_apsum = np.vstack([row[0] for row in cumulative])
@@ -111,7 +111,7 @@ radius_mid = 0.5 * (radius_edges[:-1] + radius_edges[1:])
 custom_rows = []
 for r_in, r_out, r_mid in zip(radius_edges[:-1], radius_edges[1:], radius_mid):
     an = aap.CircAn(profile_positions, r_in=r_in, r_out=r_out)
-    an_vals = an.weighted_values(data, method="center")
+    an_vals = an.sampled_values(data)
 
     # For the case of "center", npix is just the number of pixels used here.
     # For complicated calculations, user may store npix before/after sigclip
@@ -132,6 +132,21 @@ for r_in, r_out, r_mid in zip(radius_edges[:-1], radius_edges[1:], radius_mid):
 
 custom_profile = pd.DataFrame(custom_rows).set_index(["radius", "source"])
 custom_profile
+```
+
+For high-throughput grouped statistics, `flat=True` returns the same ragged
+samples as one concatenated array plus integer offsets. Aperture `i` is
+`flat_values[offsets[i]:offsets[i + 1]]`, and `np.split()` reconstructs the
+default list result.
+
+```{python}
+flat_values, offsets = an.sampled_values(data, flat=True)
+assert all(
+    np.array_equal(got, want)
+    for got, want in zip(np.split(flat_values, offsets[1:-1]), an_vals)
+)
+
+flat_values.shape, offsets.shape
 ```
 
 ```{python}
@@ -165,12 +180,12 @@ plt.show()
 
 ## Weights and boxes return lists
 
-`weights()` and `bboxes()` each return one item per vector position, even when
+`weights_exact()` and `bboxes()` each return one item per vector position, even when
 the aperture is scalar. Match them by index when clipping or reusing bbox-tight
 weights.
 
 ```{python}
-weights = ap.weights(method="center")
+weights = ap.weights_center()
 boxes = ap.bboxes()
 assert len(weights) == len(positions)
 [weight.sum() for weight in weights]
@@ -188,7 +203,7 @@ full_masks = [
 
 Vector positions are where the direct kernels are most useful. Pass coordinate
 arrays directly when you already have catalog columns. For supported unmasked
-`apsum()` calls, vector aperture objects use the same Rust kernels, so the
+`apsum_exact()` calls, vector aperture objects use the same Rust kernels, so the
 direct call mainly avoids object construction, validation, and result-shaping
 overhead. That overhead matters most for small batches; at large `n`, the
 kernel work dominates and timings can be close.

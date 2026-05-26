@@ -117,20 +117,20 @@ class TestTriangleExactArea:
         img = np.ones((15, 15), dtype=np.float64)
         center = (0.0, 0.0)
         ap = aap.PathAp(center, segs)
-        apsum, npix = ap.apsum(img)
+        apsum, npix = ap.apsum_exact(img)
         assert abs(float(npix) - 50.0) < 0.5
         assert abs(float(apsum) - 50.0) < 0.5
 
-    def test_centered_triangle(self):
+    def test_center_mode_triangle(self):
         # Equilateral-ish triangle, check center mode ≈ exact mode
         segs = _triangle_segments(-5, -3, 5, -3, 0, 6)
         img = np.ones((20, 20), dtype=np.float64)
         center = (9.5, 9.5)
         ap = aap.PathAp(center, segs)
-        exact_sum, exact_npix = ap.apsum(img, method="exact")
-        ctr_sum, ctr_npix = ap.apsum(img, method="center")
+        exact_sum, npix_exact = ap.apsum_exact(img)
+        ctr_sum, ctr_npix = ap.apsum_center(img)
         # Exact and center should be within ~2 pixels for a largish shape
-        assert abs(float(exact_npix) - float(ctr_npix)) < 3.0
+        assert abs(float(npix_exact) - float(ctr_npix)) < 3.0
 
 
 class TestRectangleMatchesRectAp:
@@ -145,8 +145,8 @@ class TestRectangleMatchesRectAp:
         path_ap = aap.PathAp((cx, cy), segs)
         rect_ap = aap.RectAp((cx, cy), w, h, theta=0.0)
 
-        _, path_npix = path_ap.apsum(img, method="exact")
-        _, rect_npix = rect_ap.apsum(img)
+        _, path_npix = path_ap.apsum_exact(img)
+        _, rect_npix = rect_ap.apsum_exact(img)
         assert abs(float(path_npix) - float(rect_npix)) < 0.05
 
     def test_center_mode_matches(self):
@@ -157,7 +157,7 @@ class TestRectangleMatchesRectAp:
 
         path_ap = aap.PathAp((cx, cy), segs)
 
-        _, path_npix = path_ap.apsum(img, method="center")
+        _, path_npix = path_ap.apsum_center(img)
         # PathAp v1 follows its documented boundary convention: outer
         # boundary centers count as inside.
         assert float(path_npix) == 35.0
@@ -167,7 +167,7 @@ class TestCircularPathMatchesCircAp:
     """Circle built from 4 arcs tracks CircAp within tight tolerance."""
 
     @pytest.mark.parametrize("r", [3.0, 5.0, 7.5])
-    def test_exact_npix_matches(self, r):
+    def test_npix_exact_matches(self, r):
         segs = _circle_segments(r, n_arcs=4)
         cx, cy = 15.5, 15.5
         img = np.ones((40, 40), dtype=np.float64)
@@ -175,8 +175,8 @@ class TestCircularPathMatchesCircAp:
         path_ap = aap.PathAp((cx, cy), segs)
         circ_ap = aap.CircAp((cx, cy), r)
 
-        _, path_npix = path_ap.apsum(img, method="exact")
-        _, circ_npix = circ_ap.apsum(img)
+        _, path_npix = path_ap.apsum_exact(img)
+        _, circ_npix = circ_ap.apsum_exact(img)
         # 4-arc circle introduces small geometric difference at corners
         assert abs(float(path_npix) - float(circ_npix)) < 0.01
 
@@ -252,14 +252,14 @@ class TestScalarAndVectorPositions:
 
     def test_scalar_position_returns_scalar_apsum(self):
         ap = aap.PathAp((10.0, 10.0), self.segs)
-        result = ap.apsum(self.img)
+        result = ap.apsum_exact(self.img)
         apsum, npix = result
         assert apsum.shape == ()
         assert npix.shape == ()
 
     def test_vector_positions_return_array(self):
         ap = aap.PathAp([(10.0, 10.0), (15.0, 15.0)], self.segs)
-        apsum, npix = ap.apsum(self.img)
+        apsum, npix = ap.apsum_exact(self.img)
         assert apsum.shape == (2,)
         assert npix.shape == (2,)
         # Both apertures fully inside 30×30 image, should have same npix
@@ -271,7 +271,7 @@ class TestReturnNpixFalse:
         segs = _rect_segments(4.0, 4.0)
         img = np.ones((20, 20), dtype=np.float64)
         ap = aap.PathAp((10.0, 10.0), segs)
-        result = ap.apsum(img, return_npix=False)
+        result = ap.apsum_exact(img, return_npix=False)
         assert not isinstance(result, tuple)
         assert result.shape == ()
 
@@ -284,23 +284,23 @@ class TestMaskedApsum:
         mask[10, 10] = True  # mask one pixel inside aperture
 
         ap = aap.PathAp((10.0, 10.0), segs)
-        _, npix_unmasked = ap.apsum(img)
-        _, npix_masked = ap.apsum(img, mask=mask)
+        _, npix_unmasked = ap.apsum_exact(img)
+        _, npix_masked = ap.apsum_exact(img, mask=mask)
         assert float(npix_masked) < float(npix_unmasked)
 
 
 class TestWeights:
-    def test_exact_weights_values_in_range(self):
+    def test_weights_weighted_values_in_range(self):
         segs = _circle_segments(4.0, n_arcs=4)
         ap = aap.PathAp((10.5, 10.5), segs)
-        w = ap.weights(method="exact")[0]
+        w = ap.weights_exact()[0]
         assert w.min() >= 0.0 - 1e-12
         assert w.max() <= 1.0 + 1e-12
 
     def test_center_weights_binary(self):
         segs = _rect_segments(4.0, 4.0)
         ap = aap.PathAp((10.0, 10.0), segs)
-        w = ap.weights(method="center")[0]
+        w = ap.weights_center()[0]
         assert set(np.unique(w)).issubset({0.0, 1.0})
 
 
@@ -350,19 +350,25 @@ def test_path_object_npix_and_weights(method):
     bad = np.zeros((24, 24), dtype=bool)
     bad[10, 10] = True
 
-    weights = aperture.weights(method=method)
+    weights = (
+        aperture.weights_exact() if method == "exact" else aperture.weights_center()
+    )
     boxes = aperture.bboxes()
 
     assert len(weights) == len(boxes) == len(positions)
     for weight, box in zip(weights, boxes, strict=True):
         assert weight.shape == box.shape
     assert_allclose(
-        aperture.npix(bad.shape, method=method),
+        (aperture.npix_exact if method == "exact" else aperture.npix_center)(bad.shape),
         npix_func(positions[:, 0], positions[:, 1], segs, shape=bad.shape),
     )
     assert_allclose(
-        aperture.npix(bad.shape, method=method, mask=bad),
-        aperture.apsum(np.ones(bad.shape), method=method, mask=bad)[1],
+        (aperture.npix_exact if method == "exact" else aperture.npix_center)(
+            bad.shape, mask=bad
+        ),
+        (aperture.apsum_exact if method == "exact" else aperture.apsum_center)(
+            np.ones(bad.shape), mask=bad
+        )[1],
     )
 
 
@@ -382,8 +388,8 @@ class TestHoleAnnulus:
         path_an = aap.PathAp((cx, cy), outer, holes=[inner])
         circ_an = aap.CircAn((cx, cy), r_in, r_out)
 
-        _, path_npix = path_an.apsum(img, method="exact")
-        _, circ_npix = circ_an.apsum(img)
+        _, path_npix = path_an.apsum_exact(img)
+        _, circ_npix = circ_an.apsum_exact(img)
 
         assert abs(float(path_npix) - float(circ_npix)) < 0.1
 
@@ -399,8 +405,8 @@ class TestPathApShapeParity:
         path_ap = aap.PathAp(positions, _rotated_rect_segments(w, h, theta))
         rect_ap = aap.RectAp(positions, w, h, theta)
 
-        path_apsum, path_npix = path_ap.apsum(data, method="exact")
-        rect_apsum, rect_npix = rect_ap.apsum(data)
+        path_apsum, path_npix = path_ap.apsum_exact(data)
+        rect_apsum, rect_npix = rect_ap.apsum_exact(data)
 
         assert_allclose(path_apsum, rect_apsum, rtol=0.0, atol=1e-11)
         assert_allclose(path_npix, rect_npix, rtol=0.0, atol=1e-12)
@@ -413,8 +419,8 @@ class TestPathApShapeParity:
         path_ap = aap.PathAp(positions, _circle_segments(r, n_arcs=4))
         circ_ap = aap.CircAp(positions, r)
 
-        path_apsum, path_npix = path_ap.apsum(data, method="exact")
-        circ_apsum, circ_npix = circ_ap.apsum(data)
+        path_apsum, path_npix = path_ap.apsum_exact(data)
+        circ_apsum, circ_npix = circ_ap.apsum_exact(data)
 
         assert_allclose(path_apsum, circ_apsum, rtol=0.0, atol=1e-11)
         assert_allclose(path_npix, circ_npix, rtol=0.0, atol=1e-12)
@@ -428,7 +434,7 @@ class TestPathApShapeParity:
 
         path_ap = aap.PathAp(positions, _pill_segments(w, r, theta))
 
-        path_apsum, path_npix = path_ap.apsum(data, method="center")
+        path_apsum, path_npix = path_ap.apsum_center(data)
         pill_apsum, pill_npix = aapk.apsum_pill_center(data, x, y, w, r, r, theta)
 
         assert_allclose(path_apsum, pill_apsum, rtol=0.0, atol=1e-12)
@@ -442,8 +448,8 @@ class TestPathApShapeParity:
         path_ap = aap.PathAp(positions, _pill_segments(w, r, theta))
         pill_ap = aap.PillAp(positions, w, r, r, theta)
 
-        path_apsum, path_npix = path_ap.apsum(data, method="exact")
-        pill_apsum, pill_npix = pill_ap.apsum(data)
+        path_apsum, path_npix = path_ap.apsum_exact(data)
+        pill_apsum, pill_npix = pill_ap.apsum_exact(data)
 
         assert_allclose(path_apsum, pill_apsum, rtol=1e-12, atol=1e-10)
         assert_allclose(path_npix, pill_npix, rtol=1e-12, atol=1e-10)

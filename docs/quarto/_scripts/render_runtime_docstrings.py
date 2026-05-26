@@ -56,7 +56,9 @@ def _parameter_table(rows, obj) -> list[str]:
         default = ""
         if "," not in row["name"]:
             default = defaults.get(row["name"], "")
-        out.extend(_definition_item(row["name"], row["type"], row["description"], default))
+        out.extend(
+            _definition_item(row["name"], row["type"], row["description"], default)
+        )
     return out
 
 

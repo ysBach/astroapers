@@ -1799,7 +1799,7 @@ mod tests {
     }
 
     #[test]
-    fn wedge_center_weight_uses_pixel_center() {
+    fn wedge_center_weight_uses_center_sampling() {
         let wedge = Wedge {
             x0: 0.0,
             y0: 0.0,

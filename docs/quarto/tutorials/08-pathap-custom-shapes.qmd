@@ -12,7 +12,7 @@ That command language is also the main limitation: `PathAp` only understands
 segments. It does not accept Bezier curves, splines, elliptical arcs,
 Matplotlib `Path` objects, or arbitrary Python callback masks. If you flatten
 another curve into short line segments before constructing `PathAp`,
-`method="exact"` is exact for that flattened approximation, not for the
+`apsum_exact()` is exact for that flattened approximation, not for the
 original curve.
 
 ```{python}
@@ -61,7 +61,7 @@ diamond = [
 ]
 
 poly_ap = aap.PathAp((x0, y0), diamond)
-poly_sum, poly_npix = poly_ap.apsum(data, method="exact")
+poly_sum, poly_npix = poly_ap.apsum_exact(data)
 poly_mean = poly_sum / poly_npix
 
 poly_sum, poly_npix, poly_mean
@@ -75,15 +75,15 @@ ax.set_title("Line-segment PathAp")
 plt.show()
 ```
 
-`method="exact"` computes fractional pixel overlap. `method="center"` selects
-pixels whose centers are inside the path. For path apertures, centers on the
+`apsum_exact()` computes fractional pixel overlap. `apsum_center()` selects pixels
+whose centers are inside the path. For path apertures, centers on the
 outer boundary count as inside.
 
 ```{python}
-exact_sum, exact_npix = poly_ap.apsum(data, method="exact")
-center_sum, center_npix = poly_ap.apsum(data, method="center")
+exact_sum, npix_exact = poly_ap.apsum_exact(data)
+center_sum, center_npix = poly_ap.apsum_center(data)
 
-np.array([exact_sum, center_sum, exact_npix, center_npix])
+np.array([exact_sum, center_sum, npix_exact, center_npix])
 ```
 
 ## Circular arcs
@@ -108,7 +108,7 @@ cap = [
 ]
 
 cap_ap = aap.PathAp((x0, y0), cap)
-cap_sum, cap_npix = cap_ap.apsum(data, method="exact")
+cap_sum, cap_npix = cap_ap.apsum_exact(data)
 cap_sum, cap_npix
 ```
 
@@ -147,7 +147,7 @@ hole = [
 ]
 
 box_with_hole = aap.PathAp((x0, y0), outer, holes=[hole])
-hole_sum, hole_npix = box_with_hole.apsum(data, method="exact")
+hole_sum, hole_npix = box_with_hole.apsum_exact(data)
 hole_sum, hole_npix
 ```
 
@@ -157,7 +157,7 @@ axes[0].imshow(data, origin="lower", cmap="viridis")
 box_with_hole.plot(ax=axes[0], color="w", lw=1.8)
 axes[0].set_title("Compound path")
 
-weights = box_with_hole.weights(method="exact")[0]
+weights = box_with_hole.weights_exact()[0]
 axes[1].imshow(weights, origin="lower", vmin=0, vmax=1)
 axes[1].set_title("bbox-tight weights")
 plt.show()
@@ -178,7 +178,7 @@ positions = np.array(
 )
 
 multi_ap = aap.PathAp(positions, diamond)
-multi_sums, multi_npix = multi_ap.apsum(data, method="exact")
+multi_sums, multi_npix = multi_ap.apsum_exact(data)
 
 np.column_stack([multi_sums, multi_npix])
 ```

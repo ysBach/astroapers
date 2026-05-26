@@ -10,13 +10,18 @@
 
 `astroapers` is a Rust-backed Python package for exact pixel-aperture overlap,
 bbox-tight aperture weights, and aperture summation in pixel coordinates.
+Although it was developed for astronomical image analysis, the core algorithms
+operate on generic two-dimensional image arrays. They can also be useful for
+other scientific and technical images, including microscopy, photography, and
+any workflow that needs reproducible measurements over pixel-defined apertures
+or regions.
 
 The package exposes three public layers:
 
 - `PixelAp` objects such as `CircAp`, `EllipAp`, `RectAp`, `PillAp`, and
   `WedgeAp` for readable workflows, plotting, weights, and one-shot aperture
   sums.
-- `bboxes()`, `weights()`, and `BoundingBox` methods for reusing bbox-tight
+- `bboxes()`, `weights_exact()`, and `BoundingBox` methods for reusing bbox-tight
   aperture weights.
 - `astroapers.kernels` for low-overhead catalog aperture sums once an algorithm is
   fixed.
@@ -49,13 +54,15 @@ uv run pytest -q
 import astroapers as aap
 
 ap = aap.CircAp((42.3, 17.2), r=3.0)
-apsum, npix = ap.apsum(data, mask=bad_pixels)
-weights = ap.weights(method="exact")[0]
+apsum, npix = ap.apsum_exact(data, mask=bad_pixels)
+weights = ap.weights_exact()[0]
 bbox = ap.bboxes()[0]
-weighted_values = bbox.weighted_values(weights, data)
+samples = ap.sampled_values(data)[0]
+weighted_values = ap.weighted_values(data)[0]
+fits_section = bbox.to_fits_section(data.shape)
 
 wedge = aap.WedgeAp((42.3, 17.2), r_in=5.0, r_out=50.0, theta_in=0.0, dtheta_in=0.2)
-wedge_sum, wedge_npix = wedge.apsum(data)
+wedge_sum, wedge_npix = wedge.apsum_exact(data)
 ```
 
 For low-overhead catalog arrays:
@@ -74,7 +81,7 @@ The direct unmasked kernels have specialized paths for `float64`, `float32`,
 before summation. Coordinate inputs and scalar geometry parameters are also
 converted to Python/NumPy `float64`.
 
-Bbox-tight weights from `PixelAp.weights()` are `float64`. When user-supplied
+Bbox-tight weights from `PixelAp.weights_exact()` are `float64`. When user-supplied
 weights are passed to `BoundingBox` methods, only `float32` and `float64` arrays
 are preserved. Other numeric or boolean weight arrays, including extended
 precision dtypes such as `float128`/`longdouble` where NumPy provides them, are

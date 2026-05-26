@@ -53,14 +53,16 @@ def _image_cases() -> list[tuple[str, np.ndarray]]:
 
 
 @pytest.mark.parametrize(("image_name", "image"), _image_cases())
-def test_circle_exact_apsum_matches_photutils_and_sep(image_name, image):
+def test_circle_apsum_exact_matches_photutils_and_sep(image_name, image):
     photutils_aperture = pytest.importorskip("photutils.aperture")
     sep = pytest.importorskip("sep")
     x = POSITIONS[:, 0]
     y = POSITIONS[:, 1]
 
     aap_apsum, aap_npix = apers.apsum_circ_exact(image, x, y, CIRCLE_RADIUS)
-    object_apsum, object_npix = apers.CircAp(POSITIONS, CIRCLE_RADIUS).apsum(image)
+    object_apsum, object_npix = apers.CircAp(POSITIONS, CIRCLE_RADIUS).apsum_exact(
+        image
+    )
     photutils_apsum, _ = photutils_aperture.CircularAperture(
         POSITIONS, r=CIRCLE_RADIUS
     ).do_photometry(image, method="exact")
@@ -76,7 +78,7 @@ def test_circle_exact_apsum_matches_photutils_and_sep(image_name, image):
 
 
 @pytest.mark.parametrize(("image_name", "image"), _image_cases())
-def test_ellipse_exact_apsum_matches_photutils_and_sep(image_name, image):
+def test_ellipse_apsum_exact_matches_photutils_and_sep(image_name, image):
     photutils_aperture = pytest.importorskip("photutils.aperture")
     sep = pytest.importorskip("sep")
     x = POSITIONS[:, 0]
@@ -87,7 +89,7 @@ def test_ellipse_exact_apsum_matches_photutils_and_sep(image_name, image):
     )
     object_apsum, object_npix = apers.EllipAp(
         POSITIONS, ELLIPSE_A, ELLIPSE_B, ELLIPSE_THETA
-    ).apsum(image)
+    ).apsum_exact(image)
     photutils_apsum, _ = photutils_aperture.EllipticalAperture(
         POSITIONS, a=ELLIPSE_A, b=ELLIPSE_B, theta=ELLIPSE_THETA
     ).do_photometry(image, method="exact")
@@ -105,7 +107,7 @@ def test_ellipse_exact_apsum_matches_photutils_and_sep(image_name, image):
 
 
 @pytest.mark.parametrize(("image_name", "image"), _image_cases())
-def test_rectangle_exact_apsum_matches_photutils_subpixel_reference(image_name, image):
+def test_rectangle_apsum_exact_matches_photutils_subpixel_reference(image_name, image):
     photutils_aperture = pytest.importorskip("photutils.aperture")
     x = POSITIONS[:, 0]
     y = POSITIONS[:, 1]
@@ -115,7 +117,7 @@ def test_rectangle_exact_apsum_matches_photutils_subpixel_reference(image_name, 
     )
     object_apsum, object_npix = apers.RectAp(
         POSITIONS, RECTANGLE_W, RECTANGLE_H, RECTANGLE_THETA
-    ).apsum(image)
+    ).apsum_exact(image)
     photutils_apsum, _ = photutils_aperture.RectangularAperture(
         POSITIONS,
         w=RECTANGLE_W,
@@ -135,7 +137,7 @@ def test_rectangle_exact_apsum_matches_photutils_subpixel_reference(image_name, 
 
 
 @pytest.mark.parametrize(("image_name", "image"), _image_cases())
-def test_circular_annulus_exact_apsum_matches_photutils_and_sep(image_name, image):
+def test_circular_annulus_apsum_exact_matches_photutils_and_sep(image_name, image):
     photutils_aperture = pytest.importorskip("photutils.aperture")
     sep = pytest.importorskip("sep")
     x = POSITIONS[:, 0]
@@ -146,7 +148,7 @@ def test_circular_annulus_exact_apsum_matches_photutils_and_sep(image_name, imag
     )
     object_apsum, object_npix = apers.CircAn(
         POSITIONS, CIRC_ANN_R_IN, CIRC_ANN_R_OUT
-    ).apsum(image)
+    ).apsum_exact(image)
     photutils_apsum, _ = photutils_aperture.CircularAnnulus(
         POSITIONS, r_in=CIRC_ANN_R_IN, r_out=CIRC_ANN_R_OUT
     ).do_photometry(image, method="exact")
@@ -164,7 +166,7 @@ def test_circular_annulus_exact_apsum_matches_photutils_and_sep(image_name, imag
 
 
 @pytest.mark.parametrize(("image_name", "image"), _image_cases())
-def test_elliptical_annulus_exact_apsum_matches_photutils_and_sep(image_name, image):
+def test_elliptical_annulus_apsum_exact_matches_photutils_and_sep(image_name, image):
     photutils_aperture = pytest.importorskip("photutils.aperture")
     sep = pytest.importorskip("sep")
     x = POSITIONS[:, 0]
@@ -176,7 +178,7 @@ def test_elliptical_annulus_exact_apsum_matches_photutils_and_sep(image_name, im
 
     object_apsum, object_npix = apers.EllipAn(
         POSITIONS, a_in, b_in, a_out, b_out, theta_in=ELLIP_ANN_THETA
-    ).apsum(image)
+    ).apsum_exact(image)
     photutils_apsum, _ = photutils_aperture.EllipticalAnnulus(
         POSITIONS,
         a_in=a_in,

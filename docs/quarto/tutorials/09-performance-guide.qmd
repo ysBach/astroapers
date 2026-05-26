@@ -6,7 +6,7 @@ Use the direct kernel namespace for catalog aperture sums when your source coord
 
 The `astroapers.kernels` (or `aapk`) functions are the same kernels used by `PixelAp` methods. Calls with `mask=None` use the fastest unmasked Rust path; calls with `mask=bad_pixels` apply bbox-tight weights.
 
-For supported unmasked aperture sums, object methods such as `CircAp(...).apsum(data)` delegate to this same kernel layer. Direct calls mostly save Python object construction, constructor validation, and result-shaping overhead. That margin is most visible for small aperture counts; as the number of apertures grows, the Rust kernel work dominates and object and direct calls can benchmark close to each other.
+For supported unmasked aperture sums, object methods such as `CircAp(...).apsum_exact(data)` delegate to this same kernel layer. Direct calls mostly save Python object construction, constructor validation, and result-shaping overhead. That margin is most visible for small aperture counts; as the number of apertures grows, the Rust kernel work dominates and object and direct calls can benchmark close to each other.
 
 * **NOTE**: In this repo, there is a benchmark script. In the output, read `aap` as the normal object API and `aap_opt` as the optimized astroapers path for that row: direct kernels where available and `validate=False` object paths otherwise.
 
@@ -45,7 +45,7 @@ for x0, y0 in positions:
 This is how general `aap` users would do:
 ```{python}
 ap = aap.CircAp(positions, r=4.0)
-obj_apsum, obj_npix = ap.apsum(data)
+obj_apsum, obj_npix = ap.apsum_exact(data)
 obj_coverage = obj_npix / ap.area
 
 pd.DataFrame({

@@ -17,7 +17,7 @@ def test_wedge_area_for_constant_width_annular_sector():
 
 def test_wedge_center_mask_selects_expected_east_sector_pixels():
     aperture = apers.WedgeAp((5.0, 5.0), 1.0, 3.1, 0.0, 0.5 * math.pi)
-    weights = aperture.weights(method="center")[0]
+    weights = aperture.weights_center()[0]
     bbox = aperture.bboxes()[0]
     image = bbox.to_image(weights, (11, 11))
 
@@ -28,12 +28,12 @@ def test_wedge_center_mask_selects_expected_east_sector_pixels():
     assert image[5, 5] == 0.0
 
 
-def test_wedge_exact_apsum_matches_mask_reduction_and_tracks_area():
+def test_wedge_apsum_exact_matches_mask_reduction_and_tracks_area():
     data = np.ones((64, 64), dtype=np.float64)
     aperture = apers.WedgeAp((32.0, 32.0), 4.0, 14.0, 0.4, 0.9)
 
-    apsum, npix = aperture.apsum(data)
-    weights = aperture.weights(method="exact")[0]
+    apsum, npix = aperture.apsum_exact(data)
+    weights = aperture.weights_exact()[0]
     bbox = aperture.bboxes()[0]
 
     assert_allclose(apsum, npix)
@@ -54,7 +54,7 @@ def test_wedge_direct_kernels_match_object_for_tapered_wedge():
         dtheta_out=0.8,
     )
 
-    obj_apsum, obj_npix = aperture.apsum(data, method="center")
+    obj_apsum, obj_npix = aperture.apsum_center(data)
     got_apsum, got_npix = apers.apsum_wedge_center(
         data, positions[:, 0], positions[:, 1], 3.0, 10.0, 0.2, 0.4, 0.5, 0.8
     )
@@ -79,14 +79,16 @@ def test_wedge_object_npix_and_weights(method):
     bad = np.zeros((50, 50), dtype=bool)
     bad[20, 20] = True
 
-    weights = aperture.weights(method=method)
+    weights = (
+        aperture.weights_exact() if method == "exact" else aperture.weights_center()
+    )
     boxes = aperture.bboxes()
 
     assert len(weights) == len(boxes) == len(positions)
     for weight, box in zip(weights, boxes, strict=True):
         assert weight.shape == box.shape
     assert_allclose(
-        aperture.npix(bad.shape, method=method),
+        (aperture.npix_exact if method == "exact" else aperture.npix_center)(bad.shape),
         npix_func(
             positions[:, 0],
             positions[:, 1],
@@ -100,8 +102,12 @@ def test_wedge_object_npix_and_weights(method):
         ),
     )
     assert_allclose(
-        aperture.npix(bad.shape, method=method, mask=bad),
-        aperture.apsum(np.ones(bad.shape), method=method, mask=bad)[1],
+        (aperture.npix_exact if method == "exact" else aperture.npix_center)(
+            bad.shape, mask=bad
+        ),
+        (aperture.apsum_exact if method == "exact" else aperture.apsum_center)(
+            np.ones(bad.shape), mask=bad
+        )[1],
     )
 
 
@@ -113,11 +119,11 @@ def test_wedge_tapered_exact_mode_is_available_and_tracks_area():
 
     assert hasattr(apers, "apsum_wedge_exact")
     assert hasattr(apers, "npix_wedge_exact")
-    exact_sum, exact_npix = aperture.apsum(data, method="exact")
-    center_sum, center_npix = aperture.apsum(data, method="center")
+    exact_sum, npix_exact = aperture.apsum_exact(data)
+    center_sum, center_npix = aperture.apsum_center(data)
 
-    assert_allclose(exact_sum, exact_npix)
-    assert abs(float(exact_npix) - aperture.area) < 0.5
+    assert_allclose(exact_sum, npix_exact)
+    assert abs(float(npix_exact) - aperture.area) < 0.5
     assert center_npix > 0.0
     assert abs(float(center_sum) - float(exact_sum)) < 10.0
 

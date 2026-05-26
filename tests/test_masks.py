@@ -13,7 +13,10 @@ def _selected_coords(mask):
 
 
 def _weights_box(aperture, method: str = "exact", idx: int = 0):
-    return aperture.weights(method=method)[idx], aperture.bboxes()[idx]
+    weights = (
+        aperture.weights_exact() if method == "exact" else aperture.weights_center()
+    )
+    return weights[idx], aperture.bboxes()[idx]
 
 
 def _to_image(aperture, shape, method: str = "exact", idx: int = 0):
@@ -33,7 +36,7 @@ def test_circular_aperture_mask_matches_sum_kernel():
     data = np.arange(100, dtype=np.float64).reshape(10, 10)
     aperture = apers.CircAp((4.3, 5.1), r=2.4)
 
-    apsum, npix = aperture.apsum(data)
+    apsum, npix = aperture.apsum_exact(data)
     direct_apsum, direct_npix = apers.apsum_circ_exact(data, [4.3], [5.1], 2.4)
 
     assert_allclose(apsum, direct_apsum[0])
@@ -66,7 +69,7 @@ def test_circular_aperture_mask_matches_photutils_overlap_grid():
 def test_weights_exposes_raw_weight_arrays():
     aperture = apers.CircAp((4.3, 5.1), r=2.4)
 
-    weights = aperture.weights()[0]
+    weights = aperture.weights_exact()[0]
 
     assert isinstance(weights, np.ndarray)
     assert weights.dtype == np.float64
@@ -79,15 +82,15 @@ def test_bounding_box_raw_weights_support_general_sum():
 
     weights, bbox = _weights_box(aperture)
     raw_apsum, raw_npix = bbox.apsum(weights, data)
-    object_apsum, object_npix = aperture.apsum(data)
+    object_apsum, object_npix = aperture.apsum_exact(data)
 
     assert_allclose(raw_apsum, object_apsum)
     assert_allclose(raw_npix, object_npix)
     assert_allclose(bbox.apsum(weights, data, return_npix=False), raw_apsum)
-    assert_allclose(aperture.apsum(data, return_npix=False), object_apsum)
+    assert_allclose(aperture.apsum_exact(data, return_npix=False), object_apsum)
 
 
-def test_bounding_box_methods_apply_bbox_tight_weights():
+def test_bounding_box_methods_apply_bbox_tight_weights_exact():
     data = np.arange(100, dtype=np.float64).reshape(10, 10)
     aperture = apers.CircAp((4.3, 5.1), r=2.4)
 
@@ -95,14 +98,14 @@ def test_bounding_box_methods_apply_bbox_tight_weights():
 
     assert_allclose(
         bbox.apsum(weights, data, return_npix=False),
-        aperture.apsum(data, return_npix=False),
+        aperture.apsum_exact(data, return_npix=False),
     )
-    assert_allclose(bbox.apsum(weights, data), aperture.apsum(data))
-    assert_allclose(bbox.npix(weights, data.shape), aperture.npix(data.shape))
+    assert_allclose(bbox.apsum(weights, data), aperture.apsum_exact(data))
+    assert_allclose(bbox.npix(weights, data.shape), aperture.npix_exact(data.shape))
     assert_allclose(bbox.to_image(weights, data.shape), _to_image(aperture, data.shape))
     assert_allclose(
         bbox.weighted_values(weights, data),
-        aperture.weighted_values(data, method="exact"),
+        aperture.weighted_values(data)[0],
     )
 
 
@@ -129,7 +132,7 @@ def test_bbox_npix_tracks_area_clipping_and_bad_pixel_mask():
     )
     assert_allclose(
         bbox.npix(weights, data_shape, mask=bad),
-        aperture.npix(data_shape, mask=bad),
+        aperture.npix_exact(data_shape, mask=bad),
     )
 
     all_bad = np.ones(data_shape, dtype=bool)
@@ -192,7 +195,7 @@ def test_bbox_raw_weights_annulus_supports_weighted_values():
 
     weights, bbox = _weights_box(annulus, method="center")
     values = bbox.weighted_values(weights, data)
-    object_values = annulus.weighted_values(data, method="center")
+    object_values = annulus.sampled_values(data)[0]
 
     assert_allclose(values, object_values)
 
@@ -212,6 +215,20 @@ def test_raw_weights_with_bbox_supports_general_to_image_and_multiply():
         bbox.weighted_cutout(weights, data),
         bbox.weighted_cutout(weights, data),
     )
+
+
+def test_bbox_weighted_cutout_uses_fill_value_for_bad_pixel_mask():
+    data = np.arange(25, dtype=np.float64).reshape(5, 5)
+    weights = np.ones((3, 3), dtype=np.float64)
+    bbox = apers.BoundingBox(ixmin=1, ixmax=4, iymin=1, iymax=4)
+    bad = np.zeros_like(data, dtype=bool)
+    bad[2, 2] = True
+
+    cutout = bbox.weighted_cutout(weights, data, mask=bad, fill_value=-999.0)
+
+    expected = data[1:4, 1:4].astype(np.float64)
+    expected[1, 1] = -999.0
+    assert_allclose(cutout, expected)
 
 
 def test_user_supplied_float32_weights_preserve_float32_work_arrays():
@@ -286,7 +303,7 @@ def test_vector_raw_weights_align_with_vector_bboxes():
     data = np.ones((16, 16), dtype=np.float64)
     aperture = apers.CircAp([(4.0, 5.0), (10.0, 8.0)], r=2.5)
 
-    weights = aperture.weights()
+    weights = aperture.weights_exact()
     boxes = aperture.bboxes()
 
     assert isinstance(weights, list)
@@ -379,7 +396,7 @@ def test_scalar_bboxes_match_rust_vector_bboxes_at_boundaries():
 def test_vector_circle_weights_are_lists():
     aperture = apers.CircAp([(4.3, 5.1), (8.7, 9.2), (12.4, 3.5)], r=2.4)
 
-    weights = aperture.weights()
+    weights = aperture.weights_exact()
 
     assert isinstance(weights, list)
     assert len(weights) == 3
@@ -400,7 +417,11 @@ def test_vector_many_weights_match_scalar_weights(aperture_cls, params, method):
     positions = np.array([(4.3, 5.1), (8.7, 9.2), (12.4, 3.5)], dtype=np.float64)
     vector_aperture = aperture_cls(positions, *params)
 
-    weights_list = vector_aperture.weights(method=method)
+    weights_list = (
+        vector_aperture.weights_exact()
+        if method == "exact"
+        else vector_aperture.weights_center()
+    )
     boxes = vector_aperture.bboxes()
 
     assert isinstance(weights_list, list)
@@ -408,7 +429,9 @@ def test_vector_many_weights_match_scalar_weights(aperture_cls, params, method):
     assert len(weights_list) == len(boxes) == len(positions)
     for weights, bbox, (x, y) in zip(weights_list, boxes, positions, strict=True):
         scalar = aperture_cls((float(x), float(y)), *params)
-        scalar_weights = scalar.weights(method=method)[0]
+        scalar_weights = (
+            scalar.weights_exact() if method == "exact" else scalar.weights_center()
+        )[0]
         scalar_bbox = scalar.bboxes()[0]
         assert weights.dtype == np.float64
         assert weights.flags.c_contiguous
@@ -433,7 +456,11 @@ def test_vector_many_annulus_weights_match_scalar_weights(
     positions = np.array([(4.3, 5.1), (8.7, 9.2), (12.4, 3.5)], dtype=np.float64)
     vector_annulus = annulus_cls(positions, *params, **kwargs)
 
-    weights_list = vector_annulus.weights(method=method)
+    weights_list = (
+        vector_annulus.weights_exact()
+        if method == "exact"
+        else vector_annulus.weights_center()
+    )
     boxes = vector_annulus.bboxes()
 
     assert isinstance(weights_list, list)
@@ -441,7 +468,9 @@ def test_vector_many_annulus_weights_match_scalar_weights(
     assert len(weights_list) == len(boxes) == len(positions)
     for weights, bbox, (x, y) in zip(weights_list, boxes, positions, strict=True):
         scalar = annulus_cls((float(x), float(y)), *params, **kwargs)
-        scalar_weights = scalar.weights(method=method)[0]
+        scalar_weights = (
+            scalar.weights_exact() if method == "exact" else scalar.weights_center()
+        )[0]
         scalar_bbox = scalar.bboxes()[0]
         assert weights.dtype == np.float64
         assert weights.flags.c_contiguous
@@ -453,17 +482,17 @@ def test_vector_many_annulus_weights_match_scalar_weights(
 def test_vector_weights_returns_list_of_weight_arrays():
     aperture = apers.RectAp([(4.0, 4.0), (8.5, 9.0)], w=3.0, h=2.0)
 
-    weights = aperture.weights()
+    weights = aperture.weights_exact()
 
     assert isinstance(weights, list)
     assert len(weights) == 2
     assert all(isinstance(weight, np.ndarray) for weight in weights)
 
 
-def test_weights_center_exposes_center_weights():
+def test_weights_center_exposes_center_weights_exact():
     aperture = apers.CircAn((3.0, 3.0), r_in=1.1, r_out=2.1)
 
-    assert aperture.weights(method="center")[0].dtype == np.float64
+    assert aperture.weights_center()[0].dtype == np.float64
 
 
 def test_center_mask_marks_pixel_centers_inside_aperture():

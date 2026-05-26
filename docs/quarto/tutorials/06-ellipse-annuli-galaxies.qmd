@@ -13,7 +13,7 @@ This tutorial starts from an image and a user-supplied semimajor-axis array.
 It uses SciPy to optimize the boundary axis ratios and angles, choosing annuli
 with small scatter in center-selected pixel values. Adjacent annuli share
 boundaries, so the result remains a contiguous radial partition. The final
-radial profile still uses exact `annulus.apsum()` measurements.
+radial profile still uses exact `annulus.apsum_exact()` measurements.
 
 This is a compact demonstration of how `EllipAn` can support a simple
 isophotal-region workflow. It is not a replacement for a full isophote-fitting
@@ -88,10 +88,10 @@ The optimizer minimizes `np.std()` of the center-selected pixels in each
 annulus. The first bin optimizes both inner and outer boundary geometry. Later
 bins reuse the previous outer boundary as their inner boundary, then optimize
 only the next outer boundary. Each trial annulus samples pixels with center
-weights and the matching `BoundingBox.weighted_values(...)`.
+weights through `PixelAp.sampled_values(...)`.
 
 ```{python}
-sma = np.linspace(3.0, 50.0, num=10)
+sma = np.geomspace(3.0, 50.0, num=10)
 
 q_bounds = (0.35, 0.90)
 theta_bounds = (np.deg2rad(-15.0), np.deg2rad(45.0))
@@ -110,9 +110,12 @@ def make_annulus(a_in, a_out, q_in, q_out, theta_in, theta_out):
 
 
 def annulus_loss(annulus):
-    weights = annulus.weights(method="center")[0]
-    bbox = annulus.bboxes()[0]
-    pixels = bbox.weighted_values(weights, sky_subtracted, mask=bad_pixels)
+    """The loss to minimize.
+    """
+    pixels = annulus.sampled_values(
+        sky_subtracted,
+        mask=bad_pixels,
+    )[0]
     if pixels.size < 8:
         return np.inf, pixels.size
     return float(np.std(pixels)), pixels.size
@@ -252,12 +255,12 @@ plt.show()
 
 The center-selected samples above choose the geometry. For flux and surface
 brightness, use the exact annular sum and effective pixel area from
-`annulus.apsum()`.
+`annulus.apsum_exact()`.
 
 ```{python}
 rows = []
 for i, annulus in enumerate(annuli):
-    flux, npix = annulus.apsum(sky_subtracted, mask=bad_pixels)
+    flux, npix = annulus.apsum_exact(sky_subtracted, mask=bad_pixels)
     rows.append(
         {
             "a_mid": 0.5 * (sma[i] + sma[i + 1]),
@@ -294,7 +297,7 @@ model_weighted = np.zeros_like(sky_subtracted, dtype=float)
 model_coverage = np.zeros_like(sky_subtracted, dtype=float)
 
 for annulus, surface_brightness in zip(annuli, profile["surface_brightness"]):
-    weights = annulus.weights(method="exact")[0]
+    weights = annulus.weights_exact()[0]
     bbox = annulus.bboxes()[0]
     annulus_image = bbox.to_image(weights, sky_subtracted.shape)
     model_weighted += surface_brightness * annulus_image
@@ -362,7 +365,7 @@ kernel_flux, kernel_npix = aapk.apsum_ellip_ann_exact(
     fit["theta_out"],
     mask=bad_pixels,
 )
-object_flux, object_npix = annuli[i].apsum(sky_subtracted, mask=bad_pixels)
+object_flux, object_npix = annuli[i].apsum_exact(sky_subtracted, mask=bad_pixels)
 
 assert np.allclose(kernel_flux[0], object_flux)
 assert np.allclose(kernel_npix[0], object_npix)
@@ -371,9 +374,9 @@ kernel_flux[0] / kernel_npix[0]
 
 ## Practical rules
 
-- Use `weights(method="center")` with `bboxes()` when the task is to score
+- Use `weights_center()` with `bboxes()` when the task is to score
   candidate annulus geometries from sampled pixels.
-- Use `annulus.apsum(data, mask=bad_pixels)` after geometry selection for exact
+- Use `annulus.apsum_exact(data, mask=bad_pixels)` after geometry selection for exact
   annular flux and area.
 - Keep masks full-image-shaped with `True` meaning excluded.
 - Treat the scatter-minimized geometry as a lightweight demonstration, not as a

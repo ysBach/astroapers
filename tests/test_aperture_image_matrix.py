@@ -172,9 +172,10 @@ def _expected_from_masks(
 ) -> tuple[np.ndarray, np.ndarray]:
     sums = []
     npixs = []
-    for weight, bbox in zip(
-        aperture.weights(method=method), aperture.bboxes(), strict=True
-    ):
+    weights = (
+        aperture.weights_exact() if method == "exact" else aperture.weights_center()
+    )
+    for weight, bbox in zip(weights, aperture.bboxes(), strict=True):
         apsum, npix = bbox.apsum(weight, data, mask=mask)
         sums.append(apsum)
         npixs.append(npix)
@@ -240,20 +241,30 @@ def test_constant_images_cover_dtypes_methods_masks_and_shapes(
         assert np.all(got_npix > 0.0)
         assert np.all(got_npix[2:] <= case.area)
 
-    object_apsum, object_npix = aperture.apsum(data, mask=mask, method=method)
-    optimized_apsum, optimized_npix = case.aperture(validate=False).apsum(
-        data, mask=mask, method=method
+    object_sum_func = (
+        aperture.apsum_exact if method == "exact" else aperture.apsum_center
     )
+    optimized_aperture = case.aperture(validate=False)
+    optimized_sum_func = (
+        optimized_aperture.apsum_exact
+        if method == "exact"
+        else optimized_aperture.apsum_center
+    )
+    object_apsum, object_npix = object_sum_func(data, mask=mask)
+    optimized_apsum, optimized_npix = optimized_sum_func(data, mask=mask)
     assert_allclose(object_apsum, got_apsum, rtol=0, atol=STRICT_ATOL)
     assert_allclose(object_npix, got_npix, rtol=0, atol=STRICT_ATOL)
     assert_allclose(optimized_apsum, got_apsum, rtol=0, atol=STRICT_ATOL)
     assert_allclose(optimized_npix, got_npix, rtol=0, atol=STRICT_ATOL)
 
-    object_npix_only = aperture.npix(IMAGE_SHAPE, method=method)
+    object_npix_func = (
+        aperture.npix_exact if method == "exact" else aperture.npix_center
+    )
+    object_npix_only = object_npix_func(IMAGE_SHAPE)
     assert_allclose(object_npix_only, got_npix_only, rtol=0, atol=STRICT_ATOL)
     if mask is not None:
         assert_allclose(
-            aperture.npix(IMAGE_SHAPE, method=method, mask=mask),
+            object_npix_func(IMAGE_SHAPE, mask=mask),
             got_npix,
             rtol=0,
             atol=STRICT_ATOL,
@@ -265,7 +276,9 @@ def test_constant_images_cover_dtypes_methods_masks_and_shapes(
 def test_object_bboxes_and_weights_are_aligned_lists(case: ApertureCase, method: str):
     aperture = case.aperture()
 
-    weights = aperture.weights(method=method)
+    weights = (
+        aperture.weights_exact() if method == "exact" else aperture.weights_center()
+    )
     boxes = aperture.bboxes()
 
     assert isinstance(weights, list)
@@ -284,13 +297,17 @@ def test_scalar_object_api_preserves_scalar_sum_shapes_and_raw_weight_lists(
     data = np.ones(IMAGE_SHAPE, dtype=np.float64)
     aperture = case.aperture(positions=POSITIONS[0])
 
-    apsum, npix = aperture.apsum(data, method=method)
-    weights = aperture.weights(method=method)
+    sum_func = aperture.apsum_exact if method == "exact" else aperture.apsum_center
+    npix_func = aperture.npix_exact if method == "exact" else aperture.npix_center
+    apsum, npix = sum_func(data)
+    weights = (
+        aperture.weights_exact() if method == "exact" else aperture.weights_center()
+    )
     boxes = aperture.bboxes()
 
     assert apsum.shape == ()
     assert npix.shape == ()
-    assert aperture.npix(IMAGE_SHAPE, method=method).shape == ()
+    assert npix_func(IMAGE_SHAPE).shape == ()
     assert len(weights) == len(boxes) == 1
 
 
@@ -386,7 +403,13 @@ def test_realistic_scene_regresses_aperture_sum_and_sky_median(dtype, method: st
         [
             bbox.apsum(weight, data)[0]
             for weight, bbox in zip(
-                source.weights(method=method), source.bboxes(), strict=True
+                (
+                    source.weights_exact()
+                    if method == "exact"
+                    else source.weights_center()
+                ),
+                source.bboxes(),
+                strict=True,
             )
         ]
     )
@@ -394,7 +417,9 @@ def test_realistic_scene_regresses_aperture_sum_and_sky_median(dtype, method: st
         [
             np.median(bbox.weighted_values(weight, data))
             for weight, bbox in zip(
-                sky.weights(method=method), sky.bboxes(), strict=True
+                (sky.weights_exact() if method == "exact" else sky.weights_center()),
+                sky.bboxes(),
+                strict=True,
             )
         ]
     )
@@ -402,7 +427,9 @@ def test_realistic_scene_regresses_aperture_sum_and_sky_median(dtype, method: st
         [
             np.median(bbox.weighted_values(weight, data, mask=_sky_mask(data.shape)))
             for weight, bbox in zip(
-                sky.weights(method=method), sky.bboxes(), strict=True
+                (sky.weights_exact() if method == "exact" else sky.weights_center()),
+                sky.bboxes(),
+                strict=True,
             )
         ]
     )

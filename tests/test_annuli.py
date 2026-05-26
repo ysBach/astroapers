@@ -8,7 +8,10 @@ import astroapers as apers
 
 
 def _weights_box(aperture, method: str = "exact", idx: int = 0):
-    return aperture.weights(method=method)[idx], aperture.bboxes()[idx]
+    weights = (
+        aperture.weights_exact() if method == "exact" else aperture.weights_center()
+    )
+    return weights[idx], aperture.bboxes()[idx]
 
 
 def _subtracted_annulus_reference(outer, inner):
@@ -36,12 +39,12 @@ def _pill_component_reference(aperture, x, y, bbox, method):
     components = aperture._components(x, y)
     if method == "center":
         weights = [
-            component._center_weights_one(*component.positions[0], bbox)
+            component._weights_center_one(*component.positions[0], bbox)
             for component in components
         ]
     else:
         weights = [
-            component._exact_weights_one(*component.positions[0], bbox)
+            component._weights_exact_one(*component.positions[0], bbox)
             for component in components
         ]
     return np.maximum.reduce(weights)
@@ -54,7 +57,7 @@ def test_circular_annulus_fused_weights_match_subtracted_circle_reference(method
     r_out = 4.2
     annulus = apers.CircAn(positions, r_in=r_in, r_out=r_out)
 
-    weights = annulus.weights(method=method)
+    weights = annulus.weights_exact() if method == "exact" else annulus.weights_center()
     boxes = annulus.bboxes()
     for weight, bbox, (x, y) in zip(weights, boxes, positions, strict=True):
         outer = _weights_box(apers.CircAp((float(x), float(y)), r_out), method)
@@ -71,7 +74,7 @@ def test_elliptical_annulus_fused_weights_match_subtracted_ellipse_reference(met
     a_in, b_in, a_out, b_out, theta = 1.3, 0.8, 4.2, 2.7, 0.35
     annulus = apers.EllipAn(positions, a_in, b_in, a_out, b_out, theta_in=theta)
 
-    weights = annulus.weights(method=method)
+    weights = annulus.weights_exact() if method == "exact" else annulus.weights_center()
     boxes = annulus.bboxes()
     for weight, bbox, (x, y) in zip(weights, boxes, positions, strict=True):
         outer = _weights_box(
@@ -92,7 +95,7 @@ def test_rectangular_annulus_fused_weights_match_subtracted_rectangle_reference(
     w_in, h_in, w_out, h_out, theta = 1.5, 0.9, 4.8, 3.1, -0.35
     annulus = apers.RectAn(positions, w_in, h_in, w_out, h_out, theta_in=theta)
 
-    weights = annulus.weights(method=method)
+    weights = annulus.weights_exact() if method == "exact" else annulus.weights_center()
     boxes = annulus.bboxes()
     for weight, bbox, (x, y) in zip(weights, boxes, positions, strict=True):
         outer = _weights_box(
@@ -112,7 +115,9 @@ def test_pill_fused_weights_match_component_reference(method):
     positions = np.array([(4.3, 5.1), (-1.2, 2.6), (12.4, 3.5)], dtype=np.float64)
     aperture = apers.PillAp(positions, w=5.0, a=1.6, b=1.1, theta=0.35)
 
-    weights = aperture.weights(method=method)
+    weights = (
+        aperture.weights_exact() if method == "exact" else aperture.weights_center()
+    )
     boxes = aperture.bboxes()
     for weight, bbox, (x, y) in zip(weights, boxes, positions, strict=True):
         scalar = apers.PillAp((float(x), float(y)), 5.0, 1.6, 1.1, 0.35)
@@ -130,7 +135,7 @@ def test_pill_annulus_fused_weights_match_component_reference(method):
         positions, w_in, a_in, b_in, w_out, a_out, b_out, theta_in=theta
     )
 
-    weights = annulus.weights(method=method)
+    weights = annulus.weights_exact() if method == "exact" else annulus.weights_center()
     boxes = annulus.bboxes()
     for weight, bbox, (x, y) in zip(weights, boxes, positions, strict=True):
         outer = apers.PillAp((float(x), float(y)), w_out, a_out, b_out, theta)
@@ -156,7 +161,7 @@ def test_pill_annulus_fused_weights_match_component_reference(method):
     ],
 )
 def test_exact_annulus_weight_sum_tracks_analytic_area(annulus, atol):
-    weight = annulus.weights(method="exact")[0]
+    weight = annulus.weights_exact()[0]
 
     assert_allclose(weight.sum(), annulus.area, rtol=0, atol=atol)
 
@@ -258,7 +263,7 @@ def test_split_theta_annulus_apsum_uses_clipped_mask_path():
         theta_out=0.0,
     )
 
-    apsum, npix = aperture.apsum(data)
+    apsum, npix = aperture.apsum_exact(data)
     weights, bbox = _weights_box(aperture)
     expected = bbox.apsum(weights, data)
 
@@ -269,7 +274,7 @@ def test_split_theta_annulus_apsum_uses_clipped_mask_path():
 def test_annulus_exact_sum_tracks_area_on_uniform_data():
     data = np.ones((32, 32), dtype=np.float64)
     annulus = apers.CircAn((16.0, 16.0), r_in=3.0, r_out=5.0)
-    apsum, npix = annulus.apsum(data)
+    apsum, npix = annulus.apsum_exact(data)
 
     assert_allclose(apsum, npix)
     assert_allclose(npix, annulus.area, rtol=0, atol=1e-8)

@@ -4,8 +4,8 @@ title: "Quickstart aperture sums"
 
 This notebook measures a synthetic source with exact circular aperture
 aperture summation. The point is to show the shortest useful workflow: create an
-aperture, call `apsum()`, and interpret the returned flux and effective pixel
-area.
+aperture, call `apsum_exact()`, and interpret the returned flux and effective
+pixel area.
 
 ```{python}
 import numpy as np
@@ -43,12 +43,12 @@ plt.show()
 
 ## Measure an aperture sum
 
-`CircAp.apsum()` uses exact fractional pixel overlap for circular apertures.
+`CircAp.apsum_exact()` uses exact fractional pixel overlap for circular apertures.
 It returns the weighted sum and the in-frame weighted pixel count.
 
 ```{python}
 ap = aap.CircAp((x0, y0), r=5.0)
-apsum, npix = ap.apsum(data, return_npix=True)
+apsum, npix = ap.apsum_exact(data, return_npix=True)
 
 apsum, npix, ap.area, npix == ap.area
 ```
@@ -73,7 +73,7 @@ plt.show()
 
 ## Low-Level Kernels for Lowest Overhead
 
-The object API above is the clearest way to learn the workflow. In production (e.g., when making large-scale pipelines after all algorithms are fixed), use the direct, that is, the lowest-overhead entry point. These are the same Rust-backed functions that `CircAp.apsum()` uses internally for this unmasked case, so the speed difference is mostly Python object construction and result-shaping overhead. That margin is most visible for small aperture counts. When you have large batches of apertures, the difference is smaller and may not be noticeable.
+The object API above is the clearest way to learn the workflow. In production (e.g., when making large-scale pipelines after all algorithms are fixed), use the direct, that is, the lowest-overhead entry point. These are the same Rust-backed functions that `CircAp.apsum_exact()` uses internally for this unmasked case, so the speed difference is mostly Python object construction and result-shaping overhead. That margin is most visible for small aperture counts. When you have large batches of apertures, the difference is smaller and may not be noticeable.
 
 ```{python}
 import astroapers.kernels as aapk

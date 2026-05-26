@@ -26,23 +26,23 @@ bbox-tight weights, and aperture summation in pixel coordinates.
   * It is a small helper to reduce calculation time and memory usage in `aap` by working only with the pixels relevant to the aperture, instead of the full image.
   * Use `bbox.to_fits_section(shape)` for DS9 or IRAF-style FITS image section (`[x1:x2,y1:y2]`, 1-indexed).
 * **Weights** (class `ndarray`)
-  * `weights = ap.weights(method="exact")` returns bbox-tight fractional pixel overlaps.
+  * `weights = ap.weights_exact()` returns bbox-tight fractional pixel overlaps.
   * In real usage, users generally won't need weights directly because the aperture methods (especially `apsum`) will use them internally.
-  * It is `bbox`-tight, so to get the full image-shaped mask, use `ap.bboxes()[i].to_image(ap.weights()[i], shape)`.
+  * It is `bbox`-tight, so to get the full image-shaped mask, use `ap.bboxes()[i].to_image(ap.weights_exact()[i], shape)`.
 * **Aperture sum** (class `float` or 1-d array):
-  * `apsum = ap.apsum(data)`.
+  * `apsum = ap.apsum_exact(data)`.
   * It internally combines bbox-tight weights with the matching `BoundingBox` to calculate the sum, which is memory- and computation-efficient.
 * **Area** (class `float`):
   * `area = ap.area`.
   * Area is the analytic geometric area of the aperture, e.g., $\pi r^2$ for a circle.
 * **Effective area** (class `float` or 1-d array):
-  * `npix = ap.npix(shape, mask=...)`.
+  * `npix = ap.npix_exact(shape, mask=...)`.
   * It is the sum of weights after excluding pixels outside the image and/or masked pixels. Therefore, `npix` $\le$ `ap.area`.
   * The image `shape` is required to correctly calculate `npix` (e.g., to exclude pixels outside the image). Optionally, a `mask` can also be passed to exclude masked pixels. Users may discard objects by `badphot = npix < area` (e.g., objects near the image edge or affected by bad pixel mask, bpm).
 * **Source sum**:
   * Called `srcsum` in the tutorials.
   * It is the background-subtracted source flux, calculated as `apsum - background * npix`.
-  * Since background estimation may require complicated or custom algorithms, it is not a built-in method in `aap`. Instead, users are expected to perform the calculation in Python. For example, one can define a function such as `bkg = background(an.weighted_values(data, method="center"), **kwargs)` and then compute `ap.apsum(data)[0] - bkg * ap.npix(data.shape)`.
+  * Since background estimation may require complicated or custom algorithms, it is not a built-in method in `aap`. Instead, users are expected to perform the calculation in Python. For example, one can define a function such as `bkg = background(an.sampled_values(data)[0], **kwargs)` and then compute `ap.apsum_exact(data)[0] - bkg * ap.npix_exact(data.shape)`.
 
 
 ## First-Look at `aap`
@@ -62,7 +62,7 @@ ypos = np.array([8.0])
 
 # Quicklook - not very slow compared to direct kernel
 ap = aap.CircAp((xpos[0], ypos[0]), r=3.0)
-obj_apsum, obj_npix = ap.apsum(data)
+obj_apsum, obj_npix = ap.apsum_exact(data)
 
 # lowest-overhead direct kernel call
 apsum = aapk.apsum_circ_exact(
@@ -94,7 +94,7 @@ This site has two kinds of documentation:
 
 1. [Quickstart aperture sums](tutorials/01-quickstart.qmd): create a synthetic
    image and measure circular aperture flux.
-2. [Bbox-tight weights](tutorials/02-masks.qmd): inspect `ap.weights()`,
+2. [Bbox-tight weights](tutorials/02-masks.qmd): inspect `ap.weights_exact()`,
    `ap.bboxes()`, `BoundingBox.to_image()`, and `BoundingBox.to_fits_section()`.
 3. [Annulus background](tutorials/03-background.qmd): estimate a local
    background from an annulus and subtract it from source flux.
@@ -121,7 +121,7 @@ unmasked kernels have specialized paths for `float64`, `float32`, `int32`, and
 `int16` images; **other image dtypes are converted to `float64` first**. Coordinate
 inputs and scalar geometry parameters are also converted to `float64`.
 
-Bbox-tight weights from `PixelAp.weights()` are `float64`. User-supplied weights
+Bbox-tight weights from `PixelAp.weights_exact()` are `float64`. User-supplied weights
 passed to `BoundingBox` methods preserve only `float32` and `float64`. Other
 numeric or boolean weight dtypes, including extended precision dtypes such as
 `float128`/`longdouble` where available, are **converted to `float64`**.

@@ -2,7 +2,7 @@
 title: "Bbox-tight weights"
 ---
 
-`PixelAp.weights()` is the sampled result of an aperture: one small
+`PixelAp.weights_exact()` is the fractional-overlap sampled result of an aperture: one small
 `bbox`-tight weight image per aperture position. `PixelAp.bboxes()` returns the
 matching `BoundingBox` objects that place those weights in the parent image.
 Both methods always return lists, even for scalar apertures.
@@ -10,7 +10,7 @@ Both methods always return lists, even for scalar apertures.
 Keep three ideas separate:
 
 - `ap.area` is the analytic geometric area of the aperture (e.g., $\pi r^2$ for a circle).
-- `ap.npix(shape, mask=...)` is the sum of weights, excluding pixels outside the image and/or masked pixels (therefore, $\le$ `ap.area`).
+- `ap.npix_exact(shape, mask=...)` is the sum of weights, excluding pixels outside the image and/or masked pixels (therefore, $\le$ `ap.area`).
 - `weights[i]` are "fraction of area for each pixel that is inside the aperture". To save memory, they are `bbox`-tight, so to get the full image-shaped mask, use `boxes[i].to_image(weights[i], shape)`.
 
 ```{python}
@@ -19,10 +19,10 @@ import matplotlib.pyplot as plt
 import astroapers as aap
 ```
 
-## `"exact"` and `"center"` Masks
+## Exact and Center Masks
 
-1. `method="exact"`: Exact masks - fractional overlap weights.
-2. `method="center"`: Center masks - weights in binary (0 or 1). ``1`` if pixel center is inside the aperture, ``0`` otherwise.
+1. `weights_exact()`: Exact masks - fractional overlap weights.
+2. `weights_center()`: Center masks - weights in binary (0 or 1). ``1`` if pixel center is inside the aperture, ``0`` otherwise.
 
 Exact masks are natural for aperture sums, while center masks are often better for sampling background pixels in an annulus, without fractional values.
 
@@ -30,22 +30,22 @@ Exact masks are natural for aperture sums, while center masks are often better f
 shape = (25, 23)
 ap = aap.CircAp((15.0, 15.0), r=6.0)
 
-weights_exact = ap.weights(method="exact")[0]
-weights_center = ap.weights(method="center")[0]
+weights_exact = ap.weights_exact()[0]
+weights_center = ap.weights_center()[0]
 bbox = ap.bboxes()[0]
 
 print("Exact weights:")
 print(f"Shape: {weights_exact.shape}")
 print(f"BBox: {bbox}")
 print(f"Area: {ap.area:.3f} - analytic geometric area")
-print(f"Npix: {ap.npix(shape):.3f} - in-frame exact weight sum")
+print(f"Npix: {ap.npix_exact(shape):.3f} - in-frame exact weight sum")
 ```
 
 * **NOTE**: Imagine your aperture was located near the edge of the image. Changing the center in `CircAp` to `(25.0, 15.0)` will make `npix` smaller than `area`.
 
 ```{python}
 ap_edge = aap.CircAp((25.0, 15.0), r=6.0)
-print(f"{ap_edge.npix(shape)} < {ap_edge.area}")
+print(f"{ap_edge.npix_exact(shape)} < {ap_edge.area}")
 ```
 
 Convert the bbox-tight weights to an arbitrary shape (preferably the same shape as your data, using the matching `BoundingBox`) for visualization or masking the full data:
@@ -89,11 +89,11 @@ means the pixel center was selected.
 
 ```{python}
 cosmicrayhit = aap.RectAp((10.0, 15.0), w=2.0, h=5.25, theta=np.pi/4)
-cr_weights = cosmicrayhit.weights()[0]
+cr_weights = cosmicrayhit.weights_exact()[0]
 cr_bbox = cosmicrayhit.bboxes()[0]
 bpm_cr = cr_bbox.to_image(cr_weights, shape) > 0.1  # bad pixel mask: >10% overlap
 print(f"Num. of pixels flagged as bad: {bpm_cr.sum()}")
-print(f"Full exact weights of RectAp (npix): {cosmicrayhit.npix(shape)}")
+print(f"Full exact weights of RectAp (npix): {cosmicrayhit.npix_exact(shape)}")
 
 fig, ax = plt.subplots(figsize=(5, 4))
 ax.imshow(exact_image, origin="lower", cmap="viridis", vmin=0, vmax=1)
@@ -107,11 +107,33 @@ The threshold is part of your data-quality rule, not part of aperture
 aperture summation. A cosmic-ray mask, saturation mask, or detector-footprint mask may
 choose different thresholds.
 
-## Weighted cutouts and values
+## Values and cutouts
 
-`weighted_cutout()` preserves the bbox shape. `weighted_values()` returns the
-positive-weight values as a 1-D array. Exact values are already multiplied by
-the fractional weights; center values are ordinary selected pixels.
+Aperture objects expose two 1-D value extractors:
+
+- `sampled_values()` returns raw image samples selected by center weights.
+- `weighted_values()` returns exact fractional-overlap values, already
+  multiplied by their weights.
+
+Both return a `list[np.ndarray]`, even for scalar apertures. Use `flat=True` to
+get a single concatenated 1-D array and integer offsets for high-throughput
+ragged reductions. `sampled_cutout()` and `weighted_cutout()` return bbox-tight
+2-D cutouts as lists; they do not have a flat mode because flattening would
+discard spatial layout.
+
+```{python}
+sampled = ap.sampled_values(np.ones(shape))
+weighted = ap.weighted_values(np.ones(shape))
+flat_weighted, offsets = ap.weighted_values(np.ones(shape), flat=True)
+
+assert np.allclose(np.split(flat_weighted, offsets[1:-1])[0], weighted[0])
+len(sampled), weighted[0].sum(), offsets
+```
+
+At the lower `BoundingBox` layer, `weighted_cutout()` preserves the bbox shape.
+Masked cutout pixels and off-image pixels use `fill_value`, which defaults to
+`np.nan`. `weighted_values()` returns the positive-weight values for explicit
+raw weights passed by the caller.
 
 Built-in aperture weights use `float64`. If you pass your own raw weights to
 `BoundingBox` methods, `float32` and `float64` are preserved, but other numeric
@@ -120,10 +142,10 @@ or boolean dtypes are converted to `float64`. That includes `float128` or
 
 ```{python}
 cutout = bbox.weighted_cutout(weights_exact, np.ones(shape))
-exact_values = bbox.weighted_values(weights_exact, np.ones(shape))
+values_exact = bbox.weighted_values(weights_exact, np.ones(shape))
 center_values = bbox.weighted_values(weights_center, np.ones(shape))
 
-cutout.shape, exact_values.sum(), center_values.size
+cutout.shape, values_exact.sum(), center_values.size
 ```
 
 With real data, the same helper returns `data * weights` on the bbox grid.
@@ -149,10 +171,10 @@ plt.show()
 
 For catalog aperture sums where your coordinates are already arrays, use the direct
 kernel namespace as the lowest-overhead entry point. For supported unmasked
-`apsum()` calls, aperture objects delegate to the same kernels, so the direct
+`apsum_exact()` calls, aperture objects delegate to the same kernels, so the direct
 path mainly saves object construction and validation overhead. That advantage is
 most visible for small aperture counts and can be a near tie for large batches.
-Use `mask=bad_pixels` for direct masked sums, and use `weights()`, `bboxes()`,
+Use `mask=bad_pixels` for direct masked sums, and use `weights_exact()`, `bboxes()`,
 or `BoundingBox` methods when you need reusable bbox-tight weights, full-frame
 masks, or custom mask composition.
 

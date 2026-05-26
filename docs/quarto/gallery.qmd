@@ -31,7 +31,7 @@ def _style_outline_axis(ax, label, *, limit=8.0):
 
 def _show_mask(ax, make_ap, method, *, limit=8.0):
     ap = make_ap(image_center)
-    weights = ap.weights(method=method)[0]
+    weights = (ap.weights_exact() if method == "exact" else ap.weights_center())[0]
     bbox = ap.bboxes()[0]
     mask = bbox.to_image(weights, image_shape)
     assert mask.sum() > 0.0
@@ -314,7 +314,7 @@ positions = np.array(
 )
 multi_path = aap.PathAp(positions, rounded_lobe)
 test_image = np.ones((28, 50), dtype=float)
-path_sums, path_npix = multi_path.apsum(test_image, method="exact")
+path_sums, path_npix = multi_path.apsum_exact(test_image)
 
 fig, ax = plt.subplots(figsize=(7, 3.5))
 ax.imshow(test_image, origin="lower", cmap="gray_r", vmin=0.0, vmax=1.0)

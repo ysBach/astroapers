@@ -83,10 +83,10 @@ r_out = 25.0
 dtheta = np.deg2rad(20.0)
 
 jet_ap = aap.WedgeAp((x0, y0), r_in, r_out, theta_jet, dtheta)
-jet_apsum, jet_npix = jet_ap.apsum(data, method="exact")
+jet_apsum, jet_npix = jet_ap.apsum_exact(data)
 
 an = aap.CircAn((x0, y0), 30, 40)
-an_weights = an.weights(method="center")[0]  # use "center" for full pixels
+an_weights = an.weights_center()[0]  # use "center" for full pixels
 an_bbox = an.bboxes()[0]
 msky = np.nanmedian(an_bbox.weighted_values(an_weights, data))
 
@@ -123,7 +123,7 @@ npix = np.empty_like(angles_rad)
 
 for i, angle in enumerate(angles_rad):
     ap = aap.WedgeAp((x0, y0), r_in, r_out, angle, dtheta)
-    raw_sums[i], npix[i] = ap.apsum(data, method="exact")
+    raw_sums[i], npix[i] = ap.apsum_exact(data)
 
 excess = raw_sums - msky * npix
 best = np.argmax(excess)
@@ -146,22 +146,22 @@ The base level is higher than zero because the wedge includes some coma flux. In
 
 ## Center mode and caveats
 
-`method="center"` assigns each pixel by its center. For large wedges this is a fast approximation that often gives a similar result to `method="exact"`.
+`apsum_center()` assigns each pixel by its center. For large wedges this is a fast approximation that often gives a similar result to `apsum_exact()`.
 
 ```{python}
-center_apsum, center_npix = jet_ap.apsum(data, method="center")
+center_apsum, center_npix = jet_ap.apsum_center(data)
 
 print(f"center_apsum: {center_apsum:.3f}")
-print(f"exact_apsum: {jet_apsum:.3f}")
+print(f"apsum_exact: {jet_apsum:.3f}")
 print(f"center_npix : {center_npix:.3f}")
-print(f"exact_npix : {jet_npix:.3f}")
+print(f"npix_exact : {jet_npix:.3f}")
 ```
 
-`method="exact"` computes analytic fractional pixel overlap. Constant wedges
+`apsum_exact()` computes analytic fractional pixel overlap. Constant wedges
 like the examples above use a fast sector path; generalized wedges connect the
 inner and outer arc endpoints with straight sides and are also evaluated
 analytically. Use exact mode when fractional overlap is scientifically
-necessary; otherwise prefer `method="center"` for exploratory scans and large
+necessary; otherwise prefer `apsum_center()` for exploratory scans and large
 position-angle sweeps.
 
 ```{python}
@@ -176,10 +176,10 @@ tapered = aap.WedgeAp(
 )
 
 # Exact generalized wedges are available, but center mode is still faster.
-tapered_center_sum, tapered_center_npix = tapered.apsum(data, method="center")
-tapered_exact_sum, tapered_exact_npix = tapered.apsum(data, method="exact")
+tapered_center_sum, tapered_center_npix = tapered.apsum_center(data)
+tapered_exact_sum, tapered_npix_exact = tapered.apsum_exact(data)
 
-np.array([tapered_center_sum, tapered_exact_sum, tapered_center_npix, tapered_exact_npix])
+np.array([tapered_center_sum, tapered_exact_sum, tapered_center_npix, tapered_npix_exact])
 ```
 
 ## Low-Level Kernels for Lowest Overhead
