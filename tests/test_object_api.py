@@ -175,53 +175,59 @@ def test_sampled_values_applies_bad_pixel_mask():
     assert_allclose(values[0], expected)
 
 
-def test_sampled_values_return_dist_matches_center_selected_value_order():
+def test_sampled_values_return_pix_matches_center_selected_value_order():
     data = np.arange(25, dtype=np.float64).reshape(5, 5)
     aperture = apers.CircAp((2.0, 2.0), r=1.1)
 
-    values, distances = aperture.sampled_values(data, return_dist=True)
+    values, pix = aperture.sampled_values(data, return_pix=True)
     weights = aperture.weights_center()[0]
     bbox = aperture.bboxes()[0]
     selected = bbox.to_image(weights, data.shape).astype(bool)
     yy, xx = np.nonzero(selected)
-    expected_distances = np.hypot(xx - 2.0, yy - 2.0)
 
     assert isinstance(values, list)
-    assert isinstance(distances, list)
-    assert len(values) == len(distances) == 1
+    assert isinstance(pix, list)
+    assert len(values) == len(pix) == 1
+    pix_y, pix_x = pix[0]
     assert_allclose(values[0], data[selected].ravel())
-    assert_allclose(distances[0], expected_distances)
+    assert_allclose(pix_y, yy)
+    assert_allclose(pix_x, xx)
 
 
-def test_sampled_values_return_dist_applies_bad_pixel_mask_to_distances():
+def test_sampled_values_return_pix_applies_bad_pixel_mask_to_pix():
     data = np.arange(25, dtype=np.float64).reshape(5, 5)
     aperture = apers.CircAp((2.0, 2.0), r=1.1)
     bad = np.zeros_like(data, dtype=bool)
     bad[2, 2] = True
 
-    values, distances = aperture.sampled_values(data, mask=bad, return_dist=True)
+    values, pix = aperture.sampled_values(data, mask=bad, return_pix=True)
+    pix_y, pix_x = pix[0]
 
-    assert 0.0 not in distances[0]
-    assert values[0].size == distances[0].size
+    assert not np.any((pix_y == 2.0) & (pix_x == 2.0))
+    assert values[0].size == pix_y.size == pix_x.size
 
 
-def test_sampled_values_return_dist_flat_reconstructs_values_and_distances():
+def test_sampled_values_return_pix_flat_reconstructs_values_and_pix():
     data = np.arange(100, dtype=np.float64).reshape(10, 10)
     aperture = apers.RectAp([(2.0, 2.0), (7.0, 7.0)], w=3.0, h=3.0)
 
-    values, distances = aperture.sampled_values(data, return_dist=True)
-    flat_values, flat_distances, offsets = aperture.sampled_values(
-        data, flat=True, return_dist=True
+    values, pix = aperture.sampled_values(data, return_pix=True)
+    flat_values, flat_pix, offsets = aperture.sampled_values(
+        data, flat=True, return_pix=True
     )
     split_values = np.split(flat_values, offsets[1:-1])
-    split_distances = np.split(flat_distances, offsets[1:-1])
+    flat_pix_y, flat_pix_x = flat_pix
+    split_pix_y = np.split(flat_pix_y, offsets[1:-1])
+    split_pix_x = np.split(flat_pix_x, offsets[1:-1])
 
-    assert flat_values.shape == flat_distances.shape
+    assert flat_values.shape == flat_pix_y.shape == flat_pix_x.shape
     assert offsets[-1] == flat_values.size
     for got_values, want_values in zip(split_values, values, strict=True):
         assert_allclose(got_values, want_values)
-    for got_distances, want_distances in zip(split_distances, distances, strict=True):
-        assert_allclose(got_distances, want_distances)
+    for got_y, got_x, want_pix in zip(split_pix_y, split_pix_x, pix, strict=True):
+        want_y, want_x = want_pix
+        assert_allclose(got_y, want_y)
+        assert_allclose(got_x, want_x)
 
 
 def test_weighted_values_returns_positive_weighted_data():
@@ -346,6 +352,22 @@ def test_sampled_cutout_preserves_bbox_shape_and_uses_fill_value():
     assert len(cutout) == 1
     assert cutout[0].shape == bbox.shape
     assert_allclose(cutout[0], expected)
+
+
+def test_sampled_cutout_return_pix_matches_cutout_shape_and_mask():
+    data = np.arange(25, dtype=np.float64).reshape(5, 5)
+    aperture = apers.CircAp((2.0, 2.0), r=1.1)
+    bad = np.zeros_like(data, dtype=bool)
+    bad[2, 2] = True
+
+    cutout, pix = aperture.sampled_cutout(data, mask=bad, return_pix=True)
+    pix_y, pix_x = pix[0]
+    valid = np.isfinite(pix_y)
+
+    assert cutout[0].shape == pix_y.shape == pix_x.shape
+    assert not valid[1, 1]
+    assert_allclose(pix_y[valid], [1.0, 2.0, 2.0, 3.0])
+    assert_allclose(pix_x[valid], [2.0, 1.0, 3.0, 2.0])
 
 
 def test_weighted_cutout_preserves_bbox_shape_and_uses_fill_value():

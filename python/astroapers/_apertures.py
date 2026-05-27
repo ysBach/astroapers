@@ -13,7 +13,6 @@ import math
 
 import numpy as np
 
-from . import _rust as aapr
 from ._aperture_kernel_ops import (
     CIRC_AN_OPS,
     CIRC_OPS,
@@ -268,7 +267,7 @@ class PixelAp:
         return _shape_apsum_result(self, apsum)
 
     def sampled_values(
-        self, data, *, mask=None, flat: bool = False, return_dist: bool = False
+        self, data, *, mask=None, flat: bool = False, return_pix: bool = False
     ):
         """Return unweighted values whose pixel centers fall in the aperture.
 
@@ -278,30 +277,36 @@ class PixelAp:
         omitted. By default, this returns one 1-D array per aperture position,
         even for scalar apertures. With ``flat=True``, return
         ``(flat_values, offsets)`` where aperture ``i`` maps to
-        ``flat_values[offsets[i]:offsets[i + 1]]``. With ``return_dist=True``,
-        also return Euclidean pixel-center distances from each aperture center,
-        aligned element-by-element with the returned values.
+        ``flat_values[offsets[i]:offsets[i + 1]]``. With ``return_pix=True``,
+        also return absolute pixel-center coordinate arrays aligned
+        element-by-element with the returned values. For two-dimensional
+        apertures, each coordinate tuple is ``(yy, xx)``. Subtract the aperture
+        center to get relative offsets, and use ``np.hypot(dx, dy)`` to compute
+        Euclidean radial distance.
         """
         arr = np.asarray(data)
         if arr.ndim != 2:
             raise ValueError("data must be a 2-D array")
         bad = None if mask is None else validate_mask(mask, arr.shape)
-        if return_dist:
+        if return_pix:
             pairs = [
                 self._sampled_values_one(arr, float(x), float(y), bad, True)
                 for x, y in self.positions
             ]
-            values = [value for value, _distance in pairs]
-            distances = [distance for _value, distance in pairs]
+            values = [value for value, _pix in pairs]
+            pix = [coord for _value, coord in pairs]
             if flat:
                 flat_values, offsets = _flatten_value_list(values, arr.dtype)
-                flat_distances, dist_offsets = _flatten_value_list(
-                    distances, np.float64
-                )
-                if not np.array_equal(offsets, dist_offsets):
-                    raise RuntimeError("sampled value and distance offsets differ")
-                return flat_values, flat_distances, offsets
-            return values, distances
+                flat_pix = []
+                for axis_coords in zip(*pix, strict=True):
+                    flat_axis, axis_offsets = _flatten_value_list(
+                        axis_coords, np.float64
+                    )
+                    if not np.array_equal(offsets, axis_offsets):
+                        raise RuntimeError("sampled value and pix offsets differ")
+                    flat_pix.append(flat_axis)
+                return flat_values, tuple(flat_pix), offsets
+            return values, pix
         values = [
             self._sampled_values_one(arr, float(x), float(y), bad, False)
             for x, y in self.positions
@@ -331,12 +336,18 @@ class PixelAp:
             return _flatten_value_list(values, arr.dtype)
         return values
 
-    def sampled_cutout(self, data, mask=None, fill_value: float = np.nan):
+    def sampled_cutout(
+        self, data, mask=None, fill_value: float = np.nan, return_pix: bool = False
+    ):
         """Return bbox-tight center-sampled cutouts.
 
         Selected pixels contain unweighted data values. Masked and off-image
         pixels contain ``fill_value``. This always returns one 2-D cutout per
-        aperture position.
+        aperture position. With ``return_pix=True``, also return absolute
+        pixel-center coordinate arrays with the same bbox-tight shapes as the
+        cutouts. For two-dimensional apertures, each coordinate tuple is
+        ``(yy, xx)``. Subtract the aperture center to get relative offsets, and
+        use ``np.hypot(dx, dy)`` to compute Euclidean radial distance.
         """
         arr = np.asarray(data)
         if arr.ndim != 2:
@@ -346,6 +357,12 @@ class PixelAp:
             self._cutout_center_one(arr, float(x), float(y), bad, fill_value)
             for x, y in self.positions
         ]
+        if return_pix:
+            pix = [
+                self._cutout_pix_one(arr, float(x), float(y), bad)
+                for x, y in self.positions
+            ]
+            return cutouts, pix
         return cutouts
 
     def weighted_cutout(self, data, mask=None, fill_value: float = np.nan):
@@ -409,33 +426,29 @@ class PixelAp:
         return plot_apertures(self, ax=ax, origin=origin, **kwargs)
 
     def _sampled_values_one(
-        self, data: np.ndarray, x: float, y: float, mask, return_dist: bool
+        self, data: np.ndarray, x: float, y: float, mask, return_pix: bool
     ):
         bbox = self._bbox_one(x, y)
         overlap = bbox.overlap_slices(data.shape)
         if overlap is None:
             empty_values = np.array([], dtype=data.dtype)
-            if return_dist:
-                return empty_values, np.array([], dtype=np.float64)
+            if return_pix:
+                empty_axis = np.array([], dtype=np.float64)
+                return empty_values, (empty_axis, empty_axis.copy())
             return empty_values
         data_slices, mask_slices = overlap
         selected = self._weights_center_one(x, y, bbox)[mask_slices] > 0.0
         if mask is not None:
             selected &= ~mask[data_slices]
         values = data[data_slices][selected].ravel()
-        if not return_dist:
+        if not return_pix:
             return values
-        distances = np.asarray(
-            aapr._selected_pixel_distances(
-                np.ascontiguousarray(selected),
-                x,
-                y,
-                bbox.ixmin + mask_slices[1].start,
-                bbox.iymin + mask_slices[0].start,
-            ),
-            dtype=np.float64,
-        )
-        return values, distances
+        rows, cols = np.nonzero(selected)
+        origin_x = bbox.ixmin + mask_slices[1].start
+        origin_y = bbox.iymin + mask_slices[0].start
+        pix_y = rows.astype(np.float64) + origin_y
+        pix_x = cols.astype(np.float64) + origin_x
+        return values, (pix_y, pix_x)
 
     def _weighted_values_one(self, data: np.ndarray, x: float, y: float, mask):
         bbox = self._bbox_one(x, y)
@@ -477,6 +490,24 @@ class PixelAp:
             fill_value=fill_value,
             validate=False,
         )
+
+    def _cutout_pix_one(self, data: np.ndarray, x: float, y: float, mask):
+        bbox = self._bbox_one(x, y)
+        pix_y = np.full(bbox.shape, np.nan, dtype=np.float64)
+        pix_x = np.full(bbox.shape, np.nan, dtype=np.float64)
+        overlap = bbox.overlap_slices(data.shape)
+        if overlap is None:
+            return pix_y, pix_x
+        data_slices, mask_slices = overlap
+        selected = self._weights_center_one(x, y, bbox)[mask_slices] > 0.0
+        if mask is not None:
+            selected &= ~mask[data_slices]
+        rows, cols = np.nonzero(selected)
+        pix_y_view = pix_y[mask_slices]
+        pix_x_view = pix_x[mask_slices]
+        pix_y_view[rows, cols] = rows.astype(np.float64) + data_slices[0].start
+        pix_x_view[rows, cols] = cols.astype(np.float64) + data_slices[1].start
+        return pix_y, pix_x
 
     def _bbox_one(self, x: float, y: float) -> BoundingBox:
         """Return one scalar bounding box.

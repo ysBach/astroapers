@@ -34,7 +34,7 @@ bbox-tight weights, and aperture summation in pixel coordinates.
   * It is `bbox`-tight, so to get the full image-shaped mask, use `ap.bboxes()[i].to_image(ap.weights_exact()[i], shape)`.
 * **Sampled and weighted values** (class `list[ndarray]`):
   * `samples = ap.sampled_values(image)` returns raw, unweighted *image values* selected by `weights_center()`.
-  * `samples, dist = ap.sampled_values(image, return_dist=True)` also returns Euclidean pixel-center distances from each aperture center, aligned with the sampled values.
+  * `samples, pix = ap.sampled_values(image, return_pix=True)` also returns absolute pixel-center coordinate arrays aligned with the sampled values. For 2-D apertures, each coordinate tuple is `(yy, xx)`; subtract the aperture center to get `dy`/`dx`, and use `np.hypot(dx, dy)` for Euclidean distance.
   * `weighted = ap.weighted_values(image)` is not designed for end users except for deep investigation/degugging. It returns `image * weights_exact()` values for positive-overlap pixels.
   * By default, both methods return one 1-d array per aperture position, even for a scalar aperture.
   * Use `flat=True` for one concatenated array plus offsets (see documentation for details).

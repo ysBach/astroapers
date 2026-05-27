@@ -21,37 +21,29 @@ import astroapers as aap
 
 ## Tilted rectangular sky boxes
 
+### Mock data
 For a longslit-like extraction, use a narrow rectangular source aperture and a
-larger rectangular annulus aligned to the same trace. Here the source aperture
-has width 1 pixel and height 5 pixels. The sky annulus keeps the same width but
-uses inner and outer heights of 10 and 20 pixels.
-
-`sampled_values(..., return_dist=True)` returns center-selected image values and
-the matching Euclidean pixel-center distances from the aperture center. That is
-enough for a simple radial-distance sky fit. If you need a signed coordinate
-along the slit, compute that signed coordinate explicitly from the selected
-pixel positions.
+larger rectangular annulus aligned to the same trace. Imagine you somehow obtained the trace slope (*aperture trace* or *aptrace* in IRAF language) which is `trace_slope` here.
 
 ```{python}
-ny, nx = 70, 80
+ny, nx = 30, 30
 yy, xx = np.mgrid[:ny, :nx]
-x0, y0 = 39.5, 34.0
-theta = np.deg2rad(10.0)
+x0, y0 = 15.5, 15
+trace_slope = 0.05
+theta = np.arctan(trace_slope)
 
-dx = xx - x0
-dy = yy - y0
-local_x = dx * np.cos(theta) + dy * np.sin(theta)
-local_y = -dx * np.sin(theta) + dy * np.cos(theta)
-distance_from_center = np.hypot(dx, dy)
+trace_y = ny // 2 + trace_slope * (xx - x0)
+trace_distance = (yy - trace_y) / np.hypot(1.0, trace_slope)
+spectrum = 5.0 - 0.05 * xx
 
-rng = np.random.default_rng(2026)
-sky_true = 12.0 + 0.08 * distance_from_center
-trace_signal = 45.0 * np.exp(-0.5 * (local_x / 0.35) ** 2)
-trace_signal *= np.exp(-0.5 * (local_y / 1.0) ** 2)
+rng = np.random.default_rng(20260312)
+sky_true = np.full((ny, nx), 12.0) + 0.05 * yy
+trace_signal = spectrum * np.exp(-0.5 * (trace_distance / 0.7) ** 2)
 longslit_image = sky_true + trace_signal
 longslit_image += rng.normal(0.0, 0.08, size=longslit_image.shape)
 ```
 
+### Sky fitting
 ```{python}
 source_ap = aap.RectAp((x0, y0), w=1.0, h=5.0, theta=theta)
 sky_an = aap.RectAn(
@@ -59,33 +51,22 @@ sky_an = aap.RectAn(
     w_in=1.0,
     h_in=10.0,
     w_out=1.0,
-    h_out=20.0,
+    h_out=25.0,
     theta_in=theta,
-    theta_out=theta,
 )
+full_ap = aap.RectAp((x0, y0), w=1.0, h=25.0, theta=theta)
+full_vals, full_pix = full_ap.sampled_values(longslit_image, return_pix=True)
+an_vals, an_pix = sky_an.sampled_values(longslit_image, return_pix=True)
 
-sky_values_list, sky_distances_list = sky_an.sampled_values(
-    longslit_image,
-    return_dist=True,
-)
-source_values_list, source_distances_list = source_ap.sampled_values(
-    longslit_image,
-    return_dist=True,
-)
-
-sky_values = sky_values_list[0]
-sky_distances = sky_distances_list[0]
-source_values = source_values_list[0]
-source_distances = source_distances_list[0]
-
-sky_line = np.polyfit(sky_distances, sky_values, deg=1)
-sky_fit_center = np.polyval(sky_line, 0.0)
-source_sky_model = np.polyval(sky_line, source_distances)
-source_sky_removed = source_values - source_sky_model
-
-assert sky_values.size == sky_distances.size
-assert source_values.size == source_distances.size
-assert sky_fit_center > 11.5
+# `aap` always return list - so get [0] for our case.
+full_vals = full_vals[0]
+an_vals = an_vals[0]
+# `pix` is in Python axis order, so (yy, xx). Subtract the aperture center to
+# get signed pixel offsets.
+full_yy, full_xx = full_pix[0]
+an_yy, an_xx = an_pix[0]
+full_dy = full_yy - y0
+an_dy = an_yy - y0
 ```
 
 ```{python}
@@ -96,25 +77,15 @@ source_ap.plot(ax=axes[0], color="tab:red", lw=1.4)
 sky_an.plot(ax=axes[0], color="white", lw=1.1)
 axes[0].set_title("Tilted source aperture and sky annulus")
 
-order = np.argsort(sky_distances)
-axes[1].scatter(sky_distances, sky_values, s=20, alpha=0.75, label="sky pixels")
-axes[1].plot(
-    sky_distances[order],
-    np.polyval(sky_line, sky_distances[order]),
-    color="tab:red",
-    lw=2,
-    label="linear sky fit",
-)
-axes[1].scatter(
-    source_distances,
-    source_sky_removed,
-    s=28,
-    marker="x",
-    color="black",
-    label="source pixels after sky",
-)
-axes[1].set_xlabel("distance from aperture center (pixels)")
-axes[1].set_ylabel("pixel value")
+axes[1].scatter(full_dy, full_vals, color="gray", s=13)
+axes[1].scatter(an_dy, an_vals, color="g")
+# linear fit to x=an_dy, y=an_vals
+an_fit = np.polyfit(an_dy, an_vals, deg=1)
+an_fit_line = np.polyval(an_fit, an_dy)
+axes[1].plot(an_dy, an_fit_line, color="g", lw=2, label=f"val={an_fit[0]:.3f}*dy + {an_fit[1]:.3f}")
+print(f"Annulus fit: {an_fit}")
+axes[1].set_xlabel("distance from center dy (pixels)")
+axes[1].set_ylabel("sampled values")
 axes[1].legend()
 
 plt.show()
@@ -123,16 +94,104 @@ plt.show()
 The annulus only selects pixels. The background model is your choice: a median,
 a clipped statistic, a polynomial, or a model tied to the observing setup.
 
+### Full sky subtraction
+
+Repeat the same sky fit at each wavelength-bin center. `RectAp` requires finite
+sizes, so use an image-covering finite height for the full subtraction strip;
+this is the practical equivalent of a full-height aperture for this image.
+
+```{python}
+lambda_x = np.arange(nx, dtype=np.float64) + 0.5
+trace_y_at_x = ny // 2 + trace_slope * (lambda_x - x0)
+full_height = 2.0 * np.hypot(nx, ny)
+positions = list(zip(lambda_x, trace_y_at_x, strict=True))
+
+kw_an = dict(w_in=1.0, h_in=10.0, w_out=1.0, h_out=25.0, theta_in=theta)
+kw_full_ap = dict(w=1.0, h=full_height, theta=theta)
+src_aps = aap.RectAp(positions, w=1., h=5., theta=theta)
+sky_ans = aap.RectAn(positions, **kw_an)
+full_aps = aap.RectAp(positions, **kw_full_ap)
+```
+
+```{python}
+sky_sub_sum = np.zeros_like(longslit_image, dtype=np.float64)
+sky_sub_n = np.zeros_like(longslit_image, dtype=np.int16)
+sky_models = []
+
+sky_vals, sky_pix, sky_offsets = sky_ans.sampled_values(
+    longslit_image,
+    flat=True,
+    return_pix=True,
+)
+sky_yy, _ = sky_pix
+full_vals, full_pix, full_offsets = full_aps.sampled_values(
+    longslit_image,
+    flat=True,
+    return_pix=True,
+)
+full_yy, full_xx = full_pix
+
+for idx, (_x_cen, y_cen) in enumerate(full_aps.positions):
+    sky_lo, sky_hi = sky_offsets[idx], sky_offsets[idx + 1]
+    full_lo, full_hi = full_offsets[idx], full_offsets[idx + 1]
+
+    sky_dy = sky_yy[sky_lo:sky_hi] - y_cen
+    sky_fit = np.polyfit(sky_dy, sky_vals[sky_lo:sky_hi], deg=1)
+    sky_models.append(sky_fit)
+
+    yy_i = full_yy[full_lo:full_hi].astype(int)
+    xx_i = full_xx[full_lo:full_hi].astype(int)
+    full_dy = full_yy[full_lo:full_hi] - y_cen
+    full_sky_sub = full_vals[full_lo:full_hi] - np.polyval(sky_fit, full_dy)
+
+    np.add.at(sky_sub_sum, (yy_i, xx_i), full_sky_sub)
+    np.add.at(sky_sub_n, (yy_i, xx_i), 1)
+
+sky_sub_image = np.full_like(longslit_image, np.nan, dtype=np.float64)
+covered = sky_sub_n > 0
+sky_sub_image[covered] = sky_sub_sum[covered] / sky_sub_n[covered]
+sky_models = np.asarray(sky_models)
+
+assert np.all(sky_sub_n[:, 1:-1] > 0)
+assert np.isfinite(sky_sub_image[covered]).all()
+```
+
+```{python}
+flux = src_aps.apsum_exact(
+    np.nan_to_num(sky_sub_image, nan=0.0),
+    return_npix=False,
+)
+expected_flux = src_aps.apsum_exact(trace_signal, return_npix=False)
+
+assert flux.shape == lambda_x.shape
+assert np.nanmax(np.abs(flux[1:-1] - expected_flux[1:-1])) < 0.5
+```
+
+```{python}
+fig, axes = plt.subplots(1, 2, figsize=(9.5, 3.8), constrained_layout=True)
+
+im = axes[0].imshow(sky_sub_image, origin="lower", cmap="viridis")
+src_aps.plot(ax=axes[0], color="tab:red", lw=0.6)
+axes[0].set_title("Sky-subtracted full strips")
+fig.colorbar(im, ax=axes[0], fraction=0.046, pad=0.04)
+
+axes[1].plot(lambda_x, flux, marker="o", label="measured")
+axes[1].plot(lambda_x, expected_flux, color="black", lw=1.5, label="input source")
+axes[1].set_xlabel(r"$\lambda$ pixel")
+axes[1].set_ylabel("source flux")
+axes[1].legend()
+
+plt.show()
+```
+
 ## Elliptical inner boundary and circular outer boundary
 
-The next image has an elliptical inner component and a circular coma:
+The next example has an elliptical inner component and a circular coma:
 
-- elliptical Gaussian: amplitude 20, `sigma_x=5` pixels, `sigma_y=8` pixels,
-  rotated by 45 degrees;
-- circular Gaussian coma: amplitude 12, `sigma=10` pixels.
+- Large elliptical Gaussian coma
+- Core circular Gaussian coma
 
-The annulus excludes the inner ellipse but samples out to a circular radius of
-30 pixels.
+Imagine we know the position angle and ellipticity of the inner coma component, but we want to subtract the circular outer coma to get the flux of inner component.
 
 ```{python}
 ny, nx = 90, 90
@@ -164,42 +223,25 @@ coma_annulus = aap.EllipAn(
     theta_out=0.0,
 )
 
-coma_values_list, coma_distances_list = coma_annulus.sampled_values(
-    coma_image,
-    return_dist=True,
-)
-coma_values = coma_values_list[0]
-coma_distances = coma_distances_list[0]
+coma_values, coma_pix = coma_annulus.sampled_values(coma_image, return_pix=True)
+coma_values = coma_values[0]
+coma_y, coma_x = coma_pix[0]
+coma_radius = np.hypot(coma_x - x0, coma_y - y0)
 
-assert coma_values.size == coma_distances.size
+assert coma_values.size == coma_radius.size
 assert coma_values.size > 0
 ```
 
 ```{python}
-radial_bins = np.arange(10.0, 31.0, 2.0)
-bin_center = 0.5 * (radial_bins[:-1] + radial_bins[1:])
-bin_median = np.array(
-    [
-        np.median(
-            coma_values[
-                (coma_distances >= r0) & (coma_distances < r1)
-            ]
-        )
-        for r0, r1 in zip(radial_bins[:-1], radial_bins[1:])
-    ]
-)
-
-valid = np.isfinite(bin_median) & (bin_median > 0.0)
-log_coma_fit = np.polyfit(bin_center[valid] ** 2, np.log(bin_median[valid]), deg=1)
-
-
 def radial_coma_model(distance):
     return np.exp(np.polyval(log_coma_fit, distance**2))
 
+valid = coma_values > 0.0
+log_coma_fit = np.polyfit(coma_radius[valid] ** 2, np.log(coma_values[valid]), deg=1)
 
 coma_model = radial_coma_model(radius)
 residual = coma_image - coma_model
-annulus_model_values = radial_coma_model(coma_distances)
+annulus_model_values = radial_coma_model(coma_radius)
 annulus_residual_mad = np.median(np.abs(coma_values - annulus_model_values))
 image_rms = np.sqrt(np.mean(coma_image**2))
 residual_rms = np.sqrt(np.mean(residual**2))
@@ -211,15 +253,7 @@ assert residual_rms < image_rms
 ```{python}
 fig, axes = plt.subplots(1, 2, figsize=(9.5, 3.8), constrained_layout=True)
 
-axes[0].scatter(coma_distances, coma_values, s=14, alpha=0.55)
-axes[0].plot(
-    bin_center[valid],
-    bin_median[valid],
-    marker="o",
-    color="black",
-    lw=0,
-    label="binned median",
-)
+axes[0].scatter(coma_radius, coma_values, s=14, alpha=0.25)
 r_plot = np.linspace(0.0, 30.0, 200)
 axes[0].plot(r_plot, radial_coma_model(r_plot), color="tab:red", lw=2, label="fit")
 axes[0].set_xlabel("distance from center (pixels)")
@@ -256,9 +290,7 @@ plt.show()
 ```
 
 The model is intentionally simple. The radial fit removes most of the circular
-coma and leaves the non-circular inner component in the residual. For real
-data, replace the toy fit with a robust binned profile, spline, or physical
-coma model.
+coma and leaves the non-circular inner component in the residual.
 
 ## Maximum Performance
 
