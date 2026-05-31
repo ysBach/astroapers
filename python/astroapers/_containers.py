@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
+import reducers as rd
 
 OverlapSlices = tuple[tuple[slice, slice], tuple[slice, slice]]
 
@@ -269,13 +270,15 @@ class BoundingBox:
         overlap = self.overlap_slices(shape)
         if overlap is None:
             return 0.0
+        bad = (
+            None if mask is None else (validate_mask(mask, shape) if validate else mask)
+        )
         data_slices, mask_slices = overlap
         weights = w_full[mask_slices]
-        if mask is not None:
+        if bad is not None:
             weights = weights.copy()
-            bad = validate_mask(mask, shape) if validate else mask
             weights[bad[data_slices]] = 0.0
-        return float(np.sum(weights, dtype=np.float64))
+        return _sum_float64(weights)
 
     def apsum(self, weights, image, mask=None, *, return_npix=True, validate=True):
         """Return aperture sum, and npix by default, for raw aperture weights.
@@ -315,17 +318,25 @@ class BoundingBox:
         overlap = self.overlap_slices(arr.shape)
         if overlap is None:
             return (0.0, 0.0) if return_npix else 0.0
+        bad = (
+            None
+            if mask is None
+            else (validate_mask(mask, arr.shape) if validate else mask)
+        )
         data_slices, mask_slices = overlap
         weights = w_full[mask_slices].astype(np.float64, copy=False)
-        if mask is not None:
+        if bad is not None:
             weights = weights.copy()
-            bad = validate_mask(mask, arr.shape) if validate else mask
             weights[bad[data_slices]] = 0.0
         data_values = arr[data_slices].astype(np.float64, copy=False)
-        apsum = float(np.sum(data_values * weights, dtype=np.float64))
+        apsum = _sum_float64(data_values * weights)
         if not return_npix:
             return apsum
-        return apsum, float(np.sum(weights, dtype=np.float64))
+        return apsum, _sum_float64(weights)
+
+
+def _sum_float64(values: np.ndarray) -> float:
+    return float(rd.sum(np.ravel(values), validate=False))
 
 
 def _validate_weights(weights, bbox: BoundingBox) -> np.ndarray:

@@ -5,6 +5,7 @@ import pytest
 from numpy.testing import assert_allclose
 
 import astroapers as apers
+from astroapers import _containers
 
 
 def _selected_coords(mask):
@@ -269,12 +270,35 @@ def test_float32_bbox_reductions_accumulate_in_float64():
     float32_apsum = np.sum(data * weights, dtype=np.float32)
     float32_npix = np.sum(weights, dtype=np.float32)
 
-    assert_allclose(apsum, expected_apsum, rtol=0, atol=0)
-    assert_allclose(npix, expected_npix, rtol=0, atol=0)
+    eps = np.finfo(np.float64).eps
+    assert_allclose(
+        apsum, expected_apsum, rtol=0, atol=eps * data.size * abs(expected_apsum)
+    )
+    assert_allclose(
+        npix, expected_npix, rtol=0, atol=eps * weights.size * abs(expected_npix)
+    )
     assert apsum != float(float32_apsum)
     assert npix != float(float32_npix)
     assert bbox.apsum(weights, data, return_npix=False) == apsum
     assert bbox.npix(weights, data.shape) == npix
+
+
+def test_bbox_apsum_uses_reducers_sum(monkeypatch):
+    bbox = apers.BoundingBox(1, 3, 2, 4)
+    weights = np.ones(bbox.shape, dtype=np.float64)
+    data = np.ones((6, 6), dtype=np.float64)
+    calls = []
+
+    def fake_sum(values, *, validate):
+        calls.append((values, validate))
+        return np.sum(values, dtype=np.float64)
+
+    monkeypatch.setattr(_containers, "rd", type("FakeReducers", (), {"sum": fake_sum}))
+
+    assert bbox.apsum(weights, data) == (4.0, 4.0)
+    assert len(calls) == 2
+    assert calls[0][1] is False
+    assert calls[1][1] is False
 
 
 def test_user_supplied_non_float32_float64_weights_convert_to_float64():
