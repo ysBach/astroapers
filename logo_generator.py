@@ -166,7 +166,7 @@ def generate_astroapers_logo(output_filename="astroapers_logo.png"):
         alpha=0.4,
     )
 
-    t1 = ax.text(
+    ax.text(
         0.0,
         fig_size[1] / 2,
         "astr",
@@ -179,7 +179,7 @@ def generate_astroapers_logo(output_filename="astroapers_logo.png"):
             path_effects.Normal(),
         ],
     )
-    t2 = ax.text(
+    ax.text(
         0.0,
         fig_size[1] / 2,
         "apers",
