@@ -283,22 +283,30 @@ def test_float32_bbox_reductions_accumulate_in_float64():
     assert bbox.npix(weights, data.shape) == npix
 
 
-def test_bbox_apsum_uses_reducers_sum(monkeypatch):
+def test_bbox_apsum_uses_fused_reducers_weighted_sum(monkeypatch):
     bbox = apers.BoundingBox(1, 3, 2, 4)
     weights = np.ones(bbox.shape, dtype=np.float64)
     data = np.ones((6, 6), dtype=np.float64)
     calls = []
 
-    def fake_sum(values, *, validate):
-        calls.append((values, validate))
-        return np.sum(values, dtype=np.float64)
+    def fake_sum(values, *, weights=None, return_sum_weights=False, validate):
+        calls.append((values, weights, return_sum_weights, validate))
+        weighted_sum = np.sum(values * weights, dtype=np.float64)
+        if return_sum_weights:
+            return weighted_sum, np.sum(weights, dtype=np.float64)
+        return weighted_sum
 
     monkeypatch.setattr(_containers, "rd", type("FakeReducers", (), {"sum": fake_sum}))
 
     assert bbox.apsum(weights, data) == (4.0, 4.0)
+    assert bbox.apsum(weights, data, return_npix=False) == 4.0
     assert len(calls) == 2
-    assert calls[0][1] is False
-    assert calls[1][1] is False
+    assert calls[0][1] is not None
+    assert calls[0][2] is True
+    assert calls[0][3] is False
+    assert calls[1][1] is not None
+    assert calls[1][2] is False
+    assert calls[1][3] is False
 
 
 def test_user_supplied_non_float32_float64_weights_convert_to_float64():

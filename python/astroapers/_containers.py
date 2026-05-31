@@ -329,14 +329,27 @@ class BoundingBox:
             weights = weights.copy()
             weights[bad[data_slices]] = 0.0
         data_values = arr[data_slices].astype(np.float64, copy=False)
-        apsum = _sum_float64(data_values * weights)
         if not return_npix:
-            return apsum
-        return apsum, _sum_float64(weights)
+            return _weighted_sum_float64(data_values, weights, return_sum_weights=False)
+        return _weighted_sum_float64(data_values, weights, return_sum_weights=True)
 
 
 def _sum_float64(values: np.ndarray) -> float:
     return float(rd.sum(np.ravel(values), validate=False))
+
+
+def _weighted_sum_float64(
+    values: np.ndarray, weights: np.ndarray, *, return_sum_weights: bool
+) -> float | tuple[float, float]:
+    result = rd.sum(
+        np.ravel(values),
+        weights=np.ravel(weights),
+        return_sum_weights=return_sum_weights,
+        validate=False,
+    )
+    if return_sum_weights:
+        return float(result[0]), float(result[1])
+    return float(result)
 
 
 def _validate_weights(weights, bbox: BoundingBox) -> np.ndarray:
