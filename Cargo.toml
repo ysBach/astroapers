@@ -2,17 +2,35 @@
 name = "astroapers"
 version = "0.1.1"
 edition = "2021"
+description = "Rust-backed aperture overlap and summation utilities"
+license = "BSD-3-Clause"
+readme = "README.md"
+repository = "https://github.com/ysbach/astroapers"
+homepage = "https://ysbach.github.io/astroapers/"
+documentation = "https://docs.rs/astroapers"
+keywords = ["astronomy", "aperture", "photometry", "numpy", "pyo3"]
+categories = ["science", "algorithms"]
+include = [
+    "/Cargo.toml",
+    "/Cargo.lock",
+    "/LICENSE",
+    "/README.md",
+    "/src/**/*.rs",
+    "/tests/**/*.rs",
+]
 
 [lib]
-name = "_rust"
+name = "astroapers"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-extension-module = ["pyo3/extension-module"]
+default = []
+python = ["dep:pyo3", "dep:numpy"]
+extension-module = ["python", "pyo3/extension-module"]
 
 [dependencies]
-numpy = "0.28"
-pyo3 = { version = "0.28" }
+numpy = { version = "0.28", optional = true }
+pyo3 = { version = "0.28", optional = true }
 rayon = "1.10"
 
 [profile.release]

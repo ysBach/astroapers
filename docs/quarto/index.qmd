@@ -85,6 +85,46 @@ Coordinates follow the SEP/Photutils pixel convention: pixel `(x, y)` is
 centered at integer coordinates and covers `[x - 0.5, x + 0.5]`.
 
 
+## Rust Crate Use
+
+`astroapers` is also usable as a Rust crate. The public Rust aperture helpers do
+not depend on PyO3 or NumPy unless the Python extension feature is enabled.
+
+```toml
+[dependencies]
+astroapers = "0.1"
+```
+
+For a local checkout before the crate is published, use:
+
+```toml
+[dependencies]
+astroapers = { path = "../astroapers", default-features = false }
+```
+
+```rust
+use astroapers::{circle_bbox, circle_exact_weight_at_pixel};
+
+let bbox = circle_bbox(8.0, 8.0, 3.0);
+let mut area = 0.0;
+
+for y in bbox.y_range() {
+    for x in bbox.x_range() {
+        area += circle_exact_weight_at_pixel(8.0, 8.0, 3.0, x, y);
+    }
+}
+
+assert!((area - std::f64::consts::PI * 9.0).abs() < 1.0e-12);
+```
+
+The current Rust-facing API exposes bbox-tight extents and exact pixel weights
+for circles, ellipses, and rectangles. Build local Rust API docs with:
+
+```bash
+cargo doc --no-default-features --open
+```
+
+
 This site has these documentation sections:
 
 - [Aperture gallery](gallery.qmd), a visual catalog of built-in apertures,
@@ -93,6 +133,7 @@ This site has these documentation sections:
   and parallel threshold tuning.
 - [Benchmarks](benchmarks.qmd), a small reproducible benchmark table.
 - [API reference](api/index.qmd), generated from the package docstrings.
+- [Rust API](rust-api.qmd), a landing page for the generated rustdoc output.
 - Tutorials, written as runnable Quarto documents.
 
 

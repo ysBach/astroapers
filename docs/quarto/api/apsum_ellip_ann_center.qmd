@@ -32,7 +32,7 @@ Return center-selected elliptical-annulus aperture sums for one or many aperture
 
 <code>[**a_in, b_in, a_out, b_out**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
 
-:   Inner and outer ellipse semiaxes in pixels. Inner axes must be smaller than the corresponding outer axes.
+:   Inner and outer ellipse semiaxes in pixels. Inner axes must be no larger than the corresponding outer axes, and at least one outer axis must be larger.
 
 <code>[**theta_in**]{.parameter-name} [:]{.parameter-annotation-sep} [float, optional]{.parameter-annotation} [ = ]{.parameter-default-sep} [0.0]{.parameter-default}</code>
 
@@ -62,4 +62,4 @@ Return center-selected elliptical-annulus aperture sums for one or many aperture
 
 ## Notes {.doc-section .doc-section-notes}
 
-For matched inner and outer angles, this uses outer-minus-inner direct center aperture summation. For split-angle annuli, it uses Rust-generated bbox-tight annulus weights and the same center-boundary convention as bbox-tight weights.
+For more raw-call patterns, inspect ``astroapers.kernels``; it is the Python layer that calls ``_rust`` internally. For matched inner and outer angles, this uses outer-minus-inner direct center aperture summation. For split-angle annuli, it uses Rust-generated bbox-tight annulus weights and the same center-boundary convention as bbox-tight weights.

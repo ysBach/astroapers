@@ -42,6 +42,8 @@ website:
         text: Benchmarks
       - href: api/index.qmd
         text: API reference
+      - href: rust-api.qmd
+        text: Rust API
 
 format:
   html:

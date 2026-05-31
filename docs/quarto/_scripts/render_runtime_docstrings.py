@@ -22,6 +22,50 @@ def main() -> None:
         path = API_DIR / f"{name}.qmd"
         if path.exists():
             path.write_text(_render_function_page(name, obj), encoding="utf-8")
+    _restore_raw_rust_links()
+
+
+def _restore_raw_rust_links() -> None:
+    """Keep the hand-written raw extension page linked after quartodoc rebuilds."""
+    sidebar = API_DIR / "_sidebar.yml"
+    if sidebar.exists():
+        text = sidebar.read_text(encoding="utf-8")
+        raw_section = (
+            "    - contents:\n"
+            "      - api/raw-rust.qmd\n"
+            "      section: Raw Rust extension\n"
+        )
+        if "section: Raw Rust extension" not in text:
+            marker = (
+                "    - contents:\n"
+                "      - api/BoundingBox.qmd\n"
+                "      section: Bounding boxes\n"
+            )
+            text = text.replace(marker, marker + raw_section)
+            sidebar.write_text(text, encoding="utf-8")
+
+    index = API_DIR / "index.qmd"
+    if index.exists():
+        text = index.read_text(encoding="utf-8")
+        raw_section = (
+            "## Raw Rust extension\n\n"
+            "Expert API for maximum performance and raw extension return values.\n\n"
+            "| | |\n"
+            "| --- | --- |\n"
+            "| [Raw Rust extension](raw-rust.qmd) | Import `astroapers._rust as aapr` and call raw signatures with contiguous arrays. |\n\n"
+        )
+        if "## Raw Rust extension" not in text:
+            text = text.replace(
+                "## Python convenience functions\n",
+                raw_section + "## Python convenience functions\n",
+            )
+        text = text.replace(
+            "Reference functions used by the object layer.",
+            "Reference for Python functions used by the object layer. For maximum\n"
+            "performance, import `astroapers._rust as aapr`; inspect `astroapers.kernels` for\n"
+            "raw usage patterns.",
+        )
+        index.write_text(text, encoding="utf-8")
 
 
 def _render_function_page(name: str, obj) -> str:

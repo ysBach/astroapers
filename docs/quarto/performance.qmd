@@ -117,7 +117,11 @@ bad[20:24, 18:22] = True
 
 masked_apsum, masked_npix = aap.apsum_circ_exact(data, xpos, ypos, r=4.0, mask=bad)
 
-assert np.all(masked_npix <= raw_npix)
+npix_spacing = 2 * np.spacing(raw_npix)
+assert np.all(
+    (masked_npix <= raw_npix)
+    | np.isclose(masked_npix, raw_npix, rtol=0.0, atol=npix_spacing)
+)
 pd.DataFrame({
     "x": xpos,
     "y": ypos,

@@ -32,11 +32,11 @@ Elliptical annulus in pixel coordinates.
 
 <code>[**a_out**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
 
-:   Outer ellipse semiaxes in pixels. Each outer axis must be larger than the corresponding inner axis.
+:   Outer ellipse semiaxes in pixels. Each outer axis must be at least the corresponding inner axis, and at least one outer axis must be larger.
 
 <code>[**b_out**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
 
-:   Outer ellipse semiaxes in pixels. Each outer axis must be larger than the corresponding inner axis.
+:   Outer ellipse semiaxes in pixels. Each outer axis must be at least the corresponding inner axis, and at least one outer axis must be larger.
 
 <code>[**theta_in**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation} [ = ]{.parameter-default-sep} [0.0]{.parameter-default}</code>
 

@@ -56,4 +56,4 @@ Return exact pill aperture sums for one or many aperture centers.
 
 ## Notes {.doc-section .doc-section-notes}
 
-Pill aperture summation currently uses Rust-generated bbox-tight pill weights and the same ``BoundingBox.apsum`` reduction.
+For more raw-call patterns, inspect ``astroapers.kernels``; it is the Python layer that calls ``_rust`` internally. Pill aperture summation currently uses Rust-generated bbox-tight pill weights and the same ``BoundingBox.apsum`` reduction.

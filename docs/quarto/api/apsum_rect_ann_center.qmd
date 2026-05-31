@@ -36,7 +36,7 @@ Return center-selected rotated-rectangle-annulus aperture sums for one or many a
 
 <code>[**w_out, h_out**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
 
-:   Outer rectangle full width and height in pixels. ``w_out`` is measured along the outer rectangle's local x axis, and ``h_out`` along its local y axis. Each outer dimension must be larger than the corresponding inner dimension. At ``theta_out=0``, the outer width axis is aligned with the image x axis and the outer height axis with the image y axis.
+:   Outer rectangle full width and height in pixels. ``w_out`` is measured along the outer rectangle's local x axis, and ``h_out`` along its local y axis. Each outer dimension must be no smaller than the corresponding inner dimension, and at least one outer dimension must be larger. At ``theta_out=0``, the outer width axis is aligned with the image x axis and the outer height axis with the image y axis.
 
 <code>[**theta_in**]{.parameter-name} [:]{.parameter-annotation-sep} [float, optional]{.parameter-annotation} [ = ]{.parameter-default-sep} [0.0]{.parameter-default}</code>
 
@@ -66,4 +66,4 @@ Return center-selected rotated-rectangle-annulus aperture sums for one or many a
 
 ## Notes {.doc-section .doc-section-notes}
 
-For matched inner and outer angles, this uses outer-minus-inner direct center aperture summation. For split-angle annuli, it uses Rust-generated bbox-tight annulus weights and the same center-boundary convention as bbox-tight weights.
+For more raw-call patterns, inspect ``astroapers.kernels``; it is the Python layer that calls ``_rust`` internally. For matched inner and outer angles, this uses outer-minus-inner direct center aperture summation. For split-angle annuli, it uses Rust-generated bbox-tight annulus weights and the same center-boundary convention as bbox-tight weights.

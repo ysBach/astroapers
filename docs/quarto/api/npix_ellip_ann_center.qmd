@@ -27,7 +27,7 @@ Return center-selected elliptical-annulus effective in-frame pixel counts.
 
 <code>[**a_in, b_in, a_out, b_out**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
 
-:   Inner and outer ellipse semiaxes in pixels. Inner axes must be smaller than the corresponding outer axes.
+:   Inner and outer ellipse semiaxes in pixels. Inner axes must be no larger than the corresponding outer axes, and at least one outer axis must be larger.
 
 <code>[**theta_in**]{.parameter-name} [:]{.parameter-annotation-sep} [float, optional]{.parameter-annotation} [ = ]{.parameter-default-sep} [0.0]{.parameter-default}</code>
 

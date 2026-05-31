@@ -1,4 +1,5 @@
 //! Pure geometry and pixel-overlap helpers.
+#![cfg_attr(not(feature = "python"), allow(dead_code))]
 
 use std::f64::consts::{FRAC_1_SQRT_2, PI};
 
