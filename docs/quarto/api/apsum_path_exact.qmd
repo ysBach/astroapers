@@ -14,4 +14,8 @@ apsum_path_exact(
 )
 ```
 
-Return exact path aperture sums for one or many centers. Exact mode is analytic for the represented straight-line and circular-arc path. Other curve types are unsupported unless approximated before calling this function.
+Return exact path aperture sums for one or many centers.
+
+Exact mode is analytic for the represented straight-line and circular-arc
+path. Other curve types are unsupported unless approximated before calling
+this function.

@@ -16,38 +16,44 @@ apsum_circ_ann_center(
 
 Return center-selected circular-annulus aperture sums for one or many aperture centers.
 
+
+
 ## Parameters {.doc-section .doc-section-parameters}
 
-<code>[**data**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like]{.parameter-annotation}</code>
+data : array_like
+    Two-dimensional image. For maximum performance with raw contiguous arrays,
+    use ``import astroapers._rust as aapr`` and call the raw functions directly.
+x, y : scalar or array_like
+    Aperture center coordinates in pixel units. Inputs are converted to
+    contiguous ``float64`` arrays. Shapes must match after ``numpy.atleast_1d``.
+    The return shape matches that broadcast-free input shape, so scalar inputs
+    return one-element arrays.
+r_in, r_out : float
+    Inner and outer annulus radii in pixels. ``r_in`` must be nonnegative and
+    smaller than ``r_out``.
+mask : array_like of bool, optional
+    Boolean image mask with the same shape as ``data``. ``True`` pixels are
+    excluded from both the aperture sum and effective pixel count. Values are
+    converted to boolean.
+return_npix : bool, optional
+    If `True`, return ``(apsum, npix)``. If `False`, return only ``apsum``.
 
-:   Two-dimensional image. For maximum performance with raw contiguous arrays, use ``import astroapers._rust as aapr`` and call the raw functions directly.
 
-<code>[**x, y**]{.parameter-name} [:]{.parameter-annotation-sep} [scalar or array_like]{.parameter-annotation}</code>
-
-:   Aperture center coordinates in pixel units. Inputs are converted to contiguous ``float64`` arrays. Shapes must match after ``numpy.atleast_1d``. The return shape matches that broadcast-free input shape, so scalar inputs return one-element arrays.
-
-<code>[**r_in, r_out**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
-
-:   Inner and outer annulus radii in pixels. ``r_in`` must be nonnegative and smaller than ``r_out``.
-
-<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like of bool, optional]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
-
-:   Boolean image mask with the same shape as ``data``. ``True`` pixels are excluded from both the aperture sum and effective pixel count. Values are converted to boolean.
-
-<code>[**return_npix**]{.parameter-name} [:]{.parameter-annotation-sep} [bool, optional]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
-
-:   If `True`, return ``(apsum, npix)``. If `False`, return only ``apsum``.
 
 ## Returns {.doc-section .doc-section-returns}
 
-<code>[**apsum**]{.parameter-name} [:]{.parameter-annotation-sep} [ndarray]{.parameter-annotation}</code>
+apsum : ndarray
+    Sum of the unmasked data values multiplied by the aperture weights.
+npix : ndarray
+    Effective in-frame pixel count, returned only when ``return_npix=True``.
+    This is the sum of aperture weights after image clipping and mask
+    exclusion.
 
-:   Sum of the unmasked data values multiplied by the aperture weights.
 
-<code>[**npix**]{.parameter-name} [:]{.parameter-annotation-sep} [ndarray]{.parameter-annotation}</code>
-
-:   Effective in-frame pixel count, returned only when ``return_npix=True``. This is the sum of aperture weights after image clipping and mask exclusion.
 
 ## Notes {.doc-section .doc-section-notes}
 
-For more raw-call patterns, inspect ``astroapers.kernels``; it is the Python layer that calls ``_rust`` internally. The annulus uses the same center convention as ``npix_circ_center(r_out) - npix_circ_center(r_in)``: the inner boundary is included and the outer boundary is excluded.
+For more raw-call patterns, inspect ``astroapers.kernels``; it is the Python
+layer that calls ``_rust`` internally.
+
+The annulus uses the same center convention as ``npix_circ_center(r_out) - npix_circ_center(r_in)``: the inner boundary is included and the outer boundary is excluded.

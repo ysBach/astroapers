@@ -19,41 +19,45 @@ npix_rect_ann_center(
 
 Return center-selected rotated-rectangle-annulus effective in-frame pixel counts.
 
+
+
 ## Parameters {.doc-section .doc-section-parameters}
 
-<code>[**x, y**]{.parameter-name} [:]{.parameter-annotation-sep} [scalar or array_like]{.parameter-annotation}</code>
+x, y : scalar or array_like
+    Aperture center coordinates in pixel units. Shapes must match after
+    ``numpy.atleast_1d``. The return shape matches that broadcast-free input
+    shape, so scalar inputs return one-element arrays.
+w_in, h_in : float
+    Inner rectangle full width and height in pixels. ``w_in`` is measured along
+    the inner rectangle's local x axis, and ``h_in`` along its local y axis.
+w_out, h_out : float
+    Outer rectangle full width and height in pixels. ``w_out`` is measured
+    along the outer rectangle's local x axis, and ``h_out`` along its local
+    y axis. Each outer dimension must be no smaller than the corresponding
+    inner dimension, and at least one outer dimension must be larger. At
+    ``theta_out=0``, the outer width axis is aligned with the image x axis and
+    the outer height axis with the image y axis.
+theta_in : float, optional
+    Inner rectangle rotation angle in radians, measured counterclockwise from
+    the positive image x axis to the inner rectangle's local width axis.
+theta_out : float or None, optional
+    Outer rectangle rotation angle in radians, measured counterclockwise from
+    the positive image x axis to the outer rectangle's local width axis. If
+    `None`, uses ``theta_in``.
+shape : tuple[int, int]
+    Image shape as ``(ny, nx)`` used to clip the aperture footprint.
+mask : array_like of bool, optional
+    Boolean image mask with shape ``shape``. ``True`` pixels are excluded from
+    the returned effective pixel count.
 
-:   Aperture center coordinates in pixel units. Shapes must match after ``numpy.atleast_1d``. The return shape matches that broadcast-free input shape, so scalar inputs return one-element arrays.
 
-<code>[**w_in, h_in**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
-
-:   Inner rectangle full width and height in pixels. ``w_in`` is measured along the inner rectangle's local x axis, and ``h_in`` along its local y axis.
-
-<code>[**w_out, h_out**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
-
-:   Outer rectangle full width and height in pixels. ``w_out`` is measured along the outer rectangle's local x axis, and ``h_out`` along its local y axis. Each outer dimension must be no smaller than the corresponding inner dimension, and at least one outer dimension must be larger. At ``theta_out=0``, the outer width axis is aligned with the image x axis and the outer height axis with the image y axis.
-
-<code>[**theta_in**]{.parameter-name} [:]{.parameter-annotation-sep} [float, optional]{.parameter-annotation} [ = ]{.parameter-default-sep} [0.0]{.parameter-default}</code>
-
-:   Inner rectangle rotation angle in radians, measured counterclockwise from the positive image x axis to the inner rectangle's local width axis.
-
-<code>[**theta_out**]{.parameter-name} [:]{.parameter-annotation-sep} [float or None, optional]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
-
-:   Outer rectangle rotation angle in radians, measured counterclockwise from the positive image x axis to the outer rectangle's local width axis. If `None`, uses ``theta_in``.
-
-<code>[**shape**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple[int, int]]{.parameter-annotation}</code>
-
-:   Image shape as ``(ny, nx)`` used to clip the aperture footprint.
-
-<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like of bool, optional]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
-
-:   Boolean image mask with shape ``shape``. ``True`` pixels are excluded from the returned effective pixel count.
 
 ## Returns {.doc-section .doc-section-returns}
 
-<code>[**npix**]{.parameter-name} [:]{.parameter-annotation-sep} [ndarray]{.parameter-annotation}</code>
+npix : ndarray
+    Effective pixel count inside the image frame.
 
-:   Effective pixel count inside the image frame.
+
 
 ## Notes {.doc-section .doc-section-notes}
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
-import reducers as rd
+import reducers.lowlevel as rdl
 
 OverlapSlices = tuple[tuple[slice, slice], tuple[slice, slice]]
 
@@ -335,21 +335,19 @@ class BoundingBox:
 
 
 def _sum_float64(values: np.ndarray) -> float:
-    return float(rd.sum(np.ravel(values), validate=False))
+    return float(rdl.sum_valid(np.ravel(values)))
 
 
 def _weighted_sum_float64(
     values: np.ndarray, weights: np.ndarray, *, return_sum_weights: bool
 ) -> float | tuple[float, float]:
-    result = rd.sum(
-        np.ravel(values),
-        weights=np.ravel(weights),
-        return_sum_weights=return_sum_weights,
-        validate=False,
-    )
     if return_sum_weights:
+        result = rdl.weighted_sum_and_weights_valid(
+            np.ravel(values),
+            np.ravel(weights),
+        )
         return float(result[0]), float(result[1])
-    return float(result)
+    return float(rdl.weighted_sum_only_valid(np.ravel(values), np.ravel(weights)))
 
 
 def _validate_weights(weights, bbox: BoundingBox) -> np.ndarray:

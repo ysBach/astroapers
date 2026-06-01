@@ -19,6 +19,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check out reducers dependency
+        run: git clone --depth 1 https://github.com/ysbach/reducers ../reducers
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 

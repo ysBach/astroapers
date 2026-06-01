@@ -17,42 +17,49 @@ apsum_rect_exact(
 
 Return exact rotated-rectangle aperture sums for one or many aperture centers.
 
+
+
 ## Parameters {.doc-section .doc-section-parameters}
 
-<code>[**data**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like]{.parameter-annotation}</code>
+data : array_like
+    Two-dimensional image. For maximum performance with raw contiguous arrays,
+    use ``import astroapers._rust as aapr`` and call the raw functions directly.
+x, y : scalar or array_like
+    Aperture center coordinates in pixel units. Inputs are converted to
+    contiguous ``float64`` arrays. Shapes must match after ``numpy.atleast_1d``.
+    The return shape matches that broadcast-free input shape, so scalar inputs
+    return one-element arrays.
+w, h : float
+    Full rectangle width and height in pixels. ``w`` is measured along the
+    rectangle's local x axis, and ``h`` along its local y axis. At ``theta=0``,
+    the width axis is aligned with the image x axis and the height axis is
+    aligned with the image y axis.
+theta : float, optional
+    Rotation angle in radians, measured counterclockwise from the positive
+    image x axis to the rectangle's local width axis.
+mask : array_like of bool, optional
+    Boolean image mask with the same shape as ``data``. ``True`` pixels are
+    excluded from both the aperture sum and effective pixel count. Values are
+    converted to boolean.
+return_npix : bool, optional
+    If `True`, return ``(apsum, npix)``. If `False`, return only ``apsum``.
 
-:   Two-dimensional image. For maximum performance with raw contiguous arrays, use ``import astroapers._rust as aapr`` and call the raw functions directly.
 
-<code>[**x, y**]{.parameter-name} [:]{.parameter-annotation-sep} [scalar or array_like]{.parameter-annotation}</code>
-
-:   Aperture center coordinates in pixel units. Inputs are converted to contiguous ``float64`` arrays. Shapes must match after ``numpy.atleast_1d``. The return shape matches that broadcast-free input shape, so scalar inputs return one-element arrays.
-
-<code>[**w, h**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
-
-:   Full rectangle width and height in pixels. ``w`` is measured along the rectangle's local x axis, and ``h`` along its local y axis. At ``theta=0``, the width axis is aligned with the image x axis and the height axis is aligned with the image y axis.
-
-<code>[**theta**]{.parameter-name} [:]{.parameter-annotation-sep} [float, optional]{.parameter-annotation} [ = ]{.parameter-default-sep} [0.0]{.parameter-default}</code>
-
-:   Rotation angle in radians, measured counterclockwise from the positive image x axis to the rectangle's local width axis.
-
-<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like of bool, optional]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
-
-:   Boolean image mask with the same shape as ``data``. ``True`` pixels are excluded from both the aperture sum and effective pixel count. Values are converted to boolean.
-
-<code>[**return_npix**]{.parameter-name} [:]{.parameter-annotation-sep} [bool, optional]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
-
-:   If `True`, return ``(apsum, npix)``. If `False`, return only ``apsum``.
 
 ## Returns {.doc-section .doc-section-returns}
 
-<code>[**apsum**]{.parameter-name} [:]{.parameter-annotation-sep} [ndarray]{.parameter-annotation}</code>
+apsum : ndarray
+    Sum of the unmasked data values multiplied by the aperture weights.
+npix : ndarray
+    Effective in-frame pixel count, returned only when ``return_npix=True``.
+    This is the sum of aperture weights after image clipping and mask
+    exclusion.
 
-:   Sum of the unmasked data values multiplied by the aperture weights.
 
-<code>[**npix**]{.parameter-name} [:]{.parameter-annotation-sep} [ndarray]{.parameter-annotation}</code>
-
-:   Effective in-frame pixel count, returned only when ``return_npix=True``. This is the sum of aperture weights after image clipping and mask exclusion.
 
 ## Notes {.doc-section .doc-section-notes}
 
-For more raw-call patterns, inspect ``astroapers.kernels``; it is the Python layer that calls ``_rust`` internally. ``exact`` mode uses fractional pixel overlap weights for the analytic aperture footprint.
+For more raw-call patterns, inspect ``astroapers.kernels``; it is the Python
+layer that calls ``_rust`` internally.
+
+``exact`` mode uses fractional pixel overlap weights for the analytic aperture footprint.

@@ -14,4 +14,7 @@ apsum_path_center(
 )
 ```
 
-Return center-selected path aperture sums for one or many centers. Path geometry is limited to closed contours made from ``"line"`` and circular ``"arc"`` commands.
+Return center-selected path aperture sums for one or many centers.
+
+Path geometry is limited to closed contours made from ``"line"`` and
+circular ``"arc"`` commands.

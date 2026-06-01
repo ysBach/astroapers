@@ -19,37 +19,36 @@ npix_wedge_center(
 
 Return center-selected wedge-aperture effective in-frame pixel counts.
 
+
+
 ## Parameters {.doc-section .doc-section-parameters}
 
-<code>[**x, y**]{.parameter-name} [:]{.parameter-annotation-sep} [scalar or array_like]{.parameter-annotation}</code>
+x, y : scalar or array_like
+    Aperture center coordinates in pixel units. Shapes must match after
+    ``numpy.atleast_1d``. The return shape matches that broadcast-free input
+    shape, so scalar inputs return one-element arrays.
+r_in, r_out : float
+    Inner and outer wedge radii in pixels. ``r_out`` must be larger than
+    ``r_in`` and ``r_in`` must be positive.
+theta_in, dtheta_in : float
+    Center angle and full angular width at ``r_in``, in radians.
+theta_out, dtheta_out : float or None, optional
+    Center angle and full angular width at ``r_out``. If either value is
+    `None`, the corresponding inner value is used.
+shape : tuple[int, int]
+    Image shape as ``(ny, nx)`` used to clip the aperture footprint.
+mask : array_like of bool, optional
+    Boolean image mask with shape ``shape``. ``True`` pixels are excluded from
+    the returned effective pixel count.
 
-:   Aperture center coordinates in pixel units. Shapes must match after ``numpy.atleast_1d``. The return shape matches that broadcast-free input shape, so scalar inputs return one-element arrays.
 
-<code>[**r_in, r_out**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
-
-:   Inner and outer wedge radii in pixels. ``r_out`` must be larger than ``r_in`` and ``r_in`` must be positive.
-
-<code>[**theta_in, dtheta_in**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
-
-:   Center angle and full angular width at ``r_in``, in radians.
-
-<code>[**theta_out, dtheta_out**]{.parameter-name} [:]{.parameter-annotation-sep} [float or None, optional]{.parameter-annotation}</code>
-
-:   Center angle and full angular width at ``r_out``. If either value is `None`, the corresponding inner value is used.
-
-<code>[**shape**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple[int, int]]{.parameter-annotation}</code>
-
-:   Image shape as ``(ny, nx)`` used to clip the aperture footprint.
-
-<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like of bool, optional]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
-
-:   Boolean image mask with shape ``shape``. ``True`` pixels are excluded from the returned effective pixel count.
 
 ## Returns {.doc-section .doc-section-returns}
 
-<code>[**npix**]{.parameter-name} [:]{.parameter-annotation-sep} [ndarray]{.parameter-annotation}</code>
+npix : ndarray
+    Effective pixel count inside the image frame.
 
-:   Effective pixel count inside the image frame.
+
 
 ## Notes {.doc-section .doc-section-notes}
 

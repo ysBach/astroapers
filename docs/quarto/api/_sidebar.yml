@@ -18,9 +18,6 @@ website:
       - api/BoundingBox.qmd
       section: Bounding boxes
     - contents:
-      - api/raw-rust.qmd
-      section: Raw Rust extension
-    - contents:
       - api/apsum_circ_exact.qmd
       - api/apsum_circ_center.qmd
       - api/apsum_circ_ann_exact.qmd

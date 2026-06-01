@@ -6,29 +6,30 @@ npix_circ_center(x, y, r, *, shape, mask=None, validate=True)
 
 Return center-selected circular-aperture effective in-frame pixel counts.
 
+
+
 ## Parameters {.doc-section .doc-section-parameters}
 
-<code>[**x, y**]{.parameter-name} [:]{.parameter-annotation-sep} [scalar or array_like]{.parameter-annotation}</code>
+x, y : scalar or array_like
+    Aperture center coordinates in pixel units. Shapes must match after
+    ``numpy.atleast_1d``. The return shape matches that broadcast-free input
+    shape, so scalar inputs return one-element arrays.
+r : float
+    Aperture radius in pixels.
+shape : tuple[int, int]
+    Image shape as ``(ny, nx)`` used to clip the aperture footprint.
+mask : array_like of bool, optional
+    Boolean image mask with shape ``shape``. ``True`` pixels are excluded from
+    the returned effective pixel count.
 
-:   Aperture center coordinates in pixel units. Shapes must match after ``numpy.atleast_1d``. The return shape matches that broadcast-free input shape, so scalar inputs return one-element arrays.
 
-<code>[**r**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
-
-:   Aperture radius in pixels.
-
-<code>[**shape**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple[int, int]]{.parameter-annotation}</code>
-
-:   Image shape as ``(ny, nx)`` used to clip the aperture footprint.
-
-<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like of bool, optional]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
-
-:   Boolean image mask with shape ``shape``. ``True`` pixels are excluded from the returned effective pixel count.
 
 ## Returns {.doc-section .doc-section-returns}
 
-<code>[**npix**]{.parameter-name} [:]{.parameter-annotation-sep} [ndarray]{.parameter-annotation}</code>
+npix : ndarray
+    Effective pixel count inside the image frame.
 
-:   Effective pixel count inside the image frame.
+
 
 ## Notes {.doc-section .doc-section-notes}
 

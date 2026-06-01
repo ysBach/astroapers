@@ -289,24 +289,93 @@ def test_bbox_apsum_uses_fused_reducers_weighted_sum(monkeypatch):
     data = np.ones((6, 6), dtype=np.float64)
     calls = []
 
-    def fake_sum(values, *, weights=None, return_sum_weights=False, validate):
-        calls.append((values, weights, return_sum_weights, validate))
-        weighted_sum = np.sum(values * weights, dtype=np.float64)
-        if return_sum_weights:
-            return weighted_sum, np.sum(weights, dtype=np.float64)
-        return weighted_sum
+    def fake_weighted_sum_and_weights(values, weight_values):
+        calls.append(("and_weights", values, weight_values))
+        return (
+            np.sum(values * weight_values, dtype=np.float64),
+            np.sum(weight_values, dtype=np.float64),
+        )
 
-    monkeypatch.setattr(_containers, "rd", type("FakeReducers", (), {"sum": fake_sum}))
+    def fake_weighted_sum_only(values, weight_values):
+        calls.append(("only", values, weight_values))
+        return np.sum(values * weight_values, dtype=np.float64)
+
+    monkeypatch.setattr(
+        _containers.rdl,
+        "weighted_sum_and_weights_valid",
+        fake_weighted_sum_and_weights,
+    )
+    monkeypatch.setattr(
+        _containers.rdl,
+        "weighted_sum_only_valid",
+        fake_weighted_sum_only,
+    )
 
     assert bbox.apsum(weights, data) == (4.0, 4.0)
     assert bbox.apsum(weights, data, return_npix=False) == 4.0
     assert len(calls) == 2
-    assert calls[0][1] is not None
-    assert calls[0][2] is True
-    assert calls[0][3] is False
-    assert calls[1][1] is not None
-    assert calls[1][2] is False
-    assert calls[1][3] is False
+    assert calls[0][0] == "and_weights"
+    assert calls[0][2] is not None
+    assert calls[1][0] == "only"
+    assert calls[1][2] is not None
+
+
+def test_bbox_npix_uses_lowlevel_reducers_sum(monkeypatch):
+    bbox = apers.BoundingBox(1, 3, 2, 4)
+    weights = np.ones(bbox.shape, dtype=np.float64)
+    calls = []
+
+    def fake_sum_valid(values):
+        calls.append(values)
+        return np.sum(values, dtype=np.float64)
+
+    monkeypatch.setattr(_containers.rdl, "sum_valid", fake_sum_valid)
+
+    assert bbox.npix(weights, (6, 6)) == 4.0
+    assert len(calls) == 1
+
+
+def test_bbox_apsum_preserves_plain_sum_nonfinite_semantics():
+    bbox = apers.BoundingBox(1, 3, 2, 4)
+    weights = np.array([[1.0, 2.0], [np.inf, np.nan]], dtype=np.float64)
+    data = np.ones((6, 6), dtype=np.float64)
+    data[2, 1] = np.inf
+    data[2, 2] = np.nan
+
+    apsum, npix = bbox.apsum(weights, data)
+
+    assert np.isnan(apsum)
+    assert np.isnan(npix)
+
+
+def test_bbox_apsum_matches_explicit_clipped_masked_weighted_sum():
+    bbox = apers.BoundingBox(ixmin=-1, ixmax=3, iymin=1, iymax=4)
+    weights = np.array(
+        [
+            [0.25, 0.5, 0.75, 1.0],
+            [1.25, 1.5, 1.75, 2.0],
+            [2.25, 2.5, 2.75, 3.0],
+        ],
+        dtype=np.float64,
+    )
+    data = np.arange(25, dtype=np.float64).reshape(5, 5)
+    bad = np.zeros(data.shape, dtype=bool)
+    bad[2, 1] = True
+
+    apsum, npix = bbox.apsum(weights, data, mask=bad)
+    data_slices, weight_slices = bbox.overlap_slices(data.shape)
+    clipped_weights = weights[weight_slices].copy()
+    clipped_weights[bad[data_slices]] = 0.0
+    expected_apsum = np.sum(data[data_slices] * clipped_weights, dtype=np.float64)
+    expected_npix = np.sum(clipped_weights, dtype=np.float64)
+
+    assert_allclose(apsum, expected_apsum)
+    assert_allclose(npix, expected_npix)
+    assert_allclose(
+        bbox.apsum(weights, data, mask=bad, return_npix=False),
+        expected_apsum,
+    )
+    assert_allclose(bbox.npix(weights, data.shape, mask=bad), expected_npix)
 
 
 def test_user_supplied_non_float32_float64_weights_convert_to_float64():

@@ -25,19 +25,9 @@ Raw bbox-weight operations.
 | --- | --- |
 | [BoundingBox](BoundingBox.qmd#astroapers.BoundingBox) | Pixel-index bounding box with exclusive upper bounds. |
 
-## Raw Rust extension
-
-Expert API for maximum performance and raw extension return values.
-
-| | |
-| --- | --- |
-| [Raw Rust extension](raw-rust.qmd) | Import `astroapers._rust as aapr` and call raw signatures with contiguous arrays. |
-
 ## Python convenience functions
 
-Reference for Python functions used by the object layer. For maximum
-performance, import `astroapers._rust as aapr`; inspect `astroapers.kernels` for
-raw usage patterns.
+Reference functions used by the object layer.
 
 | | |
 | --- | --- |

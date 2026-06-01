@@ -21,37 +21,35 @@ npix_pill_ann_exact(
 
 Return exact pill-annulus effective in-frame pixel counts.
 
+
+
 ## Parameters {.doc-section .doc-section-parameters}
 
-<code>[**x, y**]{.parameter-name} [:]{.parameter-annotation-sep} [scalar or array_like]{.parameter-annotation}</code>
+x, y : scalar or array_like
+    Aperture center coordinates in pixel units. Shapes must match after
+    ``numpy.atleast_1d``. The return shape matches that broadcast-free input
+    shape, so scalar inputs return one-element arrays.
+w_in, a_in, b_in, w_out, a_out, b_out : float
+    Inner and outer pill dimensions in pixels. Inner dimensions must be
+    smaller than the corresponding outer dimensions.
+theta_in : float, optional
+    Inner pill rotation angle in radians.
+theta_out : float or None, optional
+    Outer pill rotation angle in radians. If `None`, uses ``theta_in``.
+shape : tuple[int, int]
+    Image shape as ``(ny, nx)`` used to clip the aperture footprint.
+mask : array_like of bool, optional
+    Boolean image mask with shape ``shape``. ``True`` pixels are excluded from
+    the returned effective pixel count.
 
-:   Aperture center coordinates in pixel units. Shapes must match after ``numpy.atleast_1d``. The return shape matches that broadcast-free input shape, so scalar inputs return one-element arrays.
 
-<code>[**w_in, a_in, b_in, w_out, a_out, b_out**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
-
-:   Inner and outer pill dimensions in pixels. Inner dimensions must be smaller than the corresponding outer dimensions.
-
-<code>[**theta_in**]{.parameter-name} [:]{.parameter-annotation-sep} [float, optional]{.parameter-annotation} [ = ]{.parameter-default-sep} [0.0]{.parameter-default}</code>
-
-:   Inner pill rotation angle in radians.
-
-<code>[**theta_out**]{.parameter-name} [:]{.parameter-annotation-sep} [float or None, optional]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
-
-:   Outer pill rotation angle in radians. If `None`, uses ``theta_in``.
-
-<code>[**shape**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple[int, int]]{.parameter-annotation}</code>
-
-:   Image shape as ``(ny, nx)`` used to clip the aperture footprint.
-
-<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like of bool, optional]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
-
-:   Boolean image mask with shape ``shape``. ``True`` pixels are excluded from the returned effective pixel count.
 
 ## Returns {.doc-section .doc-section-returns}
 
-<code>[**npix**]{.parameter-name} [:]{.parameter-annotation-sep} [ndarray]{.parameter-annotation}</code>
+npix : ndarray
+    Effective pixel count inside the image frame.
 
-:   Effective pixel count inside the image frame.
+
 
 ## Notes {.doc-section .doc-section-notes}
 
