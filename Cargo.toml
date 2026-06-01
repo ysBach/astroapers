@@ -1,6 +1,6 @@
 [package]
 name = "astroapers"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 description = "Rust-backed aperture overlap and summation utilities"
 license = "BSD-3-Clause"
