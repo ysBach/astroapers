@@ -92,15 +92,10 @@ not depend on PyO3 or NumPy unless the Python extension feature is enabled.
 
 ```toml
 [dependencies]
-astroapers = "0.1"
+astroapers = "<version>"
 ```
 
-For a local checkout before the crate is published, use:
-
-```toml
-[dependencies]
-astroapers = { path = "../astroapers", default-features = false }
-```
+Replace `<version>` with the release version you want to depend on.
 
 ```rust
 use astroapers::{circle_bbox, circle_exact_weight_at_pixel};

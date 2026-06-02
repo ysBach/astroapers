@@ -57,8 +57,10 @@ For Rust crate use:
 
 ```toml
 [dependencies]
-astroapers = "0.1"
+astroapers = "<version>"
 ```
+
+Replace `<version>` with the release version you want to depend on.
 
 ## Quickstart
 
