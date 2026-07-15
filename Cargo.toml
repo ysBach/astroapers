@@ -1,6 +1,6 @@
 [package]
 name = "astroapers"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 description = "Rust-backed aperture overlap and summation utilities"
 license = "BSD-3-Clause"
@@ -13,6 +13,7 @@ categories = ["science", "algorithms"]
 include = [
     "/Cargo.toml",
     "/Cargo.lock",
+    "/CHANGELOG.md",
     "/LICENSE",
     "/README.md",
     "/src/**/*.rs",
