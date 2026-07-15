@@ -875,11 +875,6 @@ fn dot(a: Point, b: Point) -> f64 {
     a.x * b.x + a.y * b.y
 }
 
-#[no_mangle]
-pub extern "C" fn circ_area(r: f64) -> f64 {
-    PI * r * r
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Path aperture geometry (line + circular-arc segments, Green's theorem)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1449,7 +1444,7 @@ pub(crate) fn build_validated_path(
     // Hole containment and cross-contour intersection checks
     for hi in 1..contours.len() {
         // Every hole segment start must be inside the outer contour
-        let outer_segs: Vec<PathSeg> = contours[0].segs.clone();
+        let outer_segs = &contours[0].segs;
         for seg in &contours[hi].segs {
             let p = seg.point_at(0.5);
             let w: i32 = outer_segs
@@ -1461,8 +1456,8 @@ pub(crate) fn build_validated_path(
             }
         }
         // Outer and hole segments must not cross
-        let outer_segs: Vec<PathSeg> = contours[0].segs.clone();
-        for sa in &outer_segs {
+        let outer_segs = &contours[0].segs;
+        for sa in outer_segs {
             for sb in &contours[hi].segs {
                 if segs_properly_intersect(sa, sb) {
                     return Err("outer contour and hole contour intersect".to_string());
