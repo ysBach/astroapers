@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-import astroapers as apers
 import numpy as np
 import pytest
-from astroapers import _containers
 from numpy.testing import assert_allclose
+
+import astroapers as apers
+from astroapers import _containers
 
 
 @pytest.mark.parametrize("origin", [0, 10])
@@ -194,14 +195,17 @@ def test_bbox_to_fits_section_rejects_no_overlap_and_degenerate_boxes():
         degenerate.to_fits_section()
 
 
-def test_bbox_to_fits_section_matches_astro_ndslice_when_available():
+def test_bbox_to_fits_section_roundtrips_with_astro_ndslice_when_available() -> None:
     astro_ndslice = pytest.importorskip("astro_ndslice")
     bbox = apers.BoundingBox(ixmin=-2, ixmax=3, iymin=4, iymax=8)
     data_slices, _ = bbox.overlap_slices((6, 10))
 
-    assert bbox.to_fits_section((6, 10)) == astro_ndslice.slice_to_string(
-        data_slices,
-        fits_convention=True,
+    assert (
+        astro_ndslice.slice_from_string(
+            bbox.to_fits_section((6, 10)),
+            fits_convention=True,
+        )
+        == data_slices
     )
 
 
