@@ -21,12 +21,9 @@ fn parse_path_inputs<'a>(
     let kinds_slice = kinds
         .as_slice()
         .map_err(|_| PyValueError::new_err("kinds must be a contiguous int8 array"))?;
-    let data_flat = data
-        .as_slice()
-        .map_err(|_| PyValueError::new_err("data must be a contiguous float64 array"))?;
+    let (data_flat, nrows, ncols) = data_slice(data)?;
     let n = kinds_slice.len();
-    let shape = data.shape();
-    if shape[0] != n || shape[1] != 6 {
+    if nrows != n || ncols != 6 {
         return Err(PyValueError::new_err(
             "data must have shape (N, 6) where N == len(kinds)",
         ));

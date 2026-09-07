@@ -7,8 +7,9 @@ title: "Raw Rust extension"
 Facts:
 
 - Import it as `import astroapers._rust as aapr`.
-- It expects raw, contiguous NumPy arrays with the exact dtype required by the
-  function name.
+- It expects raw, C-contiguous (row-major) NumPy arrays with the exact dtype
+  required by the function name. Image, path-data, and mask functions reject
+  other layouts; use `np.ascontiguousarray()` to convert them before raw calls.
 - It does not accept `mask=`, `validate=`, `return_npix=`, keyword geometry
   arguments, scalar/list coordinate normalization, or Python `BoundingBox`
   objects.

@@ -1,15 +1,76 @@
 from __future__ import annotations
 
+import astroapers as apers
+import astroapers._kernel_dispatch as dispatch
+import astroapers._rust as aapr
+import astroapers.kernels as aapk
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-import astroapers as apers
-import astroapers._rust as aapr
-import astroapers._kernel_dispatch as dispatch
-import astroapers.kernels as aapk
-
 SEP_PARITY_RTOL = 5e-9
+
+
+@pytest.mark.parametrize(
+    ("dtype", "suffix"),
+    [(np.float64, ""), (np.float32, "_f32"), (np.int32, "_i32"), (np.int16, "_i16")],
+)
+@pytest.mark.parametrize("layout", ["fortran", "strided"])
+def test_raw_image_sums_require_c_contiguous_data(
+    dtype: type[np.generic], suffix: str, layout: str
+) -> None:
+    data = np.arange(12, dtype=dtype).reshape(3, 4)
+    if layout == "fortran":
+        data = np.asfortranarray(data)
+    else:
+        data = data[:, ::-1]
+    x = np.array([1.0])
+    y = np.array([1.0])
+    raw_sum = getattr(aapr, f"apsum_circ_center{suffix}")
+
+    with pytest.raises(ValueError, match="C-contiguous"):
+        raw_sum(data, x, y, 0.1)
+
+    expected = float(data[1, 1])
+    got, npix = raw_sum(np.ascontiguousarray(data), x, y, 0.1)
+    assert_allclose(got, [expected])
+    assert_allclose(npix, [1.0])
+    wrapped, _ = apers.apsum_circ_center(data, x, y, 0.1)
+    assert_allclose(wrapped, [expected])
+
+
+def test_raw_mask_distances_require_c_contiguous_data() -> None:
+    mask = np.zeros((3, 4), dtype=bool)
+    mask[1, 1] = True
+    fortran_mask = np.asfortranarray(mask)
+    center = np.zeros(2)
+
+    with pytest.raises(ValueError, match="C-contiguous"):
+        aapr._farthest_mask_pixel(fortran_mask, center, True)
+    with pytest.raises(ValueError, match="C-contiguous"):
+        aapr._selected_pixel_distances(fortran_mask, 0.0, 0.0, 0, 0)
+
+    radius, ndim, positions = aapr._farthest_mask_pixel(mask, center, True)
+    assert_allclose(radius, np.sqrt(2.0))
+    assert ndim == 2
+    assert positions == [1, 1]
+    assert_allclose(aapr._selected_pixel_distances(mask, 0.0, 0.0, 0, 0), [radius])
+    assert_allclose(apers.farthest_mask_pixel(fortran_mask, center), radius)
+
+
+def test_raw_path_data_requires_c_contiguous_rows() -> None:
+    kinds = np.array([0, 1, 1, 3], dtype=np.int8)
+    data = np.zeros((4, 6), dtype=np.float64)
+    data[1, 0] = 2.0
+    data[2, 1] = 2.0
+    x = np.array([0.0])
+    y = np.array([0.0])
+
+    with pytest.raises(ValueError, match="C-contiguous"):
+        aapr.bboxes_path(x, y, kinds, np.asfortranarray(data))
+
+    weights = aapr.weights_path_exact_one(0.0, 0.0, kinds, data, -1, -1, 5, 5)
+    assert_allclose(np.sum(weights), 2.0)
 
 
 def test_validate_false_circle_sum_uses_raw_rust_fast_path(monkeypatch):

@@ -15,6 +15,11 @@ fn _farthest_mask_pixel(
     center: PyReadonlyArray1<'_, f64>,
     return_pos: bool,
 ) -> PyResult<FarthestMaskResult> {
+    if !mask.is_c_contiguous() {
+        return Err(PyValueError::new_err(
+            "mask must be a C-contiguous bool array",
+        ));
+    }
     let shape = mask.shape();
     let ndim = shape.len();
     if ndim == 0 {
@@ -31,7 +36,7 @@ fn _farthest_mask_pixel(
     }
     let mask = mask
         .as_slice()
-        .map_err(|_| PyValueError::new_err("mask must be a contiguous bool array"))?;
+        .map_err(|_| PyValueError::new_err("mask must be a C-contiguous bool array"))?;
 
     let mut best_dist2 = f64::NEG_INFINITY;
     let mut found = false;
@@ -91,6 +96,11 @@ fn _selected_pixel_distances(
     x_min: isize,
     y_min: isize,
 ) -> PyResult<Vec<f64>> {
+    if !selected.is_c_contiguous() {
+        return Err(PyValueError::new_err(
+            "selected must be a C-contiguous bool array",
+        ));
+    }
     if !x0.is_finite() || !y0.is_finite() {
         return Err(PyValueError::new_err("center values must be finite"));
     }
@@ -99,7 +109,7 @@ fn _selected_pixel_distances(
     let nx = shape[1];
     let selected = selected
         .as_slice()
-        .map_err(|_| PyValueError::new_err("selected must be a contiguous bool array"))?;
+        .map_err(|_| PyValueError::new_err("selected must be a C-contiguous bool array"))?;
 
     let mut distances = Vec::new();
     for yy in 0..ny {

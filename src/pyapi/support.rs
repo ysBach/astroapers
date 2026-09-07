@@ -3,20 +3,30 @@ use super::*;
 pub(in crate::pyapi) fn data_slice<'py>(
     data: &'py PyReadonlyArray2<'py, f64>,
 ) -> PyResult<(&'py [f64], usize, usize)> {
+    if !data.is_c_contiguous() {
+        return Err(PyValueError::new_err(
+            "data must be a C-contiguous float64 array",
+        ));
+    }
     let shape = data.shape();
     let slice = data
         .as_slice()
-        .map_err(|_| PyValueError::new_err("data must be a contiguous float64 array"))?;
+        .map_err(|_| PyValueError::new_err("data must be a C-contiguous float64 array"))?;
     Ok((slice, shape[0], shape[1]))
 }
 
 pub(in crate::pyapi) fn data_slice_f32<'py>(
     data: &'py PyReadonlyArray2<'py, f32>,
 ) -> PyResult<(&'py [f32], usize, usize)> {
+    if !data.is_c_contiguous() {
+        return Err(PyValueError::new_err(
+            "data must be a C-contiguous float32 array",
+        ));
+    }
     let shape = data.shape();
     let slice = data
         .as_slice()
-        .map_err(|_| PyValueError::new_err("data must be a contiguous float32 array"))?;
+        .map_err(|_| PyValueError::new_err("data must be a C-contiguous float32 array"))?;
     Ok((slice, shape[0], shape[1]))
 }
 
@@ -24,10 +34,15 @@ pub(in crate::pyapi) fn data_slice_typed<'py, T: Element>(
     data: &'py PyReadonlyArray2<'py, T>,
     dtype: &str,
 ) -> PyResult<(&'py [T], usize, usize)> {
+    if !data.is_c_contiguous() {
+        return Err(PyValueError::new_err(format!(
+            "data must be a C-contiguous {dtype} array"
+        )));
+    }
     let shape = data.shape();
     let slice = data
         .as_slice()
-        .map_err(|_| PyValueError::new_err(format!("data must be a contiguous {dtype} array")))?;
+        .map_err(|_| PyValueError::new_err(format!("data must be a C-contiguous {dtype} array")))?;
     Ok((slice, shape[0], shape[1]))
 }
 
