@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import copy
+import pickle
+
+import astroapers as apers
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
-
-import astroapers as apers
 
 
 def test_object_scalar_apsum_preserves_zero_dimensional_return():
@@ -408,13 +410,236 @@ def test_vector_aperture_returns_vector_weights_and_apsum():
     assert_allclose(npix, [6.0, 6.0], atol=1e-12)
 
 
-def test_validate_false_reuses_position_array_and_skips_parameter_checks():
+def _position_input(layout: str, dtype: type[np.generic]) -> np.ndarray:
+    if layout == "c":
+        return np.array([[2.0, 2.0], [7.0, 7.0]], dtype=dtype, order="C")
+    if layout == "f":
+        return np.array([[2.0, 2.0], [7.0, 7.0]], dtype=dtype, order="F")
+    if layout == "strided":
+        return np.array([[2.0, 2.0], [99.0, 99.0], [7.0, 7.0]], dtype=dtype)[::2]
+    raise AssertionError(f"unknown position layout: {layout}")
+
+
+@pytest.mark.parametrize(
+    ("layout", "dtype"),
+    [
+        ("c", np.float64),
+        ("f", np.float64),
+        ("strided", np.float64),
+        ("c", np.float32),
+        ("c", np.int32),
+    ],
+)
+@pytest.mark.parametrize("validate", [True, False])
+def test_position_inputs_are_owned_float64_and_read_only(
+    layout: str, dtype: type[np.generic], validate: bool
+) -> None:
+    source = _position_input(layout, dtype)
+
+    aperture = apers.CircAp(source, r=0.1, validate=validate)
+
+    assert aperture.positions.shape == (2, 2)
+    assert aperture.positions.dtype == np.float64
+    assert aperture.positions.flags.f_contiguous
+    assert not aperture.positions.flags.writeable
+    assert not np.shares_memory(aperture.positions, source)
+    assert aperture._x.flags.c_contiguous
+    assert aperture._y.flags.c_contiguous
+    assert np.shares_memory(aperture.positions, aperture._x)
+    assert np.shares_memory(aperture.positions, aperture._y)
+    assert np.array_equal(aperture.positions, source)
+
+
+@pytest.mark.parametrize("kind", ["scalar", "singleton", "empty"])
+@pytest.mark.parametrize("validate", [True, False])
+def test_position_shapes_preserve_scalar_and_vector_result_shapes(
+    kind: str, validate: bool
+) -> None:
+    if kind == "scalar":
+        positions = (2.0, 2.0)
+        expected_shape = ()
+        expected_length = 1
+    elif kind == "singleton":
+        positions = np.array([[2.0, 2.0]], dtype=np.float32)
+        expected_shape = (1,)
+        expected_length = 1
+    else:
+        positions = np.empty((0, 2), dtype=np.float64)
+        expected_shape = (0,)
+        expected_length = 0
+
+    aperture = apers.CircAp(positions, r=0.1, validate=validate)
+    apsum, npix = aperture.apsum_center(np.arange(12 * 12).reshape(12, 12))
+
+    assert aperture.positions.shape == (expected_length, 2)
+    assert aperture.isscalar is (kind == "scalar")
+    assert apsum.shape == expected_shape
+    assert npix.shape == expected_shape
+
+
+@pytest.mark.parametrize("layout", ["c", "f", "strided"])
+@pytest.mark.parametrize("validate", [True, False])
+def test_position_source_mutation_does_not_desynchronize_aperture(
+    layout: str, validate: bool
+) -> None:
+    source = _position_input(layout, np.float64)
+    aperture = apers.CircAp(source, r=0.1, validate=validate)
+    reference = apers.CircAp(np.array([[2.0, 2.0], [7.0, 7.0]]), r=0.1)
+    data = np.arange(12 * 12, dtype=np.float64).reshape(12, 12)
+
+    source[...] = [[8.0, 8.0], [9.0, 9.0]]
+
+    assert np.array_equal(aperture.positions, reference.positions)
+    assert aperture.bboxes() == reference.bboxes()
+    for method in ("weights_center", "weights_exact"):
+        got = getattr(aperture, method)()
+        expected = getattr(reference, method)()
+        for got_weights, expected_weights in zip(got, expected, strict=True):
+            assert_allclose(got_weights, expected_weights)
+    for method in ("npix_center", "npix_exact"):
+        got = getattr(aperture, method)(data.shape)
+        expected = getattr(reference, method)(data.shape)
+        assert_allclose(got, expected)
+    for method in ("apsum_center", "apsum_exact"):
+        got = getattr(aperture, method)(data)
+        expected = getattr(reference, method)(data)
+        assert_allclose(got[0], expected[0])
+        assert_allclose(got[1], expected[1])
+    for method in ("sampled_values", "weighted_values"):
+        got = getattr(aperture, method)(data)
+        expected = getattr(reference, method)(data)
+        assert len(got) == len(expected)
+        for got_values, expected_values in zip(got, expected, strict=True):
+            assert_allclose(got_values, expected_values)
+    for method in ("sampled_cutout", "weighted_cutout"):
+        got = getattr(aperture, method)(data)
+        expected = getattr(reference, method)(data)
+        for got_cutout, expected_cutout in zip(got, expected, strict=True):
+            assert_allclose(got_cutout, expected_cutout)
+
+
+def test_reconstructing_aperture_moves_position_dependent_methods() -> None:
+    positions = np.array([[2.0, 2.0]])
+    aperture = apers.CircAp(positions, r=0.1)
+    data = np.arange(12 * 12, dtype=np.float64).reshape(12, 12)
+
+    positions[...] = [[7.0, 7.0]]
+    moved = apers.CircAp(positions, r=0.1)
+    reference = apers.CircAp((7.0, 7.0), r=0.1)
+
+    assert aperture.bboxes() != moved.bboxes()
+    assert moved.bboxes() == reference.bboxes()
+    for method in ("weights_center", "weights_exact"):
+        got = getattr(moved, method)()
+        expected = getattr(reference, method)()
+        for got_weights, expected_weights in zip(got, expected, strict=True):
+            assert_allclose(got_weights, expected_weights)
+    for method in ("npix_center", "npix_exact"):
+        got = getattr(moved, method)(data.shape)
+        expected = getattr(reference, method)(data.shape)
+        assert_allclose(got, expected)
+    for method in ("apsum_center", "apsum_exact"):
+        got = getattr(moved, method)(data)
+        expected = getattr(reference, method)(data)
+        assert_allclose(got[0], expected[0])
+        assert_allclose(got[1], expected[1])
+    for method in ("sampled_values", "weighted_values"):
+        got = getattr(moved, method)(data)
+        expected = getattr(reference, method)(data)
+        for got_values, expected_values in zip(got, expected, strict=True):
+            assert_allclose(got_values, expected_values)
+    for method in ("sampled_cutout", "weighted_cutout"):
+        got = getattr(moved, method)(data)
+        expected = getattr(reference, method)(data)
+        for got_cutout, expected_cutout in zip(got, expected, strict=True):
+            assert_allclose(got_cutout, expected_cutout)
+
+
+@pytest.mark.parametrize("positions", [(2.0, 2.0), np.array([[2.0, 2.0]])])
+def test_positions_cannot_be_written_or_reassigned(
+    positions: tuple[float, float] | np.ndarray,
+) -> None:
+    aperture = apers.CircAp(positions, r=0.1)
+
+    with pytest.raises(ValueError, match="read-only"):
+        aperture.positions[0, 0] = 3.0
+    exposed = aperture.positions
+    with pytest.raises(ValueError):
+        exposed.flags.writeable = True
+    with pytest.raises(AttributeError):
+        aperture.positions = np.array([[3.0, 3.0]])
+
+
+def test_positions_view_metadata_cannot_corrupt_aperture_storage() -> None:
+    aperture = apers.CircAp(np.array([[2.0, 2.0], [7.0, 7.0]]), r=0.1)
+    exposed = aperture.positions
+
+    exposed.dtype = np.uint64
+
+    assert aperture.positions.dtype == np.float64
+    assert aperture.positions.shape == (2, 2)
+    assert_allclose(aperture.positions, [[2.0, 2.0], [7.0, 7.0]])
+    assert_allclose(aperture._x, [2.0, 7.0])
+    assert_allclose(aperture._y, [2.0, 7.0])
+
+
+@pytest.mark.parametrize("operation", ["copy", "deepcopy", "pickle"])
+@pytest.mark.parametrize("kind", ["circ_scalar", "circ_vector", "path_vector"])
+def test_position_copy_roundtrips_preserve_storage_and_results(
+    operation: str, kind: str
+) -> None:
+    segments = [
+        ("move", -1.0, -1.0),
+        ("line", 1.0, -1.0),
+        ("line", 1.0, 1.0),
+        ("line", -1.0, 1.0),
+        ("close",),
+    ]
+    if kind == "circ_scalar":
+        aperture = apers.CircAp((2.0, 2.0), r=0.1)
+    elif kind == "circ_vector":
+        aperture = apers.CircAp(np.array([[2.0, 2.0], [7.0, 7.0]]), r=0.1)
+    else:
+        aperture = apers.PathAp(np.array([[2.0, 2.0], [7.0, 7.0]]), segments=segments)
+
+    if operation == "copy":
+        restored = copy.copy(aperture)
+    elif operation == "deepcopy":
+        restored = copy.deepcopy(aperture)
+    else:
+        restored = pickle.loads(pickle.dumps(aperture))
+
+    assert restored is not aperture
+    assert restored.isscalar is aperture.isscalar
+    assert restored.positions.dtype == np.float64
+    assert restored.positions.flags.f_contiguous
+    assert not restored.positions.flags.writeable
+    assert not np.shares_memory(restored.positions, aperture.positions)
+    assert restored._x.flags.c_contiguous
+    assert restored._y.flags.c_contiguous
+    assert np.shares_memory(restored.positions, restored._x)
+    assert np.shares_memory(restored.positions, restored._y)
+
+    data = np.arange(12 * 12, dtype=np.float64).reshape(12, 12)
+    assert restored.bboxes() == aperture.bboxes()
+    for method in ("apsum_center", "apsum_exact"):
+        got = getattr(restored, method)(data)
+        expected = getattr(aperture, method)(data)
+        assert got[0].shape == expected[0].shape
+        assert got[1].shape == expected[1].shape
+        assert_allclose(got[0], expected[0])
+        assert_allclose(got[1], expected[1])
+
+
+def test_validate_false_owns_positions_and_skips_parameter_checks() -> None:
     positions = np.array([[4.0, 4.0], [8.5, 9.0]], dtype=np.float64)
 
     aperture = apers.CircAp(positions, r=2.0, validate=False)
     unchecked = apers.CircAp(positions, r=-2.0, validate=False)
 
-    assert aperture.positions is positions
+    assert not np.shares_memory(aperture.positions, positions)
+    assert aperture.positions.dtype == np.float64
+    assert not aperture.positions.flags.writeable
     assert not aperture.isscalar
     assert unchecked.r == -2.0
     with pytest.raises(ValueError, match="positive"):
@@ -434,12 +659,13 @@ def test_validate_true_rejects_nonfinite_vector_positions():
         apers.RectAp(positions, w=3.0, h=2.0)
 
 
-def test_validate_false_skips_position_finiteness_check():
+def test_validate_false_skips_position_finiteness_check() -> None:
     positions = np.array([[4.0, 4.0], [np.nan, 9.0]], dtype=np.float64)
 
     aperture = apers.CircAp(positions, r=2.0, validate=False)
 
-    assert aperture.positions is positions
+    assert not np.shares_memory(aperture.positions, positions)
+    assert np.isnan(aperture.positions[1, 0])
 
 
 def test_object_sum_aliases_are_not_exposed():

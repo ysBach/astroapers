@@ -12,6 +12,7 @@ from __future__ import annotations
 import math
 
 import numpy as np
+from numpy.typing import ArrayLike
 
 from ._aperture_kernel_ops import (
     CIRC_AN_OPS,
@@ -22,13 +23,6 @@ from ._aperture_kernel_ops import (
     RECT_OPS,
 )
 from ._containers import BoundingBox, validate_mask
-from .kernels import (
-    _weights_many as _kernel_weights_many,
-    _weights_one,
-    bboxes_circ,
-    bboxes_ellip,
-    bboxes_rect,
-)
 from ._utils import (
     bbox_from_extent,
     compound_annulus_path,
@@ -37,6 +31,8 @@ from ._utils import (
     require_positive_float,
     resolve_theta_pair,
 )
+from .kernels import _weights_many as _kernel_weights_many
+from .kernels import _weights_one, bboxes_circ, bboxes_ellip, bboxes_rect
 
 
 class PixelAp:
@@ -56,27 +52,45 @@ class PixelAp:
 
     Constructors accept ``validate=False`` as an expert-only path for high-N
     workflows. It assumes positions and geometry parameters are already valid,
-    skips constructor positivity/finite/order checks, and avoids copying an
-    already-2D ndarray of positions. Private rasterization option strings
-    are still validated.
+    and skips constructor positivity/finite/order checks. Coordinates are always
+    copied into owned, read-only `float64` storage, including with
+    ``validate=False``. Construct a new aperture to change its positions.
+    Private rasterization option strings are still validated.
     """
 
     _kernels = None
 
-    def __init__(self, positions, *, validate: bool = True):
+    def __init__(self, positions: ArrayLike, *, validate: bool = True) -> None:
         self._validate = bool(validate)
-        if validate:
-            self.positions, self.isscalar = normalize_positions(positions)
-        else:
-            arr = (
-                positions
-                if isinstance(positions, np.ndarray)
-                else np.asarray(positions)
-            )
-            self.positions = arr.reshape(1, 2) if arr.ndim == 1 else arr
-            self.isscalar = arr.ndim == 1
-        self._x = np.ascontiguousarray(self.positions[:, 0], dtype=np.float64)
-        self._y = np.ascontiguousarray(self.positions[:, 1], dtype=np.float64)
+        self._positions, self.isscalar = normalize_positions(
+            positions, validate=validate
+        )
+        self._x = self._positions[:, 0]
+        self._y = self._positions[:, 1]
+
+    def __getstate__(self) -> dict[str, object]:
+        """Serialize coordinates once, without their derived column views."""
+        return {
+            name: value
+            for name, value in self.__dict__.items()
+            if name not in ("_x", "_y")
+        }
+
+    def __setstate__(self, state: dict[str, object]) -> None:
+        """Restore read-only coordinate ownership after copying or unpickling."""
+        self.__dict__.update(state)
+        positions = self._positions[0] if self.isscalar else self._positions
+        PixelAp.__init__(self, positions, validate=self._validate)
+
+    @property
+    def positions(self) -> np.ndarray:
+        """Read-only `float64` centers with shape ``(N, 2)``.
+
+        Coordinates are owned by the aperture and independent of the input
+        array. Construct a new aperture to use different centers. Scalar input
+        ``(x, y)`` is stored as ``(1, 2)`` while retaining scalar result shapes.
+        """
+        return self._positions.view()
 
     @property
     def area(self) -> float:

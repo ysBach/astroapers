@@ -5,21 +5,26 @@ from __future__ import annotations
 import math
 
 import numpy as np
+from numpy.typing import ArrayLike
 
 from ._containers import BoundingBox
 
 
-def normalize_positions(positions) -> tuple[np.ndarray, bool]:
-    arr = np.asarray(positions, dtype=np.float64)
-    if arr.shape == (2,):
+def normalize_positions(
+    positions: ArrayLike, *, validate: bool = True
+) -> tuple[np.ndarray, bool]:
+    """Own read-only coordinates with contiguous x and y columns."""
+    arr = np.array(positions, dtype=np.float64, order="F", copy=True)
+    isscalar = arr.ndim == 1
+    if validate:
+        if arr.shape != (2,) and not (arr.ndim == 2 and arr.shape[1] == 2):
+            raise ValueError(
+                "positions must be a 2-tuple or an array with shape (N, 2)"
+            )
         if not np.all(np.isfinite(arr)):
             raise ValueError("positions must be finite")
-        return arr.reshape(1, 2), True
-    if arr.ndim == 2 and arr.shape[1] == 2:
-        if not np.all(np.isfinite(arr)):
-            raise ValueError("positions must be finite")
-        return np.ascontiguousarray(arr), False
-    raise ValueError("positions must be a 2-tuple or an array with shape (N, 2)")
+    arr.flags.writeable = False
+    return (arr.reshape(1, 2) if isscalar else arr), isscalar
 
 
 def compound_annulus_path(outer_path, inner_path):
