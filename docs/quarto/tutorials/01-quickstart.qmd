@@ -74,10 +74,11 @@ plt.show()
 ## Maximum Performance
 
 For fixed production code, import the raw Rust extension as `aapr`. The raw
-functions expect contiguous arrays and positional geometry arguments. They do
-not provide masks, validation, keyword arguments, or Python result shaping. For
-more usage patterns, inspect `astroapers.kernels`, which is the Python layer
-that calls `_rust` internally.
+functions expect C-contiguous arrays and positional geometry arguments. They
+enforce basic input checks, including dtype and layout requirements, but do not
+provide the high-level Python validation, masks, keyword arguments, or result
+shaping. For more usage patterns, inspect `astroapers.kernels`, which is the
+Python layer that calls `_rust` internally.
 
 ```{python}
 import astroapers._rust as aapr

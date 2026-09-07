@@ -175,7 +175,7 @@ plt.show()
 ## Maximum Performance
 
 Import the raw Rust extension as `aapr` when the coordinates and image are
-already contiguous arrays. The raw functions return plain lists/tuples, not
+already C-contiguous arrays. The raw functions return plain lists/tuples, not
 `BoundingBox` objects. For more raw-call examples, inspect `astroapers.kernels`.
 
 ```{python}

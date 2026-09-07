@@ -5,7 +5,7 @@ title: "Performance"
 The fastest user-facing interface is `astroapers._rust`, conventionally imported
 as `aapr`. It skips the Python wrapper layer: no scalar/list normalization, no
 dtype conversion, no bad-pixel masks, no `BoundingBox` objects, and no result
-shaping. Use it when your pipeline already has contiguous arrays and fixed
+shaping. Use it when your pipeline already has C-contiguous arrays and fixed
 geometry.
 
 For more examples of raw `_rust` usage, inspect `astroapers.kernels`; it is the
@@ -63,6 +63,38 @@ pd.DataFrame({
     "coverage": obj_coverage,
 })
 ```
+
+### Construction and repeated measurements
+
+Pass all centers as one `(N, 2)` array to measure them in a batch. Reuse the
+same aperture for different images when its centers and geometry stay the same.
+To move centers, construct a new aperture:
+
+```{python}
+shifted_positions = ap.positions + (0.5, 0.0)
+shifted_ap = aap.CircAp(shifted_positions, r=ap.r)
+shifted_apsum, shifted_npix = shifted_ap.apsum_exact(data)
+
+assert np.array_equal(ap.positions, positions)
+assert np.array_equal(shifted_ap.positions, shifted_positions)
+```
+
+`ap.positions` is read-only and cannot be reassigned. Editing the constructor's
+input array does not move the aperture. Construction always makes an owned
+`float64` coordinate copy, including with `validate=False`; that option skips
+validation for already valid inputs, not coordinate conversion or copying.
+
+Coordinates use one Fortran-order `(N, 2)` buffer, so x and y are contiguous
+column views without separate column copies. Constructor inputs can be lists,
+C-order arrays, Fortran-order arrays, or strided arrays; there is no need to
+convert their layout first. This coordinate storage does not change the raw
+image API: raw image, path-data, and mask functions require C-contiguous arrays.
+Public Python image APIs accept other layouts and convert them when needed.
+
+The coordinate-copy rule above applies to aperture constructors. Low-level
+Python functions such as `aap.apsum_circ_exact(..., validate=False)` pass `x`
+and `y` through without normalization; supply matching one-dimensional
+C-contiguous `float64` coordinate arrays for those calls.
 
 ## Raw Rust API for maximum throughput
 
@@ -145,9 +177,10 @@ i16_apsum, i16_npix = aapr.apsum_circ_exact_i16(data_i16, xpos, ypos, 4.0)
 type(i16_apsum), type(i16_npix), i16_apsum[:2]
 ```
 
-Coordinate arrays are still `float64`. If positions are not finite, raw Rust
-returns non-finite results according to the raw kernel behavior; the Python
-wrappers provide friendlier validation and shape handling.
+Coordinate arrays are still `float64`. Non-finite coordinate behavior depends
+on the raw function: summation may return non-finite results, while weights
+and bounding-box functions reject non-finite centers. Aperture constructors
+check coordinate finiteness by default; `validate=False` assumes finite inputs.
 
 ## Raw weights and bounding boxes
 

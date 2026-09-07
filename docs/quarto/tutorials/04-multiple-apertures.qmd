@@ -49,6 +49,14 @@ pd.DataFrame({
 
 The third source is near the image edge, so its in-frame coverage is smaller.
 
+The aperture owns a read-only copy of `positions`: later edits to this input
+array do not change `ap`, and `ap.positions` cannot be edited or reassigned.
+Reuse `ap` for other images with the same centers and radius. For shifted
+centers, construct a new aperture, for example
+`shifted_ap = aap.CircAp(ap.positions + (0.5, 0.0), r=ap.r)`.
+This ownership rule also applies with `validate=False`; see
+[construction and repeated measurements](../performance.qmd#construction-and-repeated-measurements).
+
 ```{python}
 fig, ax = plt.subplots(figsize=(5, 4))
 ax.imshow(data, origin="lower", cmap="viridis")
@@ -207,7 +215,7 @@ full_masks = [
 ## Maximum Performance
 
 For catalog arrays, import the raw Rust extension as `aapr`. Keep `x`, `y`, and
-`data` contiguous, and pass geometry as positional arguments. For more examples
+`data` C-contiguous, and pass geometry as positional arguments. For more examples
 of raw call patterns, inspect `astroapers.kernels`.
 
 ```{python}

@@ -579,12 +579,19 @@ class CircAp(PixelAp):
     positions : tuple or array-like
         Aperture center or centers as ``(x, y)`` pixel coordinates. Multiple
         centers are accepted as an ``(N, 2)`` array-like object.
+        Coordinates are copied into owned, read-only `float64` storage.
+        Editing the input does not move the aperture; construct a new
+        aperture to change centers. The `positions` attribute cannot be
+        reassigned. C-order, Fortran-order, and strided inputs are accepted.
+        Input ``(x, y)`` gives scalar sums; ``[(x, y)]`` gives length-one
+        vector sums.
     r : float
         Aperture radius in pixels.
     validate : bool, optional
         If `False`, skip input validation and assume finite, positive geometry
-        and normalized positions. This is intended for expert high-throughput
-        code paths.
+        and finite positions with shape ``(2,)`` or ``(N, 2)``. Coordinates
+        are still copied and converted to `float64`. This is intended for
+        expert high-throughput code paths.
     """
 
     _kernels = CIRC_OPS
@@ -628,6 +635,12 @@ class EllipAp(PixelAp):
     positions : tuple or array-like
         Aperture center or centers as ``(x, y)`` pixel coordinates. Multiple
         centers are accepted as an ``(N, 2)`` array-like object.
+        Coordinates are copied into owned, read-only `float64` storage.
+        Editing the input does not move the aperture; construct a new
+        aperture to change centers. The `positions` attribute cannot be
+        reassigned. C-order, Fortran-order, and strided inputs are accepted.
+        Input ``(x, y)`` gives scalar sums; ``[(x, y)]`` gives length-one
+        vector sums.
     a, b : float
         Semimajor and semiminor axis lengths in pixels.
     theta : float, optional
@@ -635,7 +648,8 @@ class EllipAp(PixelAp):
         x axis.
     validate : bool, optional
         If `False`, skip input validation and assume finite, positive geometry
-        and normalized positions.
+        and finite positions with shape ``(2,)`` or ``(N, 2)``. Coordinates
+        are still copied and converted to `float64`.
     """
 
     _kernels = ELLIP_OPS
@@ -699,6 +713,12 @@ class RectAp(PixelAp):
     positions : tuple or array-like
         Aperture center or centers as ``(x, y)`` pixel coordinates. Multiple
         centers are accepted as an ``(N, 2)`` array-like object.
+        Coordinates are copied into owned, read-only `float64` storage.
+        Editing the input does not move the aperture; construct a new
+        aperture to change centers. The `positions` attribute cannot be
+        reassigned. C-order, Fortran-order, and strided inputs are accepted.
+        Input ``(x, y)`` gives scalar sums; ``[(x, y)]`` gives length-one
+        vector sums.
     w, h : float
         Full rectangle width and height in pixels. ``w`` is measured along the
         rectangle's local x axis, and ``h`` along its local y axis. At
@@ -709,7 +729,8 @@ class RectAp(PixelAp):
         image x axis to the rectangle's local width axis.
     validate : bool, optional
         If `False`, skip input validation and assume finite, positive geometry
-        and normalized positions.
+        and finite positions with shape ``(2,)`` or ``(N, 2)``. Coordinates
+        are still copied and converted to `float64`.
     """
 
     _kernels = RECT_OPS
@@ -784,12 +805,19 @@ class CircAn(PixelAp):
     positions : tuple or array-like
         Annulus center or centers as ``(x, y)`` pixel coordinates. Multiple
         centers are accepted as an ``(N, 2)`` array-like object.
+        Coordinates are copied into owned, read-only `float64` storage.
+        Editing the input does not move the aperture; construct a new
+        aperture to change centers. The `positions` attribute cannot be
+        reassigned. C-order, Fortran-order, and strided inputs are accepted.
+        Input ``(x, y)`` gives scalar sums; ``[(x, y)]`` gives length-one
+        vector sums.
     r_in, r_out : float
         Inner and outer radii in pixels. ``r_in`` may be zero and must be
         smaller than ``r_out``.
     validate : bool, optional
         If `False`, skip input validation and assume finite geometry, ordered
-        radii, and normalized positions.
+        radii, and finite positions with shape ``(2,)`` or
+        ``(N, 2)``. Coordinates are still copied and converted to `float64`.
     """
 
     _kernels = CIRC_AN_OPS
@@ -848,6 +876,12 @@ class EllipAn(PixelAp):
     positions : tuple or array-like
         Annulus center or centers as ``(x, y)`` pixel coordinates. Multiple
         centers are accepted as an ``(N, 2)`` array-like object.
+        Coordinates are copied into owned, read-only `float64` storage.
+        Editing the input does not move the aperture; construct a new
+        aperture to change centers. The `positions` attribute cannot be
+        reassigned. C-order, Fortran-order, and strided inputs are accepted.
+        Input ``(x, y)`` gives scalar sums; ``[(x, y)]`` gives length-one
+        vector sums.
     a_in, b_in : float
         Inner ellipse semiaxes in pixels.
     a_out, b_out : float
@@ -859,7 +893,8 @@ class EllipAn(PixelAp):
         ``theta_in``.
     validate : bool, optional
         If `False`, skip input validation and assume finite, positive geometry,
-        ordered axes, and normalized positions.
+        ordered axes, and finite positions with shape ``(2,)`` or
+        ``(N, 2)``. Coordinates are still copied and converted to `float64`.
     """
 
     _kernels = ELLIP_AN_OPS
@@ -956,6 +991,12 @@ class RectAn(PixelAp):
     positions : tuple or array-like
         Annulus center or centers as ``(x, y)`` pixel coordinates. Multiple
         centers are accepted as an ``(N, 2)`` array-like object.
+        Coordinates are copied into owned, read-only `float64` storage.
+        Editing the input does not move the aperture; construct a new
+        aperture to change centers. The `positions` attribute cannot be
+        reassigned. C-order, Fortran-order, and strided inputs are accepted.
+        Input ``(x, y)`` gives scalar sums; ``[(x, y)]`` gives length-one
+        vector sums.
     w_in, h_in : float
         Inner rectangle full width and height in pixels. ``w_in`` is measured
         along the inner rectangle's local x axis, and ``h_in`` along its local
@@ -977,7 +1018,8 @@ class RectAn(PixelAp):
         axis. If `None`, it defaults to ``theta_in``.
     validate : bool, optional
         If `False`, skip input validation and assume finite, positive geometry,
-        ordered dimensions, and normalized positions.
+        ordered dimensions, and finite positions with shape ``(2,)`` or
+        ``(N, 2)``. Coordinates are still copied and converted to `float64`.
     """
 
     _kernels = RECT_AN_OPS

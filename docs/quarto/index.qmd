@@ -59,7 +59,7 @@ bbox-tight weights, and aperture summation in pixel coordinates.
 
 The object layer is usually the clearest way to express a measurement. The raw
 Rust extension, imported as `aapr`, is the expert performance layer for fixed
-workflows where source coordinates already live in contiguous arrays.
+workflows where source coordinates already live in C-contiguous arrays.
 
 ```{python}
 import numpy as np
@@ -83,6 +83,13 @@ apsum
 
 Coordinates follow the SEP/Photutils pixel convention: pixel `(x, y)` is
 centered at integer coordinates and covers `[x - 0.5, x + 0.5]`.
+
+Apertures own a read-only `float64` copy of their centers, including with
+`validate=False`. Editing the constructor input leaves the aperture unchanged;
+`ap.positions` cannot be edited or reassigned. Construct a new aperture to move
+it, for example `aap.CircAp((9.0, 8.0), r=ap.r)`. See
+[construction and repeated measurements](performance.qmd#construction-and-repeated-measurements)
+for batching and reuse guidance.
 
 
 ## Rust Crate Use
@@ -158,7 +165,7 @@ This site has these documentation sections:
 
 Geometry calculations and public aperture-sum results are `float64`. The raw
 `astroapers._rust` functions, conventionally imported as `aapr`, are the
-maximum-performance interface: they expect contiguous arrays with the dtype
+maximum-performance interface: they expect C-contiguous arrays with the dtype
 matching the function name, such as `apsum_circ_exact_sum_f32` for `float32`
 data. For additional raw-call patterns, inspect `astroapers.kernels`; it is the
 Python layer that calls `_rust` internally.

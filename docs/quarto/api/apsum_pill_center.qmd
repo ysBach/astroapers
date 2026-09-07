@@ -23,11 +23,12 @@ Return center-selected pill aperture sums for one or many aperture centers.
 ## Parameters {.doc-section .doc-section-parameters}
 
 data : array_like
-    Two-dimensional image. For maximum performance with raw contiguous arrays,
+    Two-dimensional image. For maximum performance with raw C-contiguous arrays,
     use ``import astroapers._rust as aapr`` and call the raw functions directly.
 x, y : scalar or array_like
-    Aperture center coordinates in pixel units. Inputs are converted to
-    contiguous ``float64`` arrays. Shapes must match after ``numpy.atleast_1d``.
+    Aperture center coordinates in pixel units. With `validate=True`, inputs
+    are converted to C-contiguous `float64` arrays. Shapes must match after
+    ``numpy.atleast_1d``.
     The return shape matches that broadcast-free input shape, so scalar inputs
     return one-element arrays.
 w, a, b : float
@@ -41,6 +42,11 @@ mask : array_like of bool, optional
     converted to boolean.
 return_npix : bool, optional
     If `True`, return ``(apsum, npix)``. If `False`, return only ``apsum``.
+validate : bool, optional
+    If `False`, skip Python input checks and coordinate normalization. Supply
+    valid geometry and matching one-dimensional C-contiguous `float64` arrays
+    for `x` and `y`. Unlike aperture constructors, this function does not copy
+    or convert coordinates with `validate=False`.
 
 
 

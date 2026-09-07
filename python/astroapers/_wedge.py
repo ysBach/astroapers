@@ -9,8 +9,8 @@ import numpy as np
 from ._aperture_kernel_ops import WEDGE_OPS
 from ._apertures import PixelAp
 from ._containers import BoundingBox
-from .kernels import bboxes_wedge
 from ._utils import require_even_int_at_least, require_finite_float
+from .kernels import bboxes_wedge
 
 
 class WedgeAp(PixelAp):
@@ -28,6 +28,12 @@ class WedgeAp(PixelAp):
     positions : tuple or array-like
         Aperture center or centers as ``(x, y)`` pixel coordinates. Multiple
         centers are accepted as an ``(N, 2)`` array-like object.
+        Coordinates are copied into owned, read-only `float64` storage.
+        Editing the input does not move the aperture; construct a new
+        aperture to change centers. The `positions` attribute cannot be
+        reassigned. C-order, Fortran-order, and strided inputs are accepted.
+        Input ``(x, y)`` gives scalar sums; ``[(x, y)]`` gives length-one
+        vector sums.
     r_in, r_out : float
         Inner and outer radii in pixels. ``r_out`` must be larger than
         ``r_in`` and ``r_in`` must be positive.
@@ -42,7 +48,8 @@ class WedgeAp(PixelAp):
         Even number of samples used to draw the two circular arcs.
     validate : bool, optional
         If `False`, skip input validation and assume finite, ordered geometry
-        and normalized positions.
+        and finite positions with shape ``(2,)`` or ``(N, 2)``. Coordinates
+        are still copied and converted to `float64`.
     """
 
     _kernels = WEDGE_OPS

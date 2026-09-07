@@ -9,10 +9,6 @@ import numpy as np
 from ._aperture_kernel_ops import PILL_AN_OPS, PILL_OPS
 from ._apertures import EllipAp, PixelAp, RectAp
 from ._containers import BoundingBox
-from .kernels import (
-    bboxes_pill,
-    bboxes_pill_ann,
-)
 from ._utils import (
     compound_annulus_path,
     pill_vertices,
@@ -20,6 +16,10 @@ from ._utils import (
     require_finite_float,
     require_positive_float,
     resolve_theta_pair,
+)
+from .kernels import (
+    bboxes_pill,
+    bboxes_pill_ann,
 )
 
 
@@ -36,6 +36,12 @@ class PillAp(PixelAp):
     positions : tuple or array-like
         Aperture center or centers as ``(x, y)`` pixel coordinates. Multiple
         centers are accepted as an ``(N, 2)`` array-like object.
+        Coordinates are copied into owned, read-only `float64` storage.
+        Editing the input does not move the aperture; construct a new
+        aperture to change centers. The `positions` attribute cannot be
+        reassigned. C-order, Fortran-order, and strided inputs are accepted.
+        Input ``(x, y)`` gives scalar sums; ``[(x, y)]`` gives length-one
+        vector sums.
     w : float
         Length of the central rectangle in pixels, measured along the pill
         major axis between the two cap centers.
@@ -52,7 +58,8 @@ class PillAp(PixelAp):
         creating Matplotlib patches.
     validate : bool, optional
         If `False`, skip input validation and assume finite, positive geometry
-        and normalized positions.
+        and finite positions with shape ``(2,)`` or ``(N, 2)``. Coordinates
+        are still copied and converted to `float64`.
 
     Attributes
     ----------
@@ -152,6 +159,12 @@ class PillAn(PixelAp):
     positions : tuple or array-like
         Annulus center or centers as ``(x, y)`` pixel coordinates. Multiple
         centers are accepted as an ``(N, 2)`` array-like object.
+        Coordinates are copied into owned, read-only `float64` storage.
+        Editing the input does not move the aperture; construct a new
+        aperture to change centers. The `positions` attribute cannot be
+        reassigned. C-order, Fortran-order, and strided inputs are accepted.
+        Input ``(x, y)`` gives scalar sums; ``[(x, y)]`` gives length-one
+        vector sums.
     w_in : float
         Inner central-rectangle length in pixels.
     a_in : float
@@ -176,7 +189,8 @@ class PillAn(PixelAp):
         Matplotlib patches.
     validate : bool, optional
         If `False`, skip input validation and assume finite, positive geometry,
-        ordered inner/outer dimensions, and normalized positions.
+        ordered inner/outer dimensions, and finite positions with shape ``(2,)`` or
+        ``(N, 2)``. Coordinates are still copied and converted to `float64`.
 
     Attributes
     ----------

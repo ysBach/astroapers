@@ -132,6 +132,12 @@ class PathAp(PixelAp):
     positions : tuple or array-like
         Aperture center(s) as ``(x, y)`` pixel coordinates. Multiple centers
         as ``(N, 2)`` array-like.
+        Coordinates are copied into owned, read-only `float64` storage.
+        Editing the input does not move the aperture; construct a new
+        aperture to change centers. The `positions` attribute cannot be
+        reassigned. C-order, Fortran-order, and strided inputs are accepted.
+        Input ``(x, y)`` gives scalar sums; ``[(x, y)]`` gives length-one
+        vector sums.
     segments : sequence of tuples
         Outer contour commands. Must start with ``('move', x, y)``, followed
         by any mix of ``('line', x, y)`` and
@@ -142,7 +148,9 @@ class PathAp(PixelAp):
     plot_samples : int, optional
         Even number >= 4 used to sample arcs for plotting.
     validate : bool, optional
-        If `False`, skip Python-side validation.
+        If `False`, skip constructor validation and assume valid geometry
+        and finite positions with shape ``(2,)`` or ``(N, 2)``. Coordinates
+        are still copied and converted to `float64`.
     """
 
     _kernels = PATH_OPS
