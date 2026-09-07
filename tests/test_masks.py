@@ -1,11 +1,26 @@
 from __future__ import annotations
 
+import astroapers as apers
 import numpy as np
 import pytest
+from astroapers import _containers
 from numpy.testing import assert_allclose
 
-import astroapers as apers
-from astroapers import _containers
+
+@pytest.mark.parametrize("origin", [0, 10])
+@pytest.mark.parametrize(
+    "method", ["apsum", "npix", "weighted_values", "weighted_cutout"]
+)
+def test_bbox_rejects_mismatched_mask_regardless_of_overlap(
+    origin: int, method: str
+) -> None:
+    bbox = apers.BoundingBox(origin, origin + 2, origin, origin + 2)
+    weights = np.ones((2, 2))
+    image = np.ones((3, 3))
+    argument = image.shape if method == "npix" else image
+
+    with pytest.raises(ValueError, match="mask must have the same shape as data"):
+        getattr(bbox, method)(weights, argument, mask=np.zeros((1, 1), dtype=bool))
 
 
 def _selected_coords(mask):

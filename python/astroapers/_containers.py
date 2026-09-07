@@ -184,6 +184,11 @@ class BoundingBox:
         arr = np.asarray(image)
         if validate and arr.ndim != 2:
             raise ValueError("data must be a 2-D array")
+        bad = (
+            None
+            if mask is None
+            else (validate_mask(mask, arr.shape) if validate else mask)
+        )
         dtype = _calculation_dtype(arr, w_full)
         cutout = np.full(w_full.shape, fill_value, dtype=dtype)
         overlap = self.overlap_slices(arr.shape)
@@ -192,9 +197,7 @@ class BoundingBox:
         data_slices, mask_slices = overlap
         weights = w_full[mask_slices].astype(dtype, copy=False)
         weighted = arr[data_slices].astype(dtype, copy=False) * weights
-        if mask is not None:
-            weighted = weighted.copy()
-            bad = validate_mask(mask, arr.shape) if validate else mask
+        if bad is not None:
             weighted[bad[data_slices]] = fill_value
         cutout[mask_slices] = weighted
         return cutout
@@ -228,6 +231,11 @@ class BoundingBox:
         arr = np.asarray(image)
         if validate and arr.ndim != 2:
             raise ValueError("data must be a 2-D array")
+        bad = (
+            None
+            if mask is None
+            else (validate_mask(mask, arr.shape) if validate else mask)
+        )
         dtype = _calculation_dtype(arr, w_full)
         overlap = self.overlap_slices(arr.shape)
         if overlap is None:
@@ -235,8 +243,7 @@ class BoundingBox:
         data_slices, mask_slices = overlap
         weights = w_full[mask_slices].astype(dtype, copy=False)
         valid = weights > 0.0
-        if mask is not None:
-            bad = validate_mask(mask, arr.shape) if validate else mask
+        if bad is not None:
             valid &= ~bad[data_slices]
         return arr[data_slices].astype(dtype, copy=False)[valid] * weights[valid]
 
@@ -267,12 +274,12 @@ class BoundingBox:
         """
         w_full = _validate_weights(weights, self) if validate else np.asarray(weights)
         shape = _validate_imshape(shape) if validate else shape
-        overlap = self.overlap_slices(shape)
-        if overlap is None:
-            return 0.0
         bad = (
             None if mask is None else (validate_mask(mask, shape) if validate else mask)
         )
+        overlap = self.overlap_slices(shape)
+        if overlap is None:
+            return 0.0
         data_slices, mask_slices = overlap
         weights = w_full[mask_slices]
         if bad is not None:
@@ -315,14 +322,14 @@ class BoundingBox:
         arr = np.asarray(image)
         if validate and arr.ndim != 2:
             raise ValueError("data must be a 2-D array")
-        overlap = self.overlap_slices(arr.shape)
-        if overlap is None:
-            return (0.0, 0.0) if return_npix else 0.0
         bad = (
             None
             if mask is None
             else (validate_mask(mask, arr.shape) if validate else mask)
         )
+        overlap = self.overlap_slices(arr.shape)
+        if overlap is None:
+            return (0.0, 0.0) if return_npix else 0.0
         data_slices, mask_slices = overlap
         weights = w_full[mask_slices].astype(np.float64, copy=False)
         if bad is not None:

@@ -303,11 +303,11 @@ pub(crate) fn wedge_exact_weight_at_pixel(wedge: Wedge, px: isize, py: isize) ->
     }
 
     let parts = wedge_parts(wedge);
-    let quad = polygon_rect_overlap_area(&parts.quad, xlo, xhi, ylo, yhi);
+    let quad = wedge_polygon_rect_overlap_area(&parts.quad, xlo, xhi, ylo, yhi);
     let outer_sector = sector_pixel_area(&square, wedge.r_out, parts.lower_out, wedge.dtheta_out);
     let inner_sector = sector_pixel_area(&square, wedge.r_in, parts.lower_in, wedge.dtheta_in);
-    let outer_triangle = polygon_rect_overlap_area(&parts.outer_triangle, xlo, xhi, ylo, yhi);
-    let inner_triangle = polygon_rect_overlap_area(&parts.inner_triangle, xlo, xhi, ylo, yhi);
+    let outer_triangle = wedge_polygon_rect_overlap_area(&parts.outer_triangle, xlo, xhi, ylo, yhi);
+    let inner_triangle = wedge_polygon_rect_overlap_area(&parts.inner_triangle, xlo, xhi, ylo, yhi);
     let outer_sign = wedge.dtheta_out.sin().signum();
     let inner_sign = wedge.dtheta_in.sin().signum();
 
@@ -401,10 +401,10 @@ fn annular_sector_pixel_area(
     while remaining > 1.0e-14 {
         let width = remaining.min(0.5 * PI);
         let end = start + width;
-        let poly = clip_polygon_to_angle_interval(square, start, end);
-        if poly.len() >= 3 {
-            let outer = circle_polygon_overlap_area_scaled(&poly, r_out);
-            let inner = circle_polygon_overlap_area_scaled(&poly, r_in);
+        let poly = clip_wedge_square_to_angle_interval(square, start, end);
+        if poly.len >= 3 {
+            let outer = circle_polygon_overlap_area_scaled(poly.as_slice(), r_out);
+            let inner = circle_polygon_overlap_area_scaled(poly.as_slice(), r_in);
             total += (outer - inner).max(0.0);
         }
         start = end;
@@ -421,6 +421,80 @@ fn sector_pixel_area(square: &[Point; 4], r: f64, angle0: f64, dtheta: f64) -> f
 fn polygon_rect_overlap_area(poly: &[Point], xlo: f64, xhi: f64, ylo: f64, yhi: f64) -> f64 {
     let clipped = clip_polygon_to_rect(poly, xlo, xhi, ylo, yhi);
     polygon_area(&clipped)
+}
+
+const WEDGE_CLIP_CAPACITY: usize = 8;
+
+#[derive(Clone, Copy)]
+struct WedgeClipPolygon {
+    points: [Point; WEDGE_CLIP_CAPACITY],
+    len: usize,
+}
+
+impl WedgeClipPolygon {
+    #[inline(always)]
+    fn from_vertices(vertices: &[Point]) -> Self {
+        debug_assert!(vertices.len() <= WEDGE_CLIP_CAPACITY);
+        let mut poly = Self {
+            points: [Point { x: 0.0, y: 0.0 }; WEDGE_CLIP_CAPACITY],
+            len: 0,
+        };
+        for &point in vertices {
+            poly.push(point);
+        }
+        poly
+    }
+
+    #[inline(always)]
+    fn push(&mut self, point: Point) {
+        debug_assert!(self.len < WEDGE_CLIP_CAPACITY);
+        self.points[self.len] = point;
+        self.len += 1;
+    }
+
+    #[inline(always)]
+    fn as_slice(&self) -> &[Point] {
+        &self.points[..self.len]
+    }
+}
+
+// A convex quadrilateral intersected with an axis-aligned rectangle has at most
+// eight vertices, so the wedge-only clipping path needs no heap allocation.
+fn wedge_polygon_rect_overlap_area(poly: &[Point], xlo: f64, xhi: f64, ylo: f64, yhi: f64) -> f64 {
+    let clipped =
+        clip_wedge_polygon_by_axis(&WedgeClipPolygon::from_vertices(poly), true, xlo, true);
+    let clipped = clip_wedge_polygon_by_axis(&clipped, true, xhi, false);
+    let clipped = clip_wedge_polygon_by_axis(&clipped, false, ylo, true);
+    let clipped = clip_wedge_polygon_by_axis(&clipped, false, yhi, false);
+    polygon_area(clipped.as_slice())
+}
+
+fn clip_wedge_polygon_by_axis(
+    poly: &WedgeClipPolygon,
+    use_x: bool,
+    bound: f64,
+    keep_greater: bool,
+) -> WedgeClipPolygon {
+    if poly.len == 0 {
+        return *poly;
+    }
+    let mut out = WedgeClipPolygon::from_vertices(&[]);
+    let mut prev = poly.points[poly.len - 1];
+    let mut prev_inside = axis_inside(prev, use_x, bound, keep_greater);
+    for &cur in poly.as_slice() {
+        let cur_inside = axis_inside(cur, use_x, bound, keep_greater);
+        if cur_inside {
+            if !prev_inside {
+                out.push(intersect_segment_axis(prev, cur, use_x, bound));
+            }
+            out.push(cur);
+        } else if prev_inside {
+            out.push(intersect_segment_axis(prev, cur, use_x, bound));
+        }
+        prev = cur;
+        prev_inside = cur_inside;
+    }
+    out
 }
 
 fn clip_polygon_to_rect(poly: &[Point], xlo: f64, xhi: f64, ylo: f64, yhi: f64) -> Vec<Point> {
@@ -531,6 +605,51 @@ fn clip_polygon_to_angle_interval(poly: &[Point], angle0: f64, angle1: f64) -> V
     };
     let clipped = clip_polygon_by_origin_line(poly, start, true);
     clip_polygon_by_origin_line(&clipped, end, false)
+}
+
+fn clip_wedge_square_to_angle_interval(
+    square: &[Point; 4],
+    angle0: f64,
+    angle1: f64,
+) -> WedgeClipPolygon {
+    let start = Point {
+        x: angle0.cos(),
+        y: angle0.sin(),
+    };
+    let end = Point {
+        x: angle1.cos(),
+        y: angle1.sin(),
+    };
+    let clipped =
+        clip_wedge_polygon_by_origin_line(&WedgeClipPolygon::from_vertices(square), start, true);
+    clip_wedge_polygon_by_origin_line(&clipped, end, false)
+}
+
+fn clip_wedge_polygon_by_origin_line(
+    poly: &WedgeClipPolygon,
+    dir: Point,
+    keep_left: bool,
+) -> WedgeClipPolygon {
+    if poly.len == 0 {
+        return *poly;
+    }
+    let mut out = WedgeClipPolygon::from_vertices(&[]);
+    let mut prev = poly.points[poly.len - 1];
+    let mut prev_inside = origin_line_inside(dir, prev, keep_left);
+    for &cur in poly.as_slice() {
+        let cur_inside = origin_line_inside(dir, cur, keep_left);
+        if cur_inside {
+            if !prev_inside {
+                out.push(intersect_segment_origin_line(prev, cur, dir));
+            }
+            out.push(cur);
+        } else if prev_inside {
+            out.push(intersect_segment_origin_line(prev, cur, dir));
+        }
+        prev = cur;
+        prev_inside = cur_inside;
+    }
+    out
 }
 
 fn clip_polygon_by_origin_line(poly: &[Point], dir: Point, keep_left: bool) -> Vec<Point> {
@@ -1865,5 +1984,34 @@ mod tests {
             (area - expected).abs() < 5.0e-2,
             "area={area} expected={expected}"
         );
+    }
+
+    #[test]
+    fn wedge_fixed_clippers_match_dynamic_clippers() {
+        let quad = [
+            Point { x: -2.0, y: -1.0 },
+            Point { x: 3.0, y: -0.5 },
+            Point { x: 2.0, y: 2.0 },
+            Point { x: -1.5, y: 1.5 },
+        ];
+        let fixed_area = wedge_polygon_rect_overlap_area(&quad, -0.75, 1.25, -0.5, 1.0);
+        let dynamic_area = polygon_rect_overlap_area(&quad, -0.75, 1.25, -0.5, 1.0);
+        assert!((fixed_area - dynamic_area).abs() < 1.0e-14);
+
+        let square = [
+            Point { x: -1.5, y: -0.5 },
+            Point { x: 0.5, y: -0.5 },
+            Point { x: 0.5, y: 1.5 },
+            Point { x: -1.5, y: 1.5 },
+        ];
+        for (angle0, angle1) in [(-0.7, 0.3), (0.1, 0.1 + 0.5 * PI)] {
+            let fixed = clip_wedge_square_to_angle_interval(&square, angle0, angle1);
+            let dynamic = clip_polygon_to_angle_interval(&square, angle0, angle1);
+            assert_eq!(fixed.len, dynamic.len());
+            for (fixed_point, dynamic_point) in fixed.as_slice().iter().zip(&dynamic) {
+                assert!((fixed_point.x - dynamic_point.x).abs() < 1.0e-14);
+                assert!((fixed_point.y - dynamic_point.y).abs() < 1.0e-14);
+            }
+        }
     }
 }
