@@ -1,0 +1,169 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  UV_NO_SOURCES: "true"
+
+jobs:
+  verify:
+    uses: ./.github/workflows/ci.yml
+
+  wheels:
+    needs: verify
+    name: Wheel (${{ matrix.platform.name }}, Python ${{ matrix.python.version }})
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python:
+          - {version: "3.10", abi: cp310}
+          - {version: "3.11", abi: cp311}
+          - {version: "3.12", abi: cp312}
+          - {version: "3.13", abi: cp313}
+          - {version: "3.14", abi: cp314}
+        platform:
+          - name: linux-x86_64
+            runner: ubuntu-22.04
+            target: x86_64
+            manylinux: "2014"
+            container: quay.io/pypa/manylinux2014_x86_64:latest
+          - name: linux-aarch64
+            runner: ubuntu-24.04-arm
+            target: aarch64
+            manylinux: "2014"
+            container: quay.io/pypa/manylinux2014_aarch64:latest
+          - name: macos-x86_64
+            runner: macos-15-intel
+            target: x86_64
+            manylinux: "off"
+            container: "off"
+          - name: macos-aarch64
+            runner: macos-15
+            target: aarch64
+            manylinux: "off"
+            container: "off"
+          - name: windows-x86_64
+            runner: windows-2022
+            target: x64
+            manylinux: "off"
+            container: "off"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python.version }}
+      - uses: astral-sh/setup-uv@v8.1.0
+      - name: Build CPython wheel
+        uses: PyO3/maturin-action@v1.51.0
+        with:
+          target: ${{ matrix.platform.target }}
+          manylinux: ${{ matrix.platform.manylinux }}
+          container: ${{ matrix.platform.container }}
+          args: --release --locked --out dist -i ${{ matrix.platform.manylinux == '2014' && format('/opt/python/{0}-{0}/bin/python', matrix.python.abi) || 'python' }}
+      - name: Install and test this wheel
+        shell: bash
+        env:
+          EXPECTED_VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          uv venv "$RUNNER_TEMP/wheel-venv"
+          if [ "$RUNNER_OS" = Windows ]; then
+            source "$RUNNER_TEMP/wheel-venv/Scripts/activate"
+          else
+            source "$RUNNER_TEMP/wheel-venv/bin/activate"
+          fi
+          wheels=(dist/*.whl)
+          test "${#wheels[@]}" -eq 1
+          uv pip install "${wheels[0]}" pytest matplotlib photutils sep scipy astro-ndslice
+          uv run --no-project --active python -I scripts/check_installed.py --version "$EXPECTED_VERSION"
+          uv run --no-project --active python -I -m pytest tests --import-mode=importlib -q
+      - uses: actions/upload-artifact@v6
+        with:
+          name: wheels-${{ matrix.platform.name }}-${{ matrix.python.abi }}
+          path: dist/*.whl
+          if-no-files-found: error
+
+  pypi:
+    if: github.event_name == 'push' && github.ref_type == 'tag' && github.repository == 'ysBach/astroapers'
+    needs: [verify, wheels]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/astroapers/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: wheels-*
+          path: dist
+          merge-multiple: true
+      - uses: actions/download-artifact@v7
+        with:
+          name: ci-sdist
+          path: dist
+      - uses: astral-sh/setup-uv@v8.1.0
+      - name: Publish tested artifacts to PyPI
+        run: uv publish --trusted-publishing always --check-url https://pypi.org/simple/ dist/*
+
+  crates-io:
+    if: github.event_name == 'push' && github.ref_type == 'tag' && github.repository == 'ysBach/astroapers'
+    needs: [verify, wheels]
+    runs-on: ubuntu-latest
+    environment:
+      name: crates-io
+      url: https://crates.io/crates/astroapers
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: rust-lang/crates-io-auth-action@v1.0.5
+        id: auth
+      - name: Publish the validated crate
+        run: cargo publish --locked
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+
+  github-release:
+    needs: [verify, pypi, crates-io]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: wheels-*
+          path: dist
+          merge-multiple: true
+      - uses: actions/download-artifact@v7
+        with:
+          name: ci-sdist
+          path: dist
+      - uses: actions/download-artifact@v7
+        with:
+          name: release-notes
+          path: notes
+      - name: Create GitHub release after both registries succeed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" dist/* --verify-tag --title "$TAG" --notes-file notes/release-notes.md

@@ -106,7 +106,7 @@ wheels = [
 
 [[package]]
 name = "astroapers"
-version = "0.1.2"
+version = "0.1.3"
 source = { editable = "." }
 dependencies = [
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
@@ -2899,7 +2899,7 @@ wheels = [
 
 [[package]]
 name = "reducers"
-version = "0.3.0"
+version = "0.3.2"
 source = { editable = "../reducers" }
 dependencies = [
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },

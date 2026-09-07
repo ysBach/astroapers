@@ -148,22 +148,15 @@ local single-center `CircAp` measurement was **1.66 µs → 0.75 µs** (2.2×);
 machine-specific construction timings; total photometry speedups can be smaller.
 See [construction and repeated measurements](docs/quarto/performance.qmd#construction-and-repeated-measurements).
 
-## Release Checks
+## Releases
 
-Before publishing both distributions, verify the Python package and Rust crate
-from the same source tree:
+Branch pushes and pull requests run Rust checks and test installed Python wheels
+and source distributions. A manual `release.yml` run rehearses all platform builds
+without publishing. Pushing a matching `vX.Y.Z` tag publishes the validated release
+to PyPI and crates.io, then creates its GitHub release.
 
-```bash
-cargo test --no-default-features
-cargo check --features extension-module
-cargo package --allow-dirty
-uv run pytest -q
-uv build
-```
-
-Publish the Cargo crate with `cargo publish`, then publish the Python artifacts
-from `dist/` with `uv publish` after confirming the versions match in
-`Cargo.toml` and `pyproject.toml`.
+See [RELEASING.md](RELEASING.md) for one-time trusted-publisher setup, the release
+checklist, supported wheel targets, and failure recovery.
 
 ## Conventions
 

@@ -1,0 +1,136 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_call:
+    outputs:
+      version:
+        description: Validated package version
+        value: ${{ jobs.metadata.outputs.version }}
+
+permissions:
+  contents: read
+
+env:
+  UV_NO_SOURCES: "true"
+
+jobs:
+  metadata:
+    name: Release metadata and tooling
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - uses: astral-sh/setup-uv@v8.1.0
+      - name: Validate versions and release notes
+        id: release
+        shell: bash
+        run: |
+          args=(--require-clean)
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            args+=(--tag "$GITHUB_REF_NAME" --notes-file release-notes.md)
+          fi
+          python scripts/check_release.py "${args[@]}"
+      - name: Test release tooling
+        run: |
+          uv venv "$RUNNER_TEMP/checks-venv"
+          source "$RUNNER_TEMP/checks-venv/bin/activate"
+          uv pip install pytest ruff
+          uv run --no-project --active ruff check --config .github/ruff.toml scripts .github/tests
+          uv run --no-project --active ruff format --check --config .github/ruff.toml scripts .github/tests
+          uv run --no-project --active pytest .github/tests -q
+      - uses: actions/upload-artifact@v6
+        if: github.ref_type == 'tag'
+        with:
+          name: release-notes
+          path: release-notes.md
+          if-no-files-found: error
+
+  rust:
+    name: Rust crate and bindings
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Test standalone Rust crate
+        run: cargo test --locked --no-default-features
+      - name: Check Python extension feature
+        run: cargo check --locked --no-default-features --features extension-module
+      - name: Verify Rust-only dependency graph
+        shell: bash
+        run: |
+          cargo tree --locked --no-default-features --target all --prefix none > rust-only-dependencies.txt
+          if grep -E '^(numpy|pyo3(-[^ ]+)?) v' rust-only-dependencies.txt; then
+            echo "Rust-only builds must not depend on NumPy or PyO3" >&2
+            exit 1
+          fi
+      - name: Verify crate packaging
+        run: cargo publish --dry-run --locked
+
+  artifacts:
+    name: Installed ${{ matrix.kind }} (Python ${{ matrix.python }})
+    needs: metadata
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - kind: wheel
+            python: "3.10"
+          - kind: sdist
+            python: "3.13"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: astral-sh/setup-uv@v8.1.0
+      - name: Build wheel
+        if: matrix.kind == 'wheel'
+        uses: PyO3/maturin-action@v1.51.0
+        with:
+          manylinux: "off"
+          args: --release --locked --out dist -i python${{ matrix.python }}
+      - name: Build source distribution
+        if: matrix.kind == 'sdist'
+        uses: PyO3/maturin-action@v1.51.0
+        with:
+          command: sdist
+          args: --out dist
+      - name: Install and test the artifact with published dependencies
+        env:
+          EXPECTED_VERSION: ${{ needs.metadata.outputs.version }}
+          ARTIFACT_KIND: ${{ matrix.kind }}
+        run: |
+          uv venv "$RUNNER_TEMP/artifact-venv"
+          source "$RUNNER_TEMP/artifact-venv/bin/activate"
+          if [ "$ARTIFACT_KIND" = wheel ]; then
+            artifacts=(dist/*.whl)
+          else
+            artifacts=(dist/*.tar.gz)
+          fi
+          test "${#artifacts[@]}" -eq 1
+          uv pip install --config-setting=build-args=--locked "${artifacts[0]}" pytest matplotlib photutils sep scipy astro-ndslice
+          uv run --no-project --active python -I scripts/check_installed.py --version "$EXPECTED_VERSION"
+          uv run --no-project --active python -I -m pytest tests --import-mode=importlib -q
+      - uses: actions/upload-artifact@v6
+        with:
+          name: ci-${{ matrix.kind }}
+          path: dist/*
+          if-no-files-found: error
