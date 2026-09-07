@@ -25,6 +25,7 @@ import numpy as np
 from numpy.testing import assert_allclose
 
 AAP = "aap"
+AAPV = "aapv"
 AAPR = "aapr"
 RUST = "_rust"
 
@@ -64,12 +65,12 @@ except ImportError:  # pragma: no cover - benchmark dependency check
 
 try:
     from photutils.aperture import (
-        CircularAperture,
         CircularAnnulus,
-        EllipticalAperture,
+        CircularAperture,
         EllipticalAnnulus,
-        RectangularAperture,
+        EllipticalAperture,
         RectangularAnnulus,
+        RectangularAperture,
     )
     from photutils.geometry import circular_overlap_grid, elliptical_overlap_grid
 except ImportError as exc:  # pragma: no cover - benchmark dependency check
@@ -266,6 +267,8 @@ def prepare_shape(
     groups: list[BenchmarkGroup] = []
 
     if "mask" in args.tasks and run_mask and mask_functions:
+        # The existing optimized mask path already uses validate=False objects.
+        mask_functions[AAPV] = mask_functions[AAPR]
         validate_mask_results(shape, case.n_apertures, mask_functions, args)
         groups.append(
             BenchmarkGroup(
@@ -475,6 +478,9 @@ def apsum_benchmarks(
             AAP: lambda: apers.CircAp(positions, radius).apsum_exact(
                 case.image, return_npix=False
             ),
+            AAPV: lambda: apers.CircAp(positions, radius, validate=False).apsum_exact(
+                case.image, return_npix=False
+            ),
             "photutils.geometry": lambda: grid_photometry(
                 case.image,
                 case.x,
@@ -510,6 +516,9 @@ def apsum_benchmarks(
             AAP: lambda: apers.EllipAp(positions, a, b, theta).apsum_exact(
                 case.image, return_npix=False
             ),
+            AAPV: lambda: apers.EllipAp(
+                positions, a, b, theta, validate=False
+            ).apsum_exact(case.image, return_npix=False),
             "photutils.geometry": lambda: grid_photometry(
                 case.image,
                 case.x,
@@ -546,6 +555,9 @@ def apsum_benchmarks(
             AAP: lambda: apers.RectAp(positions, w, h, theta).apsum_exact(
                 case.image, return_npix=False
             ),
+            AAPV: lambda: apers.RectAp(
+                positions, w, h, theta, validate=False
+            ).apsum_exact(case.image, return_npix=False),
             "photutils.Aperture": lambda: photutils_photometry(
                 RectangularAperture(positions, w=w, h=h, theta=theta),
                 case.image,
@@ -571,6 +583,9 @@ def apsum_benchmarks(
             AAP: lambda: apers.PillAp(positions, w, a, b, theta).apsum_exact(
                 case.image, return_npix=False
             ),
+            AAPV: lambda: apers.PillAp(
+                positions, w, a, b, theta, validate=False
+            ).apsum_exact(case.image, return_npix=False),
         }
     if shape == "circle_annulus":
         r_in, r_out = 2.0, 5.0
@@ -591,6 +606,9 @@ def apsum_benchmarks(
             AAP: lambda: apers.CircAn(positions, r_in, r_out).apsum_exact(
                 case.image, return_npix=False
             ),
+            AAPV: lambda: apers.CircAn(
+                positions, r_in, r_out, validate=False
+            ).apsum_exact(case.image, return_npix=False),
             "photutils.geometry": lambda: grid_photometry(
                 case.image,
                 case.x,
@@ -626,6 +644,9 @@ def apsum_benchmarks(
             ),
             AAP: lambda: apers.EllipAn(
                 positions, a_in, b_in, a_out, b_out, theta_in=theta
+            ).apsum_exact(case.image, return_npix=False),
+            AAPV: lambda: apers.EllipAn(
+                positions, a_in, b_in, a_out, b_out, theta_in=theta, validate=False
             ).apsum_exact(case.image, return_npix=False),
             "photutils.geometry": lambda: grid_photometry(
                 case.image,
@@ -671,6 +692,9 @@ def apsum_benchmarks(
             AAP: lambda: apers.RectAn(
                 positions, w_in, h_in, w_out, h_out, theta_in=theta
             ).apsum_exact(case.image, return_npix=False),
+            AAPV: lambda: apers.RectAn(
+                positions, w_in, h_in, w_out, h_out, theta_in=theta, validate=False
+            ).apsum_exact(case.image, return_npix=False),
             "photutils.Aperture": lambda: photutils_photometry(
                 RectangularAnnulus(
                     positions,
@@ -705,6 +729,17 @@ def apsum_benchmarks(
             ),
             AAP: lambda: apers.PillAn(
                 positions, w_in, a_in, b_in, w_out, a_out, b_out, theta_in=theta
+            ).apsum_exact(case.image, return_npix=False),
+            AAPV: lambda: apers.PillAn(
+                positions,
+                w_in,
+                a_in,
+                b_in,
+                w_out,
+                a_out,
+                b_out,
+                theta_in=theta,
+                validate=False,
             ).apsum_exact(case.image, return_npix=False),
         }
     raise ValueError(f"unsupported shape: {shape}")
@@ -1001,7 +1036,7 @@ def validate_mask_samples(
     reference_masks: object,
     args: argparse.Namespace,
 ) -> None:
-    if name != AAP:
+    if name not in {AAP, AAPV}:
         return
     if is_npix_vector(candidate_masks) or is_npix_vector(reference_masks):
         return
@@ -1137,7 +1172,7 @@ def repeat_count_for_backend(
 
 
 def adaptive_repeats(library: str, n_apertures: int, repeats: int) -> int:
-    if repeats <= 1 or library in {AAP, AAPR}:
+    if repeats <= 1 or library in {AAP, AAPV, AAPR}:
         return repeats
     if library.startswith("photutils"):
         if n_apertures >= 10_000:
@@ -1208,8 +1243,17 @@ def print_notes(args: argparse.Namespace) -> None:
         "normalization and result shaping, so it is not identical to _rust."
     )
     print(
-        "# aap: normal object API; supported unmasked apsum rows delegate to "
+        "# aap: object API with validate=True; supported unmasked apsum rows delegate to "
         "the same kernels, so ratios near 1 are ties"
+    )
+    print(
+        "# aapv: the same object construction and operation as aap, with "
+        "validate=False; coordinates are still copied. For mask rows, aapr "
+        "and aapv run the same callable."
+    )
+    print(
+        "# aap_time / aapv_time measures the full-workflow validation speedup, "
+        "including construction and the aperture operation"
     )
     print("# ratios are backend_time / aapr_time")
 
@@ -1232,12 +1276,14 @@ def print_timings_table(timings: list[Timing], args: argparse.Namespace) -> None
         f"{'dtype':<7} {'task':<6} {'shape':<{SHAPE_COLUMN_WIDTH}} {'n':>7} "
         f"{'rust_us':>9} {'aapr_us':>14} {'aapr/rust':>13} "
         f"{'aap_us':>9} {'aap/aapr':>11} "
+        f"{'aapv_us':>9} {'aapv/aapr':>11} "
         f"{'photu_opt/aapr':>17} "
         f"{'photu_Ap./aapr':>23} {'sep/aapr':>11}"
     )
     print(
         f"{'-' * 7} {'-' * 6} {'-' * SHAPE_COLUMN_WIDTH} {'-' * 7} "
         f"{'-' * 9} {'-' * 14} {'-' * 13} {'-' * 9} {'-' * 11} "
+        f"{'-' * 9} {'-' * 11} "
         f"{'-' * 17} {'-' * 23} {'-' * 11}"
     )
     keys = sorted(
@@ -1271,6 +1317,8 @@ def print_timings_table(timings: list[Timing], args: argparse.Namespace) -> None
             f"{aapr_rust_ratio:>13} "
             f"{format_us(seconds_by_library.get(AAP)):>9} "
             f"{aap_ratio:>11} "
+            f"{format_us(seconds_by_library.get(AAPV)):>9} "
+            f"{format_ratio(seconds_by_library.get(AAPV), aapr_seconds):>11} "
             f"{photu_opt_ratio:>17} "
             f"{photu_ap_ratio:>23} "
             f"{format_ratio(seconds_by_library.get('sep'), aapr_seconds):>11}"

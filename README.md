@@ -23,7 +23,7 @@ The package exposes three public layers:
 - `bboxes()`, `weights_exact()`, and `BoundingBox` methods for reusing bbox-tight
   aperture weights.
 - `import astroapers._rust as aapr` for expert users who need the raw extension functions within python and
-  are willing to supply contiguous arrays and handle raw return values. (For how-tos for `aapr`, inspect `astroapers.kernels`; it is the Python layer that calls `_rust` internally).
+  are willing to supply C-contiguous arrays and handle raw return values. (For how-tos for `aapr`, inspect `astroapers.kernels`; it is the Python layer that calls `_rust` internally).
 
 Project links:
 
@@ -95,10 +95,14 @@ apsum = aapr.apsum_circ_exact_sum(data, x, y, 3.0)
 ## Dtype caveats
 
 `astroapers` performs geometry and public aperture-sum outputs in `float64`.
-The raw `_rust` functions do not provide validation, mask handling, dtype
-conversion, or return shaping. Use contiguous arrays with the dtype-specific raw
-function (`*_f32`, `*_i32`, `*_i16`) when not using `float64`. Coordinate inputs
+The raw `_rust` functions provide only basic validation and do not perform mask
+handling, dtype conversion, or return shaping. Use C-contiguous (row-major)
+arrays with the dtype-specific raw function (`*_f32`, `*_i32`, `*_i16`) when
+not using `float64`. Coordinate inputs
 and scalar geometry parameters are expected to be `float64`-compatible.
+Raw image, path-data, and mask functions reject arrays that are not C-contiguous.
+Use `np.ascontiguousarray()` before raw calls; public Python wrappers handle
+the layout conversion automatically.
 
 Bbox-tight weights from `PixelAp.weights_exact()` are `float64`. When user-supplied
 weights are passed to `BoundingBox` methods, only `float32` and `float64` arrays
@@ -114,6 +118,35 @@ but `BoundingBox.apsum()` and `BoundingBox.npix()` always accumulate in
 `weights_center()` returns bbox-tight binary weights, while
 `sampled_values(data)` returns the raw image values selected by the positive
 center weights.
+
+## Position ownership
+
+Apertures own a read-only `float64` copy of their coordinates. Changing the
+input array after construction does not move the aperture, and editing or
+reassigning `ap.positions` raises an error. Construct a new aperture to move it:
+
+```python
+ap = aap.CircAp((10.0, 20.0), r=3.0)
+moved = aap.CircAp((12.0, 20.0), r=ap.r)
+```
+
+This also applies to `validate=False`: it skips input checks but still copies
+coordinates. The stored `(N, 2)` positions use Fortran order so the Rust kernels
+can access contiguous x and y columns without separate coordinate copies.
+Scalar input `(x, y)` retains scalar results; `[(x, y)]` retains length-one
+vector results.
+
+Constructor inputs can be lists, C-order arrays, Fortran-order arrays, or
+strided arrays; no layout conversion is needed before construction. Reuse an
+aperture across images when its centers and geometry stay the same. Pass all
+centers together as an `(N, 2)` array for batched measurements.
+
+For already valid inputs, `validate=False` can make construction roughly twice
+as fast, but the absolute cost is already measured in **microseconds**. One
+local single-center `CircAp` measurement was **1.66 µs → 0.75 µs** (2.2×);
+10,000-center cases showed 1.3–2.0× speedups depending on layout. These are
+machine-specific construction timings; total photometry speedups can be smaller.
+See [construction and repeated measurements](docs/quarto/performance.qmd#construction-and-repeated-measurements).
 
 ## Release Checks
 

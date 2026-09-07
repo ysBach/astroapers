@@ -84,6 +84,23 @@ input array does not move the aperture. Construction always makes an owned
 `float64` coordinate copy, including with `validate=False`; that option skips
 validation for already valid inputs, not coordinate conversion or copying.
 
+**Disabling validation can roughly halve construction time, but construction
+already takes microseconds in these measured cases.** In an earlier local
+`CircAp` run, a single-center constructor took **1.66 µs with validation →
+0.75 µs without it** (2.2× faster), saving about **0.9 µs per construction**.
+With 10,000 centers, the times were **9.48 → 7.28 µs** for C-order input (1.3×)
+and **6.82 → 3.33 µs** for Fortran-order input (2.0×), per constructed object
+containing all 10,000 centers.
+
+These are illustrative local medians, not universal timings: the benefit
+depends on the machine, software versions, geometry, and input size/layout.
+Total photometry speedups can be smaller because summation takes additional
+time. Keep validation enabled unless inputs are already known to be valid;
+measure the full workflow before optimizing constructor overhead.
+
+For measured `validate=True` versus `False` construction-plus-sum timings,
+compare `aap` and `aapv` in the [main benchmark table](benchmarks.qmd#aperture-sum-comparisons).
+
 Coordinates use one Fortran-order `(N, 2)` buffer, so x and y are contiguous
 column views without separate column copies. Constructor inputs can be lists,
 C-order arrays, Fortran-order arrays, or strided arrays; there is no need to

@@ -7,7 +7,6 @@ from pathlib import Path
 
 import astroapers
 
-
 API_DIR = Path(__file__).resolve().parents[1] / "api"
 RUNTIME_PREFIXES = ("apsum_", "npix_")
 
@@ -52,7 +51,7 @@ def _restore_raw_rust_links() -> None:
             "Expert API for maximum performance and raw extension return values.\n\n"
             "| | |\n"
             "| --- | --- |\n"
-            "| [Raw Rust extension](raw-rust.qmd) | Import `astroapers._rust as aapr` and call raw signatures with contiguous arrays. |\n\n"
+            "| [Raw Rust extension](raw-rust.qmd) | Import `astroapers._rust as aapr` and call raw signatures with C-contiguous arrays. |\n\n"
         )
         if "## Raw Rust extension" not in text:
             text = text.replace(

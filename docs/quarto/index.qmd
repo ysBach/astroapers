@@ -91,6 +91,12 @@ it, for example `aap.CircAp((9.0, 8.0), r=ap.r)`. See
 [construction and repeated measurements](performance.qmd#construction-and-repeated-measurements)
 for batching and reuse guidance.
 
+For already valid inputs, `validate=False` can make aperture construction
+roughly twice as fast in some cases, although construction already takes
+microseconds in local `CircAp` measurements: **1.66 µs → 0.75 µs** for a single
+center. The gain depends on the input and machine; total photometry speedups
+can be smaller. The performance guide above gives the timing context.
+
 
 ## Rust Crate Use
 

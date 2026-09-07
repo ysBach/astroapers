@@ -107,6 +107,38 @@ def test_validate_false_circular_annulus_sum_uses_raw_rust_fast_path(monkeypatch
     assert_allclose(got, expected)
 
 
+@pytest.mark.parametrize("dtype", [np.float64, np.float32, np.int32, np.int16])
+@pytest.mark.parametrize("shape", ["ellipse", "rectangle"])
+@pytest.mark.parametrize("count", [0, 1, 2])
+@pytest.mark.parametrize("validate", [True, False])
+def test_annulus_sum_only_preserves_float64_and_matches_sum_with_npix(
+    dtype: type[np.generic], shape: str, count: int, validate: bool
+) -> None:
+    data = np.arange(32 * 32, dtype=dtype).reshape(32, 32)
+    x = np.array([8.3, 16.2])[:count]
+    y = np.array([9.4, 15.1])[:count]
+    if shape == "ellipse":
+        kernel = aapk.apsum_ellip_ann_exact
+        aperture_class = apers.EllipAn
+    else:
+        kernel = aapk.apsum_rect_ann_exact
+        aperture_class = apers.RectAn
+    params = (1.2, 0.8, 3.4, 2.5)
+
+    expected, _ = kernel(data, x, y, *params, theta_in=0.3)
+    got = kernel(
+        data, x, y, *params, theta_in=0.3, return_npix=False, validate=validate
+    )
+    aperture = aperture_class(
+        np.column_stack((x, y)), *params, theta_in=0.3, validate=validate
+    )
+
+    assert got.shape == (count,)
+    assert got.dtype == np.float64
+    assert_allclose(got, expected)
+    assert_allclose(aperture.apsum_exact(data, return_npix=False), expected)
+
+
 @pytest.mark.parametrize(
     ("wrapper", "rust_func", "pars"),
     [

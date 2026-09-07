@@ -2,9 +2,12 @@
 title: "Benchmarks"
 ---
 
-This page records a small reproducible aperture-sum benchmark. Timings are
-machine-specific; see [Performance](performance.qmd) for API-selection and
-parallel-threshold guidance.
+This page compares aperture-sum performance, including the effect of
+`validate=False` in the object API. Times and speedup ratios depend on the
+machine, input layout, and software versions. See [Performance](performance.qmd)
+for API-selection and reuse guidance.
+
+## Aperture-sum comparisons {#aperture-sum-comparisons}
 
 The repository benchmark script validates numerical agreement before it prints
 timings. This page runs the same script with `--repeats 5` and shows a focused
@@ -13,12 +16,33 @@ pills at 1, 100, and 10,000 positions.
 
 The benchmark labels are:
 
-- `aap`: the normal object API;
-- `aapr`: the optimized `astroapers` path for that row, usually a direct
-  Rust-backed kernel;
-- `pg`: `photutils.geometry`, low-level Photutils overlap kernels where available;
-- `pa`: `photutils.Aperture`, Photutils aperture objects;
-- `sep`: SEP aperture sums where available.
+| Label | Timed operation |
+| --- | --- |
+| `aap` | Construct an aperture with `validate=True`, then sum the image. |
+| `aapv` | The same construction and sum with `validate=False`. |
+| `aapr` | Optimized Python kernel path with `validate=False`. |
+| `pg` | `photutils.geometry` overlap kernels where available. |
+| `pa` | Photutils aperture construction and photometry. |
+| `sep` | SEP aperture sums where available. |
+
+**Compare `aap/aapr` with `aapv/aapr` to measure the effect of validation.**
+Their quotient is `aap_time / aapv_time`: values `1.8x` and `1.2x`, for example,
+mean the object workflow is `1.5x` faster with validation disabled. These are
+construction-plus-sum timings; they do not measure constructor overhead alone.
+
+For scale, earlier local `CircAp` constructor measurements showed **roughly
+2× faster construction** for a single center: **1.66 µs → 0.75 µs**, a saving
+of about **0.9 µs**. A 10,000-center C-order case improved by only 1.3×.
+Construction was already measured in microseconds, so the full-workflow ratios
+below need not approach 2×. These illustrative timings are machine- and
+input-dependent; see [construction timing context](performance.qmd#construction-and-repeated-measurements).
+
+Both object paths receive the same prebuilt C-order `(N, 2)` coordinates and
+image, construct a fresh aperture, and call `apsum_exact(return_npix=False)`.
+Both still copy coordinates into owned `float64` storage. `validate=False`
+skips applicable checks in construction and the subsequent operation; use it
+only when inputs are already valid. Numerical agreement is checked before
+timing. A ratio close to `1x` can reflect timing noise or little validation cost.
 
 ```{python}
 from io import StringIO
@@ -93,11 +117,11 @@ benchmark_summary = (
     .reset_index()
 )
 
-for column in ["aapr", "aap", "pg", "pa", "sep"]:
+for column in ["aapr", "aap", "aapv", "pg", "pa", "sep"]:
     if column in benchmark_summary:
         benchmark_summary[f"{column}_us"] = benchmark_summary[column] * 1.0e6
 
-for column in ["aap", "pg", "pa", "sep"]:
+for column in ["aap", "aapv", "pg", "pa", "sep"]:
     if column in benchmark_summary:
         benchmark_summary[f"{column}/aapr"] = (
             benchmark_summary[column] / benchmark_summary["aapr"]
@@ -108,6 +132,7 @@ display_columns = [
     "n_apertures",
     "aapr_us",
     "aap/aapr",
+    "aapv/aapr",
     "pg/aapr",
     "pa/aapr",
     "sep/aapr",
@@ -126,8 +151,8 @@ for column in benchmark_table.columns:
 benchmark_table
 ```
 
-The exact numbers are hardware-dependent, but the ratios are the useful part:
-values larger than `1x` mean that backend was slower than `aapr`. The script
+Times and ratios are hardware-dependent. In the table, values larger than
+`1x` mean that backend was slower than `aapr`. The script
 interleaves timing order, validates results before reporting times, and drops
 one fastest and one slowest sample when at least three samples are available.
 For very large Photutils rows the script may reduce the effective Photutils
