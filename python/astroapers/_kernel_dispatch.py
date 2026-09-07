@@ -225,7 +225,7 @@ def _npix_from_weights(
 
 def _subtract_apsum(outer, inner, *, return_npix: bool):
     if not return_npix:
-        return outer - inner
+        return np.subtract(outer, inner)
     outer_sum, outer_npix = outer
     inner_sum, inner_npix = inner
     return outer_sum - inner_sum, outer_npix - inner_npix
