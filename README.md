@@ -152,8 +152,9 @@ See [construction and repeated measurements](docs/quarto/performance.qmd#constru
 
 Branch pushes and pull requests run Rust checks and test installed Python wheels
 and source distributions. A manual `release.yml` run rehearses all platform builds
-without publishing. Pushing a matching `vX.Y.Z` tag publishes the validated release
-to PyPI and crates.io, then creates its GitHub release.
+without publishing. Pushing a matching `vX.Y.Z` tag in `ysBach/astroapers` publishes
+the validated release to PyPI and crates.io, then creates its GitHub release.
+Tag pushes in forks build and test without publishing.
 
 See [RELEASING.md](RELEASING.md) for one-time trusted-publisher setup, the release
 checklist, supported wheel targets, and failure recovery.

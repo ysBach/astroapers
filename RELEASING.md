@@ -1,19 +1,18 @@
 # Releasing astroapers
 
 **Rehearse manually, then push the matching `vX.Y.Z` tag to publish.**
-The tag must point to the exact commit that passed the rehearsal.
+Publication runs only in the canonical `ysBach/astroapers` repository; forks
+build and test without publishing. The tag must point to the exact commit that
+passed the rehearsal.
 
 | Event | Build and test | Publish |
 | --- | --- | --- |
 | Branch push or pull request | Rust + installed wheel/sdist CI | Never |
 | Manual `release.yml`, including on a tag | CI + full wheel matrix | Never |
-| Matching `vX.Y.Z` tag push | CI + full wheel matrix | PyPI, crates.io, then GitHub |
+| Matching `vX.Y.Z` tag push | CI + full wheel matrix | PyPI and crates.io in parallel, then GitHub |
 
-This convention combines `imcombiners`' tag-triggered publishing, `reducers`'
-early validation and reusable CI, and `pqfilt`'s installed-artifact checks.
-`astroimred` uses the same release rules for PyPI; `astroapers` also publishes a
-Rust crate. Cargo packages the validated commit again when publishing; the Python
-jobs upload the exact wheel and sdist files that passed their checks.
+Cargo packages the validated commit again when publishing. The Python jobs
+upload the exact wheel and sdist files that passed their checks.
 
 ## One-time setup
 
@@ -58,12 +57,23 @@ jobs upload the exact wheel and sdist files that passed their checks.
    uv run --no-sync python scripts/check_release.py --tag vX.Y.Z
    ```
 
+   If using the already configured shared environment instead, activate it and
+   use `uv run --active --no-sync --frozen` for these release-checker commands:
+
+   ```sh
+   source ~/.venvs/ysbpy/bin/activate
+   uv run --active --no-sync --frozen python scripts/check_release.py --tag vX.Y.Z
+   ```
+
    The `../reducers` uv override is for local development. CI sets
    `UV_NO_SOURCES=true` and installs distribution artifacts with registry
    dependencies. Do not replace the development lock with a release-only lock,
    and never run project synchronization against `~/.venvs/ysbpy`.
 2. Review and commit the intended files, including new files. Push the commit
    and run a rehearsal:
+
+   The clean-checkout check includes untracked files. Keep local session notes
+   such as `.handoff/` outside the checkout or stash them before continuing.
 
    ```sh
    uv run --no-sync python scripts/check_release.py --require-clean

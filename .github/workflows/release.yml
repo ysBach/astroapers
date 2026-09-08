@@ -80,7 +80,7 @@ jobs:
         run: |
           uv venv "$RUNNER_TEMP/wheel-venv"
           if [ "$RUNNER_OS" = Windows ]; then
-            source "$RUNNER_TEMP/wheel-venv/Scripts/activate"
+            source "$(cygpath -u "$RUNNER_TEMP")/wheel-venv/Scripts/activate"
           else
             source "$RUNNER_TEMP/wheel-venv/bin/activate"
           fi
