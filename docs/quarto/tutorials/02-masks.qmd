@@ -104,7 +104,7 @@ plt.show()
 ```
 
 The threshold is part of your data-quality rule, not part of aperture
-aperture summation. A cosmic-ray mask, saturation mask, or detector-footprint mask may
+summation. A cosmic-ray mask, saturation mask, or detector-footprint mask may
 choose different thresholds.
 
 ## Values and cutouts

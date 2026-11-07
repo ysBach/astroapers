@@ -31,11 +31,13 @@ website:
           - href: tutorials/05-custom-masks.qmd
             text: Custom weights and composition
           - href: tutorials/06-mixed-annulus-shapes.qmd
-            text: Mixed inner and outer annulus shapes
+            text: Different inner and outer annulus shapes
           - href: tutorials/07-wedge-comet-jet.qmd
-            text: Wedge aperture sums for comet jets
+            text: Wedge aperture sums for jet structures
           - href: tutorials/08-pathap-custom-shapes.qmd
             text: PathAp custom line and arc apertures
+          - href: tutorials/09-isophote-fitting.qmd
+            text: "Isophote fitting: ELLIPSE analysis"
       - href: performance.qmd
         text: Performance
       - href: benchmarks.qmd

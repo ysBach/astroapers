@@ -1,5 +1,5 @@
 ---
-title: "Wedge aperture sums for comet jets"
+title: "Wedge aperture sums for jet structures"
 ---
 
 This tutorial builds a synthetic comet-like image with three components:

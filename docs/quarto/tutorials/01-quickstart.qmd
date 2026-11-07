@@ -3,7 +3,7 @@ title: "Quickstart aperture sums"
 ---
 
 This notebook measures a synthetic source with exact circular aperture
-aperture summation. The point is to show the shortest useful workflow: create an
+summation. The point is to show the shortest useful workflow: create an
 aperture, call `apsum_exact()`, and interpret the returned flux and effective
 pixel area.
 
