@@ -18,7 +18,7 @@ center. Angles are radians counterclockwise from the positive x axis.
 
 ## Parameters {.doc-section .doc-section-parameters}
 
-<code>[**positions**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple or array - like]{.parameter-annotation}</code>
+<code>[**positions**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple or array-like]{.parameter-annotation}</code>
 
 :   Aperture center(s) as ``(x, y)`` pixel coordinates. Multiple centers as ``(N, 2)`` array-like. Coordinates are copied into owned, read-only `float64` storage. Editing the input does not move the aperture; construct a new aperture to change centers. The `positions` attribute cannot be reassigned. C-order, Fortran-order, and strided inputs are accepted. Input ``(x, y)`` gives scalar sums; ``[(x, y)]`` gives length-one vector sums.
 
@@ -26,14 +26,14 @@ center. Angles are radians counterclockwise from the positive x axis.
 
 :   Outer contour commands. Must start with ``('move', x, y)``, followed by any mix of ``('line', x, y)`` and ``('arc', cx, cy, r, theta0, dtheta)``, and end with ``('close',)``. These are the only supported geometry commands.
 
-<code>[**holes**]{.parameter-name} [:]{.parameter-annotation-sep} [sequence of sequences]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
+<code>[**holes**]{.parameter-name} [:]{.parameter-annotation-sep} [sequence of sequences]{.parameter-annotation}[, default =]{.parameter-default-sep} [None]{.parameter-default}</code>
 
 :   Zero or more hole contours, each using the same command language.
 
-<code>[**plot_samples**]{.parameter-name} [:]{.parameter-annotation-sep} [int]{.parameter-annotation} [ = ]{.parameter-default-sep} [96]{.parameter-default}</code>
+<code>[**plot_samples**]{.parameter-name} [:]{.parameter-annotation-sep} [int]{.parameter-annotation}[, default =]{.parameter-default-sep} [96]{.parameter-default}</code>
 
 :   Even number >= 4 used to sample arcs for plotting.
 
-<code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
+<code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation}[, default =]{.parameter-default-sep} [True]{.parameter-default}</code>
 
 :   If `False`, skip constructor validation and assume valid geometry and finite positions with shape ``(2,)`` or ``(N, 2)``. Coordinates are still copied and converted to `float64`.

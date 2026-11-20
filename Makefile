@@ -18,7 +18,7 @@ docs-rust-copy:  ## Copy rustdoc output into the rendered Quarto site.
 	mkdir -p "$(DOCS_RUSTDOC_SITE)"
 	cp -R target/doc/. "$(DOCS_RUSTDOC_SITE)"
 
-docs-tutorials:  ## Render tutorial qmd notebooks only, leaving generated API sources alone.
+docs-tutorials: docs-api  ## Generate the API inventory and render tutorial notebooks.
 	cd $(DOCS_DIR) && $(DOCS_ENV) quarto render --profile tutorials --no-clean
 
 docs-render:  ## Render the whole Quarto website from existing qmd files.

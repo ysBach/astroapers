@@ -1,6 +1,17 @@
+filters:
+  - _filters/api-links.lua
+
+api-links:
+  aliases:
+    aap: astroapers
+    aapr: astroapers._rust
+  reexports:
+    CircAp.apsum_exact: astroapers._apertures.PixelAp.apsum_exact
+
 project:
   type: website
   output-dir: _site
+  post-render: _scripts/link_api.py
 
 metadata-files:
   - api/_sidebar.yml
@@ -86,6 +97,12 @@ quartodoc:
         - PillAn
         - WedgeAp
         - PathAp
+        - kind: page
+          path: PixelAp
+          package: astroapers._apertures
+          contents:
+            - name: PixelAp
+              include_attributes: false
     - title: Bounding boxes
       desc: Raw bbox-weight operations.
       contents:
@@ -132,6 +149,7 @@ quartodoc:
         - npix_wedge_exact
         - npix_wedge_center
         - bboxes_path
+        - farthest_mask_pixel
     - title: Parallel threshold utilities
       desc: Helpers for configuring when the Rust kernels switch to Rayon.
       contents:
@@ -140,6 +158,6 @@ quartodoc:
         - get_parallel_threshold
         - set_parallel_threshold
   renderer:
-    style: markdown
+    style: _renderer.py
     display_name: short
     table_style: description-list

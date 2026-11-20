@@ -18,7 +18,7 @@ Elliptical annulus in pixel coordinates.
 
 ## Parameters {.doc-section .doc-section-parameters}
 
-<code>[**positions**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple or array - like]{.parameter-annotation}</code>
+<code>[**positions**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple or array-like]{.parameter-annotation}</code>
 
 :   Annulus center or centers as ``(x, y)`` pixel coordinates. Multiple centers are accepted as an ``(N, 2)`` array-like object. Coordinates are copied into owned, read-only `float64` storage. Editing the input does not move the aperture; construct a new aperture to change centers. The `positions` attribute cannot be reassigned. C-order, Fortran-order, and strided inputs are accepted. Input ``(x, y)`` gives scalar sums; ``[(x, y)]`` gives length-one vector sums.
 
@@ -38,15 +38,15 @@ Elliptical annulus in pixel coordinates.
 
 :   Outer ellipse semiaxes in pixels. Each outer axis must be at least the corresponding inner axis, and at least one outer axis must be larger.
 
-<code>[**theta_in**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation} [ = ]{.parameter-default-sep} [0.0]{.parameter-default}</code>
+<code>[**theta_in**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}[, default =]{.parameter-default-sep} [0.0]{.parameter-default}</code>
 
 :   Inner and outer rotation angles in radians, measured counterclockwise from the positive x axis. If ``theta_out`` is `None`, it defaults to ``theta_in``.
 
-<code>[**theta_out**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation} [ = ]{.parameter-default-sep} [0.0]{.parameter-default}</code>
+<code>[**theta_out**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}[, default =]{.parameter-default-sep} [None]{.parameter-default}</code>
 
 :   Inner and outer rotation angles in radians, measured counterclockwise from the positive x axis. If ``theta_out`` is `None`, it defaults to ``theta_in``.
 
-<code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
+<code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation}[, default =]{.parameter-default-sep} [True]{.parameter-default}</code>
 
 :   If `False`, skip input validation and assume finite, positive geometry, ordered axes, and finite positions with shape ``(2,)`` or ``(N, 2)``. Coordinates are still copied and converted to `float64`.
 

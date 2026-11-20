@@ -16,23 +16,23 @@ bbox-tight weights, and aperture summation in pixel coordinates.
 Each concept below has a one-line summary. Click **Details** to see more.
 
 **Aperture** (class `PixelAp`): An aperture is defined by a single closed-curve geometry.\
-`ap = aap.CircAp((x, y), r)`
+`ap = aap.CircAp((x, y), r)`{api-target="astroapers.CircAp"}
 
 **Annulus** (class `PixelAp`): An annulus is a special kind of aperture, defined by two closed-curve geometries: an inner one and an outer one.\
-`an = aap.CircAn((x, y), r_in, r_out)`
+`an = aap.CircAn((x, y), r_in, r_out)`{api-target="astroapers.CircAn"}
 
 **Bounding Box** (class `BoundingBox`): The smallest rectangle that contains the aperture.\
-`bboxes = ap.bboxes()`
+`bboxes = ap.bboxes()`{api-target="astroapers._apertures.PixelAp.bboxes"}
 
 ::: {.callout-note collapse="true" appearance="minimal" icon=false title="Details"}
 * General users will not need to access this at all.
 * Defined using four `int`s: `(ixmin, ixmax, iymin, iymax)`.
 * It is a small helper to reduce calculation time and memory usage in `aap` by working only with the pixels relevant to the aperture, instead of the full image.
-* Use `bbox.to_fits_section(shape)` for DS9 or IRAF-style FITS image section (`[x1:x2,y1:y2]`, 1-indexed).
+* Use `bbox.to_fits_section(shape)`{api-target="astroapers.BoundingBox.to_fits_section"} for DS9 or IRAF-style FITS image section (`[x1:x2,y1:y2]`, 1-indexed).
 :::
 
 **Weights** (class `list[ndarray]`): One bbox-tight array per aperture position, holding the exact fraction (0 to 1) of each pixel covered by the aperture.\
-`weights = ap.weights_exact()`
+`weights = ap.weights_exact()`{api-target="astroapers._apertures.PixelAp.weights_exact"}
 
 ::: {.callout-note collapse="true" appearance="minimal" icon=false title="Details"}
 * In real usage, users **generally won't need it directly** because the aperture methods (especially `apsum`) will use them internally.
@@ -42,17 +42,17 @@ Each concept below has a one-line summary. Click **Details** to see more.
 :::
 
 **Sampled values** (class `list[ndarray]`): Raw, unweighted *image values* selected by `weights_center()`.\
-`samples = ap.sampled_values(image)`
+`samples = ap.sampled_values(image)`{api-target="astroapers._apertures.PixelAp.sampled_values"}
 
 ::: {.callout-note collapse="true" appearance="minimal" icon=false title="Details"}
-* `samples, pix = ap.sampled_values(image, return_pix=True)` also returns absolute pixel-center coordinate arrays aligned with the sampled values. For 2-D apertures, each coordinate tuple is `(yy, xx)`; subtract the aperture center to get `dy`/`dx`, and use `np.hypot(dx, dy)` for Euclidean distance.
+* `samples, pix = ap.sampled_values(image, return_pix=True)`{api-target="astroapers._apertures.PixelAp.sampled_values"} also returns absolute pixel-center coordinate arrays aligned with the sampled values. For 2-D apertures, each coordinate tuple is `(yy, xx)`; subtract the aperture center to get `dy`/`dx`, and use `np.hypot(dx, dy)` for Euclidean distance.
 * By default, it returns one 1-d array per aperture position, even for a scalar aperture.
 * Use `flat=True` for one concatenated array plus offsets (see documentation for details).
-* Expected usage: `ann.sampled_values()` for custom statistics such as median, sigma clipping, or robust background estimation.
+* Expected usage: `ann.sampled_values()`{api-target="astroapers._apertures.PixelAp.sampled_values"} for custom statistics such as median, sigma clipping, or robust background estimation.
 :::
 
 **Weighted values** (class `list[ndarray]`): Image values multiplied by `weights_exact()`, for positive-overlap pixels.\
-`weighted = ap.weighted_values(image)`
+`weighted = ap.weighted_values(image)`{api-target="astroapers._apertures.PixelAp.weighted_values"}
 
 ::: {.callout-note collapse="true" appearance="minimal" icon=false title="Details"}
 * It is not designed for end users except for deep investigation/debugging.
@@ -61,13 +61,13 @@ Each concept below has a one-line summary. Click **Details** to see more.
 :::
 
 **Aperture sum** (class `float` or 1-d array): It internally combines bbox-tight weights with the matching `BoundingBox` to calculate the sum, which is memory- and computation-efficient.\
-`apsum, npix = ap.apsum_exact(image)`
+`apsum, npix = ap.apsum_exact(image)`{api-target="astroapers._apertures.PixelAp.apsum_exact"}
 
 **Area** (class `float`): Area is the analytic geometric area of the aperture, e.g., $\pi r^2$ for a circle.\
 `area = ap.area`
 
 **Effective area** (class `float` or 1-d array): It is the sum of weights after excluding pixels outside the image and/or masked pixels. Therefore, `npix` $\le$ `ap.area`.\
-`npix = ap.npix_exact(shape, mask=...)`
+`npix = ap.npix_exact(shape, mask=...)`{api-target="astroapers._apertures.PixelAp.npix_exact"}
 
 ::: {.callout-note collapse="true" appearance="minimal" icon=false title="Details"}
 * The image `shape` is required to correctly calculate `npix` (e.g., to exclude pixels outside the image). Optionally, a `mask` can also be passed to exclude masked pixels. Users may discard objects by `badphot = npix/area < criterion` (e.g., objects near the image edge or affected by bad pixel mask, bpm).
@@ -140,8 +140,8 @@ This site has these documentation sections:
 
 1. [**Quickstart** aperture sums](tutorials/01-quickstart.qmd): create a synthetic
    image and measure circular aperture flux.
-2. [Bbox-tight **weights**](tutorials/02-masks.qmd): inspect `ap.weights_exact()`,
-   `ap.bboxes()`, `BoundingBox.to_image()`, and `BoundingBox.to_fits_section()`.
+2. [Bbox-tight **weights**](tutorials/02-masks.qmd): inspect `ap.weights_exact()`{api-target="astroapers._apertures.PixelAp.weights_exact"},
+   `ap.bboxes()`{api-target="astroapers._apertures.PixelAp.bboxes"}, `BoundingBox.to_image()`, and `BoundingBox.to_fits_section()`.
 3. [Annulus **background**](tutorials/03-background.qmd): estimate a local
    background from an annulus and subtract it from source flux.
 4. [Multiple apertures and **radial profiles**](tutorials/04-multiple-apertures.qmd):
@@ -168,7 +168,7 @@ This site has these documentation sections:
 Geometry calculations and public aperture-sum results are `float64`. The raw
 `astroapers._rust` functions, conventionally imported as `aapr`, are the
 maximum-performance interface: they expect C-contiguous arrays with the dtype
-matching the function name, such as `apsum_circ_exact_sum_f32` for `float32`
+matching the function name, such as [`apsum_circ_exact_sum_f32`](api/raw-rust.qmd#naming-rules) for `float32`
 data. For additional raw-call patterns, inspect `astroapers.kernels`; it is the
 Python layer that calls `_rust` internally.
 

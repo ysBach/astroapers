@@ -58,3 +58,8 @@ div.sourceCode pre code {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+main code a.api-symbol {
+  color: var(--bs-link-color);
+  text-decoration: underline;
+}

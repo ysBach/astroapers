@@ -1,0 +1,218 @@
+# PixelAp { #astroapers._apertures.PixelAp }
+
+```python
+_apertures.PixelAp(positions, *, validate=True)
+```
+
+Base class for pixel-coordinate apertures and annuli.
+
+Classes derived from `PixelAp` are lightweight geometry objects. The
+public method and attribute names are short but familiar for aperture
+work (`positions`, `area`, `weights_exact()`, `apsum_exact()`, `plot()`,
+and `to_patches()`), while heavy aperture summation routes through
+Rust-backed kernels.
+
+The intended performance split is:
+
+- use shape-specific `apsum_*_exact()` functions for fastest bulk aperture summation;
+- use `weights_exact()` and `bboxes()` when bbox-tight weights are useful;
+- use `BoundingBox` methods when you already have raw weights and boxes.
+
+Constructors accept ``validate=False`` as an expert-only path for high-N
+workflows. It assumes positions and geometry parameters are already valid,
+and skips constructor positivity/finite/order checks. Coordinates are always
+copied into owned, read-only `float64` storage, including with
+``validate=False``. Construct a new aperture to change its positions.
+Private rasterization option strings are still validated.
+
+## Methods
+
+| Name | Description |
+| --- | --- |
+| [apsum_center](#astroapers._apertures.PixelAp.apsum_center) | Return center-sampled aperture sums, and sampled npix by default. |
+| [apsum_exact](#astroapers._apertures.PixelAp.apsum_exact) | Return fractional-overlap aperture sums, and npix by default. |
+| [bboxes](#astroapers._apertures.PixelAp.bboxes) | Return bbox-tight bounding boxes for all aperture positions. |
+| [npix_center](#astroapers._apertures.PixelAp.npix_center) | Return in-frame center-sampled pixel counts. |
+| [npix_exact](#astroapers._apertures.PixelAp.npix_exact) | Return in-frame fractional-overlap effective pixel counts. |
+| [plot](#astroapers._apertures.PixelAp.plot) | Add aperture outlines to a Matplotlib axes and return the patches. |
+| [sampled_cutout](#astroapers._apertures.PixelAp.sampled_cutout) | Return bbox-tight center-sampled cutouts. |
+| [sampled_values](#astroapers._apertures.PixelAp.sampled_values) | Return unweighted values whose pixel centers fall in the aperture. |
+| [to_patches](#astroapers._apertures.PixelAp.to_patches) | Return Matplotlib patch objects without adding them to an axes. |
+| [weighted_cutout](#astroapers._apertures.PixelAp.weighted_cutout) | Return bbox-tight fractional-overlap weighted cutouts. |
+| [weighted_values](#astroapers._apertures.PixelAp.weighted_values) | Return fractional-overlap weighted aperture values. |
+| [weights_center](#astroapers._apertures.PixelAp.weights_center) | Return bbox-tight center-sampled binary aperture weights. |
+| [weights_exact](#astroapers._apertures.PixelAp.weights_exact) | Return bbox-tight fractional-overlap aperture weights. |
+
+### apsum_center { #astroapers._apertures.PixelAp.apsum_center }
+
+```python
+_apertures.PixelAp.apsum_center(data, mask=None, *, return_npix=True)
+```
+
+Return center-sampled aperture sums, and sampled npix by default.
+
+### apsum_exact { #astroapers._apertures.PixelAp.apsum_exact }
+
+```python
+_apertures.PixelAp.apsum_exact(data, mask=None, *, return_npix=True)
+```
+
+Return fractional-overlap aperture sums, and npix by default.
+
+### bboxes { #astroapers._apertures.PixelAp.bboxes }
+
+```python
+_apertures.PixelAp.bboxes()
+```
+
+Return bbox-tight bounding boxes for all aperture positions.
+
+The boxes are computed on demand. This method returns a list for both
+scalar and vector apertures so callers can handle both cases uniformly.
+It does not compute aperture weights; use :meth:`weights_exact` or
+:meth:`weights_center` for the corresponding bbox-tight weight
+arrays.
+
+### npix_center { #astroapers._apertures.PixelAp.npix_center }
+
+```python
+_apertures.PixelAp.npix_center(shape, *, mask=None)
+```
+
+Return in-frame center-sampled pixel counts.
+
+### npix_exact { #astroapers._apertures.PixelAp.npix_exact }
+
+```python
+_apertures.PixelAp.npix_exact(shape, *, mask=None)
+```
+
+Return in-frame fractional-overlap effective pixel counts.
+
+### plot { #astroapers._apertures.PixelAp.plot }
+
+```python
+_apertures.PixelAp.plot(ax=None, origin=(0, 0), **kwargs)
+```
+
+Add aperture outlines to a Matplotlib axes and return the patches.
+
+This convenience wrapper delegates to :meth:`to_patches`, imports
+Matplotlib lazily, and has no effect on the Rust summation kernels.
+
+### sampled_cutout { #astroapers._apertures.PixelAp.sampled_cutout }
+
+```python
+_apertures.PixelAp.sampled_cutout(
+    data,
+    mask=None,
+    fill_value=np.nan,
+    return_pix=False,
+)
+```
+
+Return bbox-tight center-sampled cutouts.
+
+Selected pixels contain unweighted data values. Masked and off-image
+pixels contain ``fill_value``. This always returns one 2-D cutout per
+aperture position. With ``return_pix=True``, also return absolute
+pixel-center coordinate arrays with the same bbox-tight shapes as the
+cutouts. For two-dimensional apertures, each coordinate tuple is
+``(yy, xx)``. Subtract the aperture center to get relative offsets, and
+use ``np.hypot(dx, dy)`` to compute Euclidean radial distance.
+
+### sampled_values { #astroapers._apertures.PixelAp.sampled_values }
+
+```python
+_apertures.PixelAp.sampled_values(
+    data,
+    *,
+    mask=None,
+    flat=False,
+    return_pix=False,
+)
+```
+
+Return unweighted values whose pixel centers fall in the aperture.
+
+This returns raw data values selected by :meth:`weights_center`, not
+the center weights themselves. Use :meth:`weights_center` when you need
+bbox-tight binary mask arrays. Pixels where ``mask`` is `True` are
+omitted. By default, this returns one 1-D array per aperture position,
+even for scalar apertures. With ``flat=True``, return
+``(flat_values, offsets)`` where aperture ``i`` maps to
+``flat_values[offsets[i]:offsets[i + 1]]``. With ``return_pix=True``,
+also return absolute pixel-center coordinate arrays aligned
+element-by-element with the returned values. For two-dimensional
+apertures, each coordinate tuple is ``(yy, xx)``. Subtract the aperture
+center to get relative offsets, and use ``np.hypot(dx, dy)`` to compute
+Euclidean radial distance.
+
+### to_patches { #astroapers._apertures.PixelAp.to_patches }
+
+```python
+_apertures.PixelAp.to_patches(origin=(0, 0), **kwargs)
+```
+
+Return Matplotlib patch objects without adding them to an axes.
+
+Returning the patch object instead of drawing directly lets callers
+customize artists before adding them to an axes.
+
+#### Parameters {.doc-section .doc-section-parameters}
+
+<code>[**origin**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple\[float, float\]]{.parameter-annotation}[, default =]{.parameter-default-sep} [(0, 0)]{.parameter-default}</code>
+
+:   Coordinate offset subtracted from aperture positions before constructing patches. This is useful when plotting on a cutout image whose pixel origin differs from the parent image.
+
+<code>[**\*\*kwargs**]{.parameter-name} [:]{.parameter-annotation-sep} []{.parameter-annotation}</code>
+
+:   Passed directly to the Matplotlib patch constructor. By default patches are outlines (`fill=False`, `facecolor="none"`) with the standard Matplotlib first-cycle edge color.
+
+#### Returns {.doc-section .doc-section-returns}
+
+<code>[]{.parameter-name} [:]{.parameter-annotation-sep} [matplotlib.patches.Patch or list\[matplotlib.patches.Patch\]]{.parameter-annotation}</code>
+
+:   A single patch for scalar-position apertures, otherwise one patch per aperture position.
+
+### weighted_cutout { #astroapers._apertures.PixelAp.weighted_cutout }
+
+```python
+_apertures.PixelAp.weighted_cutout(data, mask=None, fill_value=np.nan)
+```
+
+Return bbox-tight fractional-overlap weighted cutouts.
+
+Unmasked overlapping pixels contain ``data * fractional_weight``.
+Masked and off-image pixels contain ``fill_value``. This always
+returns one 2-D cutout per aperture position.
+
+### weighted_values { #astroapers._apertures.PixelAp.weighted_values }
+
+```python
+_apertures.PixelAp.weighted_values(data, *, mask=None, flat=False)
+```
+
+Return fractional-overlap weighted aperture values.
+
+Returned values are ``data * fractional_weight`` for positive-weight
+pixels. Pixels where ``mask`` is `True` are omitted. By default, this
+returns one 1-D array per aperture position, even for scalar apertures.
+With ``flat=True``, return ``(flat_values, offsets)`` where aperture
+``i`` maps to ``flat_values[offsets[i]:offsets[i + 1]]``.
+
+### weights_center { #astroapers._apertures.PixelAp.weights_center }
+
+```python
+_apertures.PixelAp.weights_center()
+```
+
+Return bbox-tight center-sampled binary aperture weights.
+
+### weights_exact { #astroapers._apertures.PixelAp.weights_exact }
+
+```python
+_apertures.PixelAp.weights_exact()
+```
+
+Return bbox-tight fractional-overlap aperture weights.

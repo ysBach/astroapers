@@ -57,23 +57,23 @@ Return aperture sum, and npix by default, for raw aperture weights.
 
 #### Parameters {.doc-section .doc-section-parameters}
 
-<code>[**weights**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like]{.parameter-annotation}</code>
+<code>[**weights**]{.parameter-name} [:]{.parameter-annotation-sep} [array-like]{.parameter-annotation}</code>
 
 :   Bbox-tight aperture weights with shape ``self.shape``.
 
-<code>[**image**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like]{.parameter-annotation}</code>
+<code>[**image**]{.parameter-name} [:]{.parameter-annotation-sep} [array-like]{.parameter-annotation}</code>
 
 :   Two-dimensional image to sample.
 
-<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like of bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
+<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array-like of bool]{.parameter-annotation}[, default =]{.parameter-default-sep} [None]{.parameter-default}</code>
 
 :   Boolean image mask with the same shape as ``image``. ``True`` pixels contribute zero weight.
 
-<code>[**return_npix**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
+<code>[**return_npix**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation}[, default =]{.parameter-default-sep} [True]{.parameter-default}</code>
 
 :   If `True`, return ``(apsum, npix)``. If `False`, return only ``apsum``.
 
-<code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
+<code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation}[, default =]{.parameter-default-sep} [True]{.parameter-default}</code>
 
 :   If `False`, trust that ``weights``, ``image``, and ``mask`` are already valid and aligned.
 
@@ -97,7 +97,7 @@ Return the in-frame sum of raw aperture weights for ``shape``.
 
 #### Parameters {.doc-section .doc-section-parameters}
 
-<code>[**weights**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like]{.parameter-annotation}</code>
+<code>[**weights**]{.parameter-name} [:]{.parameter-annotation-sep} [array-like]{.parameter-annotation}</code>
 
 :   Bbox-tight aperture weights with shape ``self.shape``.
 
@@ -105,11 +105,11 @@ Return the in-frame sum of raw aperture weights for ``shape``.
 
 :   Full image shape as ``(ny, nx)``. This controls image-edge clipping.
 
-<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like of bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
+<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array-like of bool]{.parameter-annotation}[, default =]{.parameter-default-sep} [None]{.parameter-default}</code>
 
 :   Boolean image mask with shape ``shape``. ``True`` pixels are excluded from the returned effective pixel count.
 
-<code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
+<code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation}[, default =]{.parameter-default-sep} [True]{.parameter-default}</code>
 
 :   If `False`, trust that ``weights``, ``shape``, and ``mask`` are already valid and aligned.
 
@@ -149,7 +149,7 @@ Return this box as a FITS image section string.
 
 #### Parameters {.doc-section .doc-section-parameters}
 
-<code>[**shape**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple\[int, int\]]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
+<code>[**shape**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple\[int, int\]]{.parameter-annotation}[, default =]{.parameter-default-sep} [None]{.parameter-default}</code>
 
 :   Full image shape as ``(ny, nx)``. If supplied, the returned section is clipped to the image overlap. If omitted, the raw bounding box must already be valid in FITS coordinates.
 
@@ -175,7 +175,7 @@ Embed bbox-tight mask weights in a full image array.
 
 #### Parameters {.doc-section .doc-section-parameters}
 
-<code>[**weights**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like]{.parameter-annotation}</code>
+<code>[**weights**]{.parameter-name} [:]{.parameter-annotation-sep} [array-like]{.parameter-annotation}</code>
 
 :   Bbox-tight aperture weights with shape ``self.shape``.
 
@@ -183,11 +183,11 @@ Embed bbox-tight mask weights in a full image array.
 
 :   Output image shape as ``(ny, nx)``.
 
-<code>[**fill_value**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation} [ = ]{.parameter-default-sep} [0.0]{.parameter-default}</code>
+<code>[**fill_value**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}[, default =]{.parameter-default-sep} [0.0]{.parameter-default}</code>
 
 :   Value assigned to pixels outside the aperture mask footprint.
 
-<code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
+<code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation}[, default =]{.parameter-default-sep} [True]{.parameter-default}</code>
 
 :   If `False`, trust that ``weights`` and ``shape`` are already valid.
 
@@ -214,23 +214,23 @@ Return a bbox-tight weighted cutout for raw aperture weights.
 
 #### Parameters {.doc-section .doc-section-parameters}
 
-<code>[**weights**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like]{.parameter-annotation}</code>
+<code>[**weights**]{.parameter-name} [:]{.parameter-annotation-sep} [array-like]{.parameter-annotation}</code>
 
 :   Bbox-tight aperture weights with shape ``self.shape``.
 
-<code>[**image**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like]{.parameter-annotation}</code>
+<code>[**image**]{.parameter-name} [:]{.parameter-annotation-sep} [array-like]{.parameter-annotation}</code>
 
 :   Two-dimensional image to sample.
 
-<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like of bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
+<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array-like of bool]{.parameter-annotation}[, default =]{.parameter-default-sep} [None]{.parameter-default}</code>
 
 :   Boolean image mask with the same shape as ``image``. ``True`` pixels are set to ``fill_value`` in the returned cutout.
 
-<code>[**fill_value**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation} [ = ]{.parameter-default-sep} [np.nan]{.parameter-default}</code>
+<code>[**fill_value**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}[, default =]{.parameter-default-sep} [np.nan]{.parameter-default}</code>
 
 :   Value used in returned cutout pixels that do not overlap ``image``.
 
-<code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
+<code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation}[, default =]{.parameter-default-sep} [True]{.parameter-default}</code>
 
 :   If `False`, trust that ``weights``, ``image``, and ``mask`` are already valid and aligned.
 
@@ -250,19 +250,19 @@ Return weighted values for positive raw aperture weights.
 
 #### Parameters {.doc-section .doc-section-parameters}
 
-<code>[**weights**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like]{.parameter-annotation}</code>
+<code>[**weights**]{.parameter-name} [:]{.parameter-annotation-sep} [array-like]{.parameter-annotation}</code>
 
 :   Bbox-tight aperture weights with shape ``self.shape``.
 
-<code>[**image**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like]{.parameter-annotation}</code>
+<code>[**image**]{.parameter-name} [:]{.parameter-annotation-sep} [array-like]{.parameter-annotation}</code>
 
 :   Two-dimensional image to sample.
 
-<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array_like of bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
+<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array-like of bool]{.parameter-annotation}[, default =]{.parameter-default-sep} [None]{.parameter-default}</code>
 
 :   Boolean image mask with the same shape as ``image``. ``True`` pixels are omitted from the returned vector.
 
-<code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
+<code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation}[, default =]{.parameter-default-sep} [True]{.parameter-default}</code>
 
 :   If `False`, trust that ``weights``, ``image``, and ``mask`` are already valid and aligned.
 

@@ -16,6 +16,7 @@ Classes for readable aperture construction, plotting, weights, and aperture sums
 | [PillAn](PillAn.qmd#astroapers.PillAn) | Capsule-like annulus with explicit inner and outer pills. |
 | [WedgeAp](WedgeAp.qmd#astroapers.WedgeAp) | Annular wedge aperture in pixel coordinates. |
 | [PathAp](PathAp.qmd#astroapers.PathAp) | Aperture defined by a closed path of line segments and circular arcs. |
+| [PixelAp](PixelAp.qmd#astroapers._apertures.PixelAp) | Base class for pixel-coordinate apertures and annuli. |
 
 ## Bounding boxes
 
@@ -25,9 +26,19 @@ Raw bbox-weight operations.
 | --- | --- |
 | [BoundingBox](BoundingBox.qmd#astroapers.BoundingBox) | Pixel-index bounding box with exclusive upper bounds. |
 
+## Raw Rust extension
+
+Expert API for maximum performance and raw extension return values.
+
+| | |
+| --- | --- |
+| [Raw Rust extension](raw-rust.qmd) | Import `astroapers._rust as aapr` and call raw signatures with C-contiguous arrays. |
+
 ## Python convenience functions
 
-Reference functions used by the object layer.
+Reference for Python functions used by the object layer. For maximum
+performance, import `astroapers._rust as aapr`; inspect `astroapers.kernels` for
+raw usage patterns.
 
 | | |
 | --- | --- |
@@ -70,6 +81,7 @@ Reference functions used by the object layer.
 | [npix_wedge_exact](npix_wedge_exact.qmd#astroapers.npix_wedge_exact) | Return exact wedge-aperture effective in-frame pixel counts. |
 | [npix_wedge_center](npix_wedge_center.qmd#astroapers.npix_wedge_center) | Return center-selected wedge-aperture effective in-frame pixel counts. |
 | [bboxes_path](bboxes_path.qmd#astroapers.bboxes_path) | Return path aperture bounding boxes for one or many centers. |
+| [farthest_mask_pixel](farthest_mask_pixel.qmd#astroapers.farthest_mask_pixel) | Return the farthest `True` mask pixel distance from ``center``. |
 
 ## Parallel threshold utilities
 

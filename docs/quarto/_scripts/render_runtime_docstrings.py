@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+import re
 from pathlib import Path
 
 import astroapers
@@ -207,9 +208,10 @@ def _signature(name: str, obj) -> str:
 def _definition_item(
     name: str, type_: str, description: str, default: str = ""
 ) -> list[str]:
+    type_ = re.sub(r"\barray_like\b", "array-like", type_.removesuffix(", optional"))
     annotation = f" [:]{{.parameter-annotation-sep}} [{type_}]{{.parameter-annotation}}"
     default_text = (
-        f" [ = ]{{.parameter-default-sep}} [{default}]{{.parameter-default}}"
+        f"[, default =]{{.parameter-default-sep}} [{default}]{{.parameter-default}}"
         if default
         else ""
     )

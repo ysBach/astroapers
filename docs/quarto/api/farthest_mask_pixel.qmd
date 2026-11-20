@@ -1,0 +1,31 @@
+# farthest_mask_pixel { #astroapers.farthest_mask_pixel }
+
+```python
+farthest_mask_pixel(mask, center, *, return_pos=False)
+```
+
+Return the farthest `True` mask pixel distance from ``center``.
+
+## Parameters {.doc-section .doc-section-parameters}
+
+<code>[**mask**]{.parameter-name} [:]{.parameter-annotation-sep} [array-like of bool]{.parameter-annotation}</code>
+
+:   N-dimensional boolean mask. `True` pixels are candidates.
+
+<code>[**center**]{.parameter-name} [:]{.parameter-annotation-sep} [sequence of float]{.parameter-annotation}</code>
+
+:   Center coordinate in NumPy index order. Its length must match ``mask.ndim``.
+
+<code>[**return_pos**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation}[, default =]{.parameter-default-sep} [False]{.parameter-default}</code>
+
+:   If `True`, also return all farthest pixel positions as a ``(n_ties, mask.ndim)`` array.
+
+## Returns {.doc-section .doc-section-returns}
+
+<code>[**radius**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}</code>
+
+:   Euclidean distance from ``center`` to the farthest `True` pixel.
+
+<code>[**positions**]{.parameter-name} [:]{.parameter-annotation-sep} [ndarray]{.parameter-annotation}</code>
+
+:   Returned only when ``return_pos=True``. A two-dimensional integer array containing every farthest coordinate in NumPy C-order.

@@ -26,7 +26,7 @@ used by wedge-photometry workflows.
 
 ## Parameters {.doc-section .doc-section-parameters}
 
-<code>[**positions**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple or array - like]{.parameter-annotation}</code>
+<code>[**positions**]{.parameter-name} [:]{.parameter-annotation-sep} [tuple or array-like]{.parameter-annotation}</code>
 
 :   Aperture center or centers as ``(x, y)`` pixel coordinates. Multiple centers are accepted as an ``(N, 2)`` array-like object. Coordinates are copied into owned, read-only `float64` storage. Editing the input does not move the aperture; construct a new aperture to change centers. The `positions` attribute cannot be reassigned. C-order, Fortran-order, and strided inputs are accepted. Input ``(x, y)`` gives scalar sums; ``[(x, y)]`` gives length-one vector sums.
 
@@ -46,19 +46,19 @@ used by wedge-photometry workflows.
 
 :   Center angle and full angular width at ``r_in``. ``dtheta_in`` must be in ``(0, 2*pi)``.
 
-<code>[**theta_out**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
+<code>[**theta_out**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}[, default =]{.parameter-default-sep} [None]{.parameter-default}</code>
 
 :   Center angle and full angular width at ``r_out``. ``dtheta_out`` must be in ``(0, 2*pi)``. Missing values default to the corresponding inner value.
 
-<code>[**dtheta_out**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation} [ = ]{.parameter-default-sep} [None]{.parameter-default}</code>
+<code>[**dtheta_out**]{.parameter-name} [:]{.parameter-annotation-sep} [float]{.parameter-annotation}[, default =]{.parameter-default-sep} [None]{.parameter-default}</code>
 
 :   Center angle and full angular width at ``r_out``. ``dtheta_out`` must be in ``(0, 2*pi)``. Missing values default to the corresponding inner value.
 
-<code>[**plot_samples**]{.parameter-name} [:]{.parameter-annotation-sep} [int]{.parameter-annotation} [ = ]{.parameter-default-sep} [96]{.parameter-default}</code>
+<code>[**plot_samples**]{.parameter-name} [:]{.parameter-annotation-sep} [int]{.parameter-annotation}[, default =]{.parameter-default-sep} [96]{.parameter-default}</code>
 
 :   Even number of samples used to draw the two circular arcs.
 
-<code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation} [ = ]{.parameter-default-sep} [True]{.parameter-default}</code>
+<code>[**validate**]{.parameter-name} [:]{.parameter-annotation-sep} [bool]{.parameter-annotation}[, default =]{.parameter-default-sep} [True]{.parameter-default}</code>
 
 :   If `False`, skip input validation and assume finite, ordered geometry and finite positions with shape ``(2,)`` or ``(N, 2)``. Coordinates are still copied and converted to `float64`.
 

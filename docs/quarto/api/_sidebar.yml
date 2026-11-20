@@ -13,10 +13,14 @@ website:
       - api/PillAn.qmd
       - api/WedgeAp.qmd
       - api/PathAp.qmd
+      - api/PixelAp.qmd
       section: Python aperture objects
     - contents:
       - api/BoundingBox.qmd
       section: Bounding boxes
+    - contents:
+      - api/raw-rust.qmd
+      section: Raw Rust extension
     - contents:
       - api/apsum_circ_exact.qmd
       - api/apsum_circ_center.qmd
@@ -57,6 +61,7 @@ website:
       - api/npix_wedge_exact.qmd
       - api/npix_wedge_center.qmd
       - api/bboxes_path.qmd
+      - api/farthest_mask_pixel.qmd
       section: Python convenience functions
     - contents:
       - api/ParallelThresholdCalibration.qmd
