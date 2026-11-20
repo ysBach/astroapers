@@ -144,7 +144,9 @@ pub(crate) fn circ_pixel_area(x0: f64, y0: f64, xx: isize, yy: isize, r: f64) ->
     circ_rect_overlap(xlo - x0, ylo - y0, xhi - x0, yhi - y0, r).clamp(0.0, 1.0)
 }
 
-// Specialized rectangle-circle overlap adapted from SEP's BSD-licensed overlap.h.
+// Rectangle-circle overlap adapted from SEP's src/overlap.h.
+// Thomas Robitaille wrote the original Cython implementation and Kyle Barbary
+// converted it to C. See licenses/SEP-overlap-BSD-3-Clause.txt.
 #[inline(always)]
 fn circ_rect_overlap(xmin: f64, ymin: f64, xmax: f64, ymax: f64, r: f64) -> f64 {
     if r <= 0.0 {

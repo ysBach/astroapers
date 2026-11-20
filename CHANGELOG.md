@@ -4,6 +4,11 @@ Release candidates also appear here. See
 
 ## Unreleased
 
+## 0.2.1 - 2026-11-20
+
+- Include the Photutils BSD-3-Clause notice for the circle–pixel overlap code
+  adapted from SEP in every wheel, the Python source archive, and the Rust crate.
+
 ## 0.2.0 - 2026-09-07
 
 ### Breaking changes

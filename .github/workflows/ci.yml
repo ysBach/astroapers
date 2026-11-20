@@ -78,7 +78,9 @@ jobs:
             exit 1
           fi
       - name: Verify crate packaging
-        run: cargo publish --dry-run --locked
+        run: |
+          cargo package --list --locked | grep -Fx 'licenses/SEP-overlap-BSD-3-Clause.txt'
+          cargo publish --dry-run --locked
 
   artifacts:
     name: Installed ${{ matrix.kind }} (Python ${{ matrix.python }})

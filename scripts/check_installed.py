@@ -6,12 +6,11 @@ import argparse
 import importlib
 import logging
 import sysconfig
-from importlib.metadata import version
+from importlib.metadata import distribution
 from pathlib import Path
 
-import numpy as np
-
 import astroapers
+import numpy as np
 
 LOGGER = logging.getLogger(__name__)
 
@@ -22,8 +21,16 @@ def main() -> None:
     parser.add_argument("--version", required=True)
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    if version("astroapers") != args.version:
+    dist = distribution("astroapers")
+    if dist.version != args.version:
         raise RuntimeError("Installed distribution version differs from the release")
+    if dist.metadata.get("License-Expression") != "BSD-3-Clause":
+        raise RuntimeError("Installed distribution must declare BSD-3-Clause")
+    root = Path(__file__).resolve().parents[1]
+    for name in ("LICENSE", "licenses/SEP-overlap-BSD-3-Clause.txt"):
+        expected = (root / name).read_text(encoding="utf-8")
+        if dist.read_text(f"licenses/{name}") != expected:
+            raise RuntimeError(f"Installed notice differs from {name}")
     site_paths = {
         Path(sysconfig.get_path(kind)).resolve() for kind in ("purelib", "platlib")
     }
