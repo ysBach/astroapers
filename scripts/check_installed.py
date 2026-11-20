@@ -9,8 +9,9 @@ import sysconfig
 from importlib.metadata import distribution
 from pathlib import Path
 
-import astroapers
 import numpy as np
+
+import astroapers
 
 LOGGER = logging.getLogger(__name__)
 
